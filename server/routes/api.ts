@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { geminiTextureService } from '../services/geminiService';
+import { generationService } from '../services/generationService';
 import { tileProcessor } from '../image/tileProcessor';
 import { seamAnalysisService } from '../services/seamAnalysisService';
 import { exportService } from '../services/exportService';
@@ -20,7 +20,8 @@ apiRouter.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'AI Tile Generator Server',
-    geminiConfigured: geminiTextureService.isConfigured(),
+    geminiConfigured: generationService.isConfigured('gemini'),
+    providerConfigured: generationService.isConfigured(),
     sharpReady: true,
     supportedMaterials: ['cobblestone', 'wood', 'water', 'grass', 'lava', 'sand'],
     supportedResolutions: [128, 256, 512, 1024],
@@ -32,7 +33,7 @@ apiRouter.get('/health', (req, res) => {
  * AI Texture Generation Endpoint
  *
  * Executes full pipeline:
- * Gemini AI Generation (Raw) → Sharp Offset-Crossfade Processor → Seam Continuity Analyzer
+ * Provider Image Generation (Raw) → Sharp Offset-Crossfade Processor → Seam Continuity Analyzer
  * Preserves both original raw image and processed tile.
  */
 apiRouter.post('/generate', async (req, res) => {
@@ -45,21 +46,25 @@ apiRouter.post('/generate', async (req, res) => {
       customPrompt,
       resolution = 512,
       processingOptions,
+      providerId,
     } = req.body;
 
     if (!material) {
       return res.status(400).json({ error: 'Material parameter is required.' });
     }
 
-    // Step 1: Call server-side Gemini texture generation service
-    const rawResult = await geminiTextureService.generateRawTexture({
-      material,
-      style,
-      detail,
-      additionalPrompt,
-      customPrompt,
-      resolution,
-    });
+    // Step 1: Call server-side provider generation service
+    const rawResult = await generationService.generate(
+      {
+        material,
+        style,
+        detail,
+        additionalPrompt,
+        customPrompt,
+        resolution,
+      },
+      providerId
+    );
 
     const tileId = `tile-${Date.now()}`;
 
@@ -95,8 +100,10 @@ apiRouter.post('/generate', async (req, res) => {
       generatedAt: new Date().toISOString(),
       processingAlgorithm: processResult.metadata.algorithm,
       processingTimeMs: processResult.metadata.processingTimeMs,
-      geminiDurationMs: rawResult.generationTimeMs,
+      generationDurationMs: rawResult.generationTimeMs,
+      geminiDurationMs: rawResult.generationTimeMs, // Backwards compatibility
       blendMarginPercent: processResult.metadata.blendMarginPercent,
+      providerMetadata: rawResult.metadata,
     };
 
     res.json({
@@ -109,7 +116,7 @@ apiRouter.post('/generate', async (req, res) => {
       generationMetadata,
       seamReport,
       processingMetadata: processResult.metadata,
-      message: 'Generated texture via Gemini and executed full seamless tile pipeline.',
+      message: 'Generated texture via ImageProvider and executed full seamless tile pipeline.',
     });
   } catch (error: any) {
     console.error('Error in /api/generate:', error);
@@ -122,20 +129,23 @@ apiRouter.post('/generate', async (req, res) => {
  */
 apiRouter.post('/generate-raw', async (req, res) => {
   try {
-    const { material, style, detail, additionalPrompt, customPrompt, resolution = 512 } = req.body;
+    const { material, style, detail, additionalPrompt, customPrompt, resolution = 512, providerId } = req.body;
 
     if (!material) {
       return res.status(400).json({ error: 'Material parameter is required.' });
     }
 
-    const rawResult = await geminiTextureService.generateRawTexture({
-      material,
-      style,
-      detail,
-      additionalPrompt,
-      customPrompt,
-      resolution,
-    });
+    const rawResult = await generationService.generate(
+      {
+        material,
+        style,
+        detail,
+        additionalPrompt,
+        customPrompt,
+        resolution,
+      },
+      providerId
+    );
 
     res.json({
       success: true,
