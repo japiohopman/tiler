@@ -4,41 +4,27 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
-import { PromptBuilder, PromptBuildOptions } from './promptBuilder';
-
-export interface GenerateTileRequest {
-  material: string;
-  style: string;
-  detail?: string;
-  additionalPrompt?: string;
-  customPrompt?: string;
-  resolution?: number;
-  seed?: number;
-}
-
-export interface RawGenerationResult {
-  imageDataUrl: string;
-  model: string;
-  builtPrompt: string;
-  requestedParams: GenerateTileRequest;
-  generationTimeMs: number;
-}
+import { PromptBuilder } from '../promptBuilder';
+import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
 
 /**
- * Server-Side Gemini Image Generation Service
- *
- * SECURITY:
- * - The GEMINI_API_KEY remains strictly server-side and is never sent to the browser.
- * - Uses lazy client initialization to prevent crash on startup if key is pending.
+ * Concrete Gemini Image Generation Provider (Temporary / Isolated)
+ * Encapsulates all Google GenAI SDK logic and GEMINI_API_KEY credential checks behind the ImageGenerationProvider contract.
  */
-export class GeminiTextureService {
+export class GeminiProvider implements ImageGenerationProvider {
+  public readonly id = 'gemini';
+  public readonly name = 'Google Gemini Provider';
+
   private ai: GoogleGenAI | null = null;
 
   private getClient(): GoogleGenAI {
     if (!this.ai) {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
-        throw new Error('GEMINI_API_KEY is not configured in server environment. Please set GEMINI_API_KEY in Settings or .env.');
+        throw new ProviderError(
+          this.id,
+          'GEMINI_API_KEY is not configured in server environment. Please set GEMINI_API_KEY in .env.'
+        );
       }
       this.ai = new GoogleGenAI({ apiKey });
     }
@@ -46,7 +32,7 @@ export class GeminiTextureService {
   }
 
   /**
-   * Checks if Gemini API credentials are validly configured in the server environment
+   * Checks if Gemini API credentials are validly configured in the environment
    */
   isConfigured(): boolean {
     const key = process.env.GEMINI_API_KEY;
@@ -54,15 +40,9 @@ export class GeminiTextureService {
   }
 
   /**
-   * Generates a raw base visual texture from the structured GenerateTileRequest.
-   *
-   * IMPORTANT:
-   * This service generates the raw AI image from Gemini.
-   * The application must NEVER assume the model actually produced a seamless tile.
-   * Every generated image must subsequently pass through the Sharp tile processor
-   * and mathematical seam analyzer.
+   * Generates a raw visual texture candidate using Gemini / Imagen API
    */
-  async generateRawTexture(request: GenerateTileRequest): Promise<RawGenerationResult> {
+  async generate(request: GenerationRequest): Promise<GeneratedImage> {
     const startTime = Date.now();
     const resolution = request.resolution || 512;
 
@@ -75,20 +55,22 @@ export class GeminiTextureService {
       resolution,
     });
 
-    const ai = this.getClient();
+    let ai: GoogleGenAI;
+    try {
+      ai = this.getClient();
+    } catch (err) {
+      throw err instanceof ProviderError ? err : new ProviderError(this.id, 'Failed to initialize Gemini client', err);
+    }
+
     let imageDataUrl = '';
     let usedModel = 'gemini-3.1-flash-image';
 
     try {
-      // Primary Attempt: gemini-3.1-flash-image with 1:1 aspect ratio and 512px size
+      // Primary Attempt: gemini-3.1-flash-image
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-flash-image',
         contents: {
-          parts: [
-            {
-              text: builtPrompt,
-            },
-          ],
+          parts: [{ text: builtPrompt }],
         },
         config: {
           imageConfig: {
@@ -113,7 +95,7 @@ export class GeminiTextureService {
         throw new Error(`Model finished without image part. Reason: ${candidate.finishReason}`);
       }
     } catch (primaryError: any) {
-      console.warn('Primary model gemini-3.1-flash-image error, attempting fallback:', primaryError?.message || primaryError);
+      console.warn('[GeminiProvider] Primary model gemini-3.1-flash-image error, attempting lite fallback:', primaryError?.message || primaryError);
 
       // Fallback 1: gemini-3.1-flash-lite-image
       try {
@@ -121,11 +103,7 @@ export class GeminiTextureService {
         const liteResponse = await ai.models.generateContent({
           model: 'gemini-3.1-flash-lite-image',
           contents: {
-            parts: [
-              {
-                text: builtPrompt,
-              },
-            ],
+            parts: [{ text: builtPrompt }],
           },
           config: {
             imageConfig: {
@@ -145,7 +123,7 @@ export class GeminiTextureService {
           }
         }
       } catch (liteError: any) {
-        console.warn('Fallback model gemini-3.1-flash-lite-image error, attempting imagen fallback:', liteError?.message || liteError);
+        console.warn('[GeminiProvider] Fallback model gemini-3.1-flash-lite-image error, attempting imagen fallback:', liteError?.message || liteError);
 
         // Fallback 2: imagen-3.0-generate-002
         try {
@@ -164,16 +142,17 @@ export class GeminiTextureService {
             imageDataUrl = `data:image/png;base64,${imgResponse.generatedImages[0].image.imageBytes}`;
           }
         } catch (imgError: any) {
-          // If all model calls fail, bubble up the clearest error
-          throw new Error(
-            `Gemini Image Generation failed: ${primaryError?.message || liteError?.message || imgError?.message || 'Unknown API error'}`
+          throw new ProviderError(
+            this.id,
+            `All Gemini image generation attempts failed: ${primaryError?.message || liteError?.message || imgError?.message || 'Unknown error'}`,
+            imgError
           );
         }
       }
     }
 
     if (!imageDataUrl) {
-      throw new Error('No image data returned from Gemini image generation service.');
+      throw new ProviderError(this.id, 'No image data was returned by Gemini generation service.');
     }
 
     const duration = Date.now() - startTime;
@@ -182,10 +161,13 @@ export class GeminiTextureService {
       imageDataUrl,
       model: usedModel,
       builtPrompt,
-      requestedParams: request,
       generationTimeMs: duration,
+      metadata: {
+        providerId: this.id,
+        fallbackChainEvaluated: usedModel !== 'gemini-3.1-flash-image',
+      },
     };
   }
 }
 
-export const geminiTextureService = new GeminiTextureService();
+export const geminiProvider = new GeminiProvider();

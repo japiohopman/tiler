@@ -196,6 +196,8 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
     }
   };
 
+  const durationMs = generationMetadata?.generationDurationMs ?? generationMetadata?.geminiDurationMs;
+
   return (
     <div className={`flex flex-col xl:flex-row gap-5 bg-slate-950 rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-2xl ${className}`}>
       {/* LEFT / TOP: Canvas & Control Viewport */}
@@ -252,7 +254,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             </button>
           </div>
 
-          {/* Texture Source Toggle (Processed Seamless vs Raw Gemini) */}
+          {/* Texture Source Toggle (Processed Seamless vs Raw AI) */}
           {rawImageDataUrl && imageDataUrl && (
             <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
               <span className="text-slate-400 font-semibold px-1.5 hidden md:inline">View:</span>
@@ -545,7 +547,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
               </div>
               <div className="bg-slate-950 p-2 rounded border border-slate-800/80">
                 <span className="text-[10px] text-slate-500 font-sans block">AI Generation</span>
-                <span className="text-slate-200">{generationMetadata.geminiDurationMs ? `${(generationMetadata.geminiDurationMs / 1000).toFixed(1)}s` : 'Real-time'}</span>
+                <span className="text-slate-200">{durationMs ? `${(durationMs / 1000).toFixed(1)}s` : 'Real-time'}</span>
               </div>
               <div className="bg-slate-950 p-2 rounded border border-slate-800/80 col-span-2">
                 <span className="text-[10px] text-slate-500 font-sans block">Pipeline Transform</span>
