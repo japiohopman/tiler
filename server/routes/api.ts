@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import '../bootstrap';
 import { Router } from 'express';
 import { generationService } from '../services/generationService';
 import { tileProcessor } from '../image/tileProcessor';
@@ -20,8 +21,8 @@ apiRouter.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'AI Tile Generator Server',
-    geminiConfigured: generationService.isConfigured('gemini'),
     providerConfigured: generationService.isConfigured(),
+    activeProvider: generationService.getDefaultProviderId(),
     sharpReady: true,
     supportedMaterials: ['cobblestone', 'wood', 'water', 'grass', 'lava', 'sand'],
     supportedResolutions: [128, 256, 512, 1024],
@@ -101,7 +102,6 @@ apiRouter.post('/generate', async (req, res) => {
       processingAlgorithm: processResult.metadata.algorithm,
       processingTimeMs: processResult.metadata.processingTimeMs,
       generationDurationMs: rawResult.generationTimeMs,
-      geminiDurationMs: rawResult.generationTimeMs, // Backwards compatibility
       blendMarginPercent: processResult.metadata.blendMarginPercent,
       providerMetadata: rawResult.metadata,
     };

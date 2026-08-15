@@ -34,6 +34,7 @@ export interface GenerateTileRequest {
   resolution?: SupportedResolution | number;
   seed?: number;
   processingOptions?: TileProcessingOptions;
+  providerId?: string;
 }
 
 export interface GenerationParams {
@@ -56,7 +57,8 @@ export interface GenerationMetadata {
   generatedAt: string;
   processingAlgorithm?: string;
   processingTimeMs?: number;
-  geminiDurationMs?: number;
+  generationDurationMs?: number;
+  geminiDurationMs?: number; // Legacy compatibility
   blendMarginPercent?: number;
 }
 
