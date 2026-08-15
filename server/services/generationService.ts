@@ -3,21 +3,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { geminiProvider } from './providers/geminiProvider';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './providers/types';
 
 /**
  * Generation Service
  * Core application service that manages ImageGenerationProviders and delegates generation requests.
- * Completely decouples routing and domain logic from specific model providers.
+ * Completely decoupled from concrete provider implementations. Providers are registered via application bootstrap.
  */
 export class GenerationService {
   private providers: Map<string, ImageGenerationProvider> = new Map();
-  private defaultProviderId = 'gemini';
+  private defaultProviderId?: string;
 
-  constructor() {
-    // Register default providers
-    this.registerProvider(geminiProvider);
+  constructor(initialProviders: ImageGenerationProvider[] = [], defaultProviderId?: string) {
+    for (const provider of initialProviders) {
+      this.registerProvider(provider);
+    }
+    if (defaultProviderId) {
+      this.defaultProviderId = defaultProviderId;
+    } else if (initialProviders.length > 0) {
+      this.defaultProviderId = initialProviders[0].id;
+    }
   }
 
   /**
@@ -25,6 +30,9 @@ export class GenerationService {
    */
   public registerProvider(provider: ImageGenerationProvider): void {
     this.providers.set(provider.id, provider);
+    if (!this.defaultProviderId) {
+      this.defaultProviderId = provider.id;
+    }
   }
 
   /**
@@ -32,6 +40,9 @@ export class GenerationService {
    */
   public getProvider(providerId?: string): ImageGenerationProvider {
     const id = providerId || this.defaultProviderId;
+    if (!id) {
+      throw new ProviderError('none', 'No image generation providers are currently registered in GenerationService.');
+    }
     const provider = this.providers.get(id);
     if (!provider) {
       throw new ProviderError(id, `Image generation provider '${id}' is not registered.`);
@@ -47,6 +58,13 @@ export class GenerationService {
       throw new ProviderError(providerId, `Cannot set default provider. '${providerId}' is not registered.`);
     }
     this.defaultProviderId = providerId;
+  }
+
+  /**
+   * Returns the ID of the current default provider, if set
+   */
+  public getDefaultProviderId(): string | undefined {
+    return this.defaultProviderId;
   }
 
   /**

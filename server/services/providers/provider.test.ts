@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { generationService } from '../generationService';
+import { GenerationService } from '../generationService';
 import { geminiProvider } from './geminiProvider';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
 
@@ -53,19 +53,26 @@ export async function runProviderTestSuite() {
     }
   }
 
-  // Test 1: GeminiProvider satisfies ImageGenerationProvider interface
-  assert(geminiProvider.id === 'gemini', 'GeminiProvider has correct id');
-  assert(typeof geminiProvider.isConfigured === 'function', 'GeminiProvider implements isConfigured');
-  assert(typeof geminiProvider.generate === 'function', 'GeminiProvider implements generate');
+  // Test 1: Isolated GenerationService instantiation with ZERO default providers
+  const isolatedService = new GenerationService();
+  let emptyErrorCaught = false;
+  try {
+    isolatedService.getProvider();
+  } catch (err) {
+    if (err instanceof ProviderError) {
+      emptyErrorCaught = true;
+    }
+  }
+  assert(emptyErrorCaught, 'Isolated GenerationService throws ProviderError when no providers registered');
 
-  // Test 2: GenerationService registers and retrieves providers
+  // Test 2: Register MockProvider into isolated GenerationService
   const mock = new MockProvider();
-  generationService.registerProvider(mock);
-  const retrieved = generationService.getProvider('mock');
-  assert(retrieved.id === 'mock', 'GenerationService registered and retrieved MockProvider');
+  isolatedService.registerProvider(mock);
+  const retrieved = isolatedService.getProvider('mock');
+  assert(retrieved.id === 'mock', 'Isolated GenerationService registered and retrieved MockProvider');
 
-  // Test 3: Generation workflow operates seamlessly through provider abstraction
-  const mockResult = await generationService.generate(
+  // Test 3: Generation workflow operates seamlessly in total isolation from Gemini
+  const mockResult = await isolatedService.generate(
     { material: 'cobblestone', style: 'stylized' },
     'mock'
   );
@@ -73,11 +80,16 @@ export async function runProviderTestSuite() {
   assert(mockResult.imageDataUrl.startsWith('data:image/png'), 'Returned valid base64 image data URL');
   assert(mockResult.generationTimeMs === 42, 'Returned valid generation duration');
 
-  // Test 4: Unconfigured provider errors are caught cleanly as ProviderError
+  // Test 4: GeminiProvider satisfies ImageGenerationProvider interface
+  assert(geminiProvider.id === 'gemini', 'GeminiProvider has correct id');
+  assert(typeof geminiProvider.isConfigured === 'function', 'GeminiProvider implements isConfigured');
+  assert(typeof geminiProvider.generate === 'function', 'GeminiProvider implements generate');
+
+  // Test 5: Unconfigured provider errors are caught cleanly as ProviderError
   mock.configured = false;
   let caughtError = false;
   try {
-    await generationService.generate({ material: 'grass', style: 'realistic' }, 'mock');
+    await isolatedService.generate({ material: 'grass', style: 'realistic' }, 'mock');
   } catch (err) {
     if (err instanceof ProviderError && err.providerId === 'mock') {
       caughtError = true;
@@ -85,10 +97,10 @@ export async function runProviderTestSuite() {
   }
   assert(caughtError, 'Unconfigured provider throws normalized ProviderError');
 
-  // Test 5: Unknown provider ID throws ProviderError
+  // Test 6: Unknown provider ID throws ProviderError
   let unknownCaught = false;
   try {
-    generationService.getProvider('non-existent-provider');
+    isolatedService.getProvider('non-existent-provider');
   } catch (err) {
     if (err instanceof ProviderError) {
       unknownCaught = true;
