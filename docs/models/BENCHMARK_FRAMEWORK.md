@@ -8,8 +8,7 @@ The purpose of the framework is to allow direct, objective comparison across dif
 - test materials
 - versioned prompts
 - output resolution requirements
-- processing pipeline (`TileProcessor`)
-- seam validation analysis (`SeamAnalysisService`)
+- raw vs processed seam measurement pipeline (`SeamAnalysisService` & `TileProcessor`)
 - scoring methodology
 
 The benchmark framework does NOT depend on any external AI provider or network connection. Offline verification is validated using `MockImageGenerationProvider`.
@@ -18,25 +17,30 @@ The benchmark framework does NOT depend on any external AI provider or network c
 
 ## Architecture & Pipeline
 
-The framework executes generated assets through Tiler's full deterministic processing pipeline:
+The benchmark evaluates two distinct seam measurements for every generated image:
 
 ```text
-Benchmark Runner
-       ↓
-ImageGenerationProvider (generate)
-       ↓
-512×512 Raw Generated Image (Data URL)
-       ↓
-TileProcessor (50% Torus Offset + Smooth Cosine Crossfade)
-       ↓
-SeamAnalysisService (RGB Boundary Delta Comparison)
-       ↓
-Metrics & Score Calculation
-       ↓
-BenchmarkRunResult (JSON & Markdown)
+               Benchmark Runner
+                      ↓
+        ImageGenerationProvider (generate)
+                      ↓
+        512×512 Raw Generated Image (Data URL)
+                      ├──→ Raw SeamAnalysis → rawTileabilityScore (Primary Metric)
+                      │
+                      └──→ TileProcessor (50% Torus Offset + Smooth Crossfade)
+                              ↓
+                           Processed Image
+                              ↓
+                           SeamAnalysis → processedTileabilityScore (Diagnostic Metric)
 ```
 
-No phase of the tile-processing or seam-analysis pipeline is bypassed during benchmark execution.
+1. **RAW PROVIDER TILEABILITY (Primary Provider Quality Metric):**
+   `SeamAnalysisService` evaluates boundary pixel deltas directly against the raw 512×512 image returned by the provider BEFORE any modification. This measures whether the AI model natively generates seamless textures.
+
+2. **PROCESSED TILEABILITY (Secondary Pipeline Diagnostic Metric):**
+   The raw image enters Tiler's local `TileProcessor` (50% torus offset + smooth cosine seam crossfade), and `SeamAnalysisService` measures the resulting processed tile. This quantifies how effectively Tiler improves texture tileability.
+
+> **IMPORTANT:** High processed tileability scores (such as MockProvider's ~99% processed score) demonstrate the effectiveness of Tiler's local tile-processing engine. They MUST NOT be interpreted as proof that a provider natively generates tileable images.
 
 ---
 
@@ -59,17 +63,17 @@ Prompts are versioned (`v1.0`) and do NOT contain vendor-specific prompt enginee
 
 Tiler adheres to the following quality weighting standard:
 
-| Category | Weight | Evaluation Method | Note |
-| :--- | :---: | :---: | :--- |
-| **Tileability** | **30%** | **Objective** | Derived from `SeamAnalysisService` RGB edge pixel deltas |
-| **Texture Quality** | **25%** | **Subjective** | Evaluated via human visual inspection (defaults to `null`) |
-| **Prompt Adherence** | **20%** | **Subjective** | Evaluated via human material fidelity inspection (defaults to `null`) |
-| **Style Consistency** | **15%** | **Subjective** | Evaluated via human set consistency inspection (defaults to `null`) |
-| **Generation Speed** | **10%** | **Objective** | Derived from end-to-end latency (generation + processing) |
+| Category | Weight | Evaluation Basis | Evaluation Method |
+| :--- | :---: | :--- | :--- |
+| **Tileability** | **30%** | **Raw Provider Image** | Derived from `SeamAnalysisService` RGB edge deltas on raw AI output |
+| **Texture Quality** | **25%** | **Raw / Processed Asset** | Subjective human visual inspection (defaults to `null`) |
+| **Prompt Adherence** | **20%** | **Raw / Processed Asset** | Subjective human material fidelity inspection (defaults to `null`) |
+| **Style Consistency** | **15%** | **Texture Set** | Subjective human game style consistency inspection (defaults to `null`) |
+| **Generation Speed** | **10%** | **Raw Model Time** | Derived strictly from `rawGenerationTimeMs` (AI model inference time) |
 
 ### Objective vs Subjective Scores
 
-Machine-measurable metrics (Tileability 30% + Speed 10%) account for a maximum **40%** evaluated objective weight.
+Machine-measurable metrics (Raw Tileability 30% + Raw Generation Speed 10%) account for a maximum **40%** evaluated objective weight.
 
 Subjective metrics (Texture Quality 25%, Prompt Adherence 20%, Style Consistency 15%) remain marked as **`null`** until evaluated by human reviewers during formal model assessment. The benchmark framework does NOT substitute fake or arbitrary placeholder numbers for subjective metrics.
 

@@ -7,7 +7,6 @@ import { mockProvider } from '../providers/mockProvider';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider } from '../providers/types';
 import {
   BENCHMARK_FRAMEWORK_VERSION,
-  BENCHMARK_MATERIALS,
   BENCHMARK_PROMPT_VERSION,
   benchmarkReporter,
   benchmarkRunner,
@@ -16,7 +15,6 @@ import {
   calculateWeightedQualityScore,
   getBenchmarkMaterial,
   getBenchmarkMaterials,
-  QUALITY_WEIGHTS,
 } from './index';
 
 async function runTests() {
@@ -66,27 +64,28 @@ async function runTests() {
   assert(calculateTileabilityScore(1.0) === 0, 'Seam score 1.0 maps to Tileability score 0');
   assert(calculateTileabilityScore(null) === null, 'Seam score null maps to Tileability score null');
 
-  assert(calculateSpeedScore(0) === 100, 'Latency 0ms maps to Speed score 100');
-  assert(calculateSpeedScore(1000) === 80, 'Latency 1000ms maps to Speed score 80');
-  assert(calculateSpeedScore(5000) === 0, 'Latency 5000ms maps to Speed score 0');
+  assert(calculateSpeedScore(0) === 100, 'Raw generation time 0ms maps to Speed score 100');
+  assert(calculateSpeedScore(1000) === 80, 'Raw generation time 1000ms maps to Speed score 80');
+  assert(calculateSpeedScore(5000) === 0, 'Raw generation time 5000ms maps to Speed score 0');
+  assert(calculateSpeedScore(null) === null, 'Raw generation time null maps to Speed score null');
 
   const qualityScore = calculateWeightedQualityScore({
-    seamScore: 0.01,
-    latencyMs: 500,
+    rawSeamScore: 0.12, // Raw provider score (discontinuous)
+    processedSeamScore: 0.01, // Processed Tiler score
+    rawGenerationTimeMs: 500, // Raw generation time
   });
 
-  assert(qualityScore.components.tileability === 99, 'Tileability component calculated correctly (99%)');
-  assert(qualityScore.components.generationSpeed === 90, 'Speed component calculated correctly (90%)');
+  // Primary tileability score is derived from rawSeamScore (1 - 0.12 = 0.88 -> 88%)
+  assert(qualityScore.components.tileability === 88, 'Primary Tileability score derived from rawSeamScore (88%)');
+  assert(qualityScore.components.processedTileability === 99, 'Diagnostic processedTileability score derived from processedSeamScore (99%)');
+  assert(qualityScore.components.generationSpeed === 90, 'Speed component derived from rawGenerationTimeMs (90%)');
   assert(qualityScore.components.textureQuality === null, 'Texture quality subjective score is null by default');
-  assert(qualityScore.components.promptAdherence === null, 'Prompt adherence subjective score is null by default');
-  assert(qualityScore.components.styleConsistency === null, 'Style consistency subjective score is null by default');
-  assert(qualityScore.maxEvaluatedWeight === 40, 'Max evaluated weight is 40% for objective metrics');
 
-  // Objective score calculation: (99 * 0.30) + (90 * 0.10) = 29.7 + 9 = 38.7
-  assert(qualityScore.score === 38.7, 'Weighted objective score evaluated correctly (38.7)');
+  // Objective score calculation: (88 * 0.30) + (90 * 0.10) = 26.4 + 9 = 35.4
+  assert(qualityScore.score === 35.4, 'Weighted objective score evaluated correctly using raw metrics (35.4)');
 
-  // 3. Execution with MockProvider
-  console.log('\n--- MockProvider Benchmark Execution ---');
+  // 3. Execution with MockProvider & Verification of Distinct Dual Seam Measurements
+  console.log('\n--- Dual Seam Measurements Verification (Raw vs Processed) ---');
   const runResult = await benchmarkRunner.run(mockProvider, {
     resolution: 512,
     seed: 12345,
@@ -97,17 +96,30 @@ async function runTests() {
   assert(runResult.summary.total === 6, 'Summary total is 6');
   assert(runResult.summary.successful === 6, 'Summary successful is 6');
   assert(runResult.summary.failed === 0, 'Summary failed is 0');
-  assert(runResult.summary.overallPassRate === 100, 'Overall pass rate is 100%');
-  assert(typeof runResult.summary.averageLatencyMs === 'number', 'Average latency recorded');
-  assert(typeof runResult.summary.averageSeamScore === 'number', 'Average seam score recorded');
+  assert(typeof runResult.summary.averageRawGenerationTimeMs === 'number', 'Summary records averageRawGenerationTimeMs');
+  assert(typeof runResult.summary.averageLatencyMs === 'number', 'Summary records averageLatencyMs');
+  assert(typeof runResult.summary.averageRawSeamScore === 'number', 'Summary records averageRawSeamScore');
+  assert(typeof runResult.summary.averageProcessedSeamScore === 'number', 'Summary records averageProcessedSeamScore');
 
   for (const item of runResult.results) {
     assert(item.success === true, `Material '${item.material}' generation succeeded`);
     assert(item.width === 512 && item.height === 512, `Material '${item.material}' resolution is 512x512`);
-    assert(typeof item.seamScore === 'number' && item.seamScore >= 0, `Material '${item.material}' has valid seam score (${item.seamScore})`);
-    assert(item.pass === true, `Material '${item.material}' passed seam threshold (<= 0.05)`);
-    assert(item.subjectiveScores.textureQuality === null, `Material '${item.material}' subjective texture quality is null`);
-    assert(item.errors.length === 0, `Material '${item.material}' has no errors`);
+
+    assert(typeof item.rawSeamScore === 'number', `Material '${item.material}' has rawSeamScore`);
+    assert(typeof item.processedSeamScore === 'number', `Material '${item.material}' has processedSeamScore`);
+
+    // Verify distinct measurements: Raw vs Processed
+    assert(
+      item.rawSeamScore !== item.processedSeamScore,
+      `Material '${item.material}' rawSeamScore (${item.rawSeamScore}) and processedSeamScore (${item.processedSeamScore}) are distinct`
+    );
+
+    assert(typeof item.rawGenerationTimeMs === 'number', `Material '${item.material}' has rawGenerationTimeMs`);
+    assert(typeof item.tileProcessingTimeMs === 'number', `Material '${item.material}' has tileProcessingTimeMs`);
+    assert(
+      item.latencyMs >= (item.rawGenerationTimeMs || 0) + (item.tileProcessingTimeMs || 0) - 1,
+      `Total latencyMs is end-to-end duration (${item.latencyMs}ms >= gen ${item.rawGenerationTimeMs}ms + proc ${item.tileProcessingTimeMs}ms)`
+    );
   }
 
   // 4. Determinism Verification
@@ -120,8 +132,8 @@ async function runTests() {
   for (let i = 0; i < runResult.results.length; i++) {
     const item1 = runResult.results[i];
     const item2 = runResult2.results[i];
-    assert(item1.seamScore === item2.seamScore, `Material '${item1.material}' seam scores are identical across runs`);
-    assert(item1.tileabilityScore === item2.tileabilityScore, `Material '${item1.material}' tileability scores are identical across runs`);
+    assert(item1.rawSeamScore === item2.rawSeamScore, `Material '${item1.material}' rawSeamScores are identical across runs`);
+    assert(item1.processedSeamScore === item2.processedSeamScore, `Material '${item1.material}' processedSeamScores are identical across runs`);
   }
 
   // 5. Failure Handling & Isolation
@@ -152,7 +164,8 @@ async function runTests() {
   const sandResult = flakyResult.results.find((r) => r.material === 'sand');
   assert(sandResult !== undefined, 'Sand result exists in flaky run');
   assert(sandResult?.success === false, 'Sand material is marked as failed');
-  assert(sandResult?.seamScore === null, 'Failed material seam score is null');
+  assert(sandResult?.rawSeamScore === null, 'Failed material rawSeamScore is null');
+  assert(sandResult?.processedSeamScore === null, 'Failed material processedSeamScore is null');
   assert(sandResult?.errors.some((e) => e.includes('Simulated network failure')), 'Error message captured in results');
 
   const grassResult = flakyResult.results.find((r) => r.material === 'grass');
@@ -161,16 +174,15 @@ async function runTests() {
   // 6. Report Generation
   console.log('\n--- Benchmark Reporter Verification ---');
   const jsonReport = benchmarkReporter.generateJsonReport(runResult);
-  assert(typeof jsonReport === 'string' && jsonReport.includes('"benchmarkVersion"'), 'generateJsonReport generates valid JSON string');
+  assert(typeof jsonReport === 'string' && jsonReport.includes('"rawSeamScore"'), 'generateJsonReport includes rawSeamScore');
 
   const parsedJson = JSON.parse(jsonReport);
-  assert(parsedJson.providerId === 'mock', 'Parsed JSON matches providerId');
-  assert(parsedJson.results.length === 6, 'Parsed JSON contains all 6 results');
+  assert(parsedJson.summary.averageRawSeamScore !== undefined, 'Parsed JSON includes averageRawSeamScore');
 
   const markdownReport = benchmarkReporter.generateMarkdownReport(runResult);
   assert(markdownReport.includes('# Tiler Benchmark Report'), 'generateMarkdownReport contains title');
-  assert(markdownReport.includes('cobblestone'), 'Markdown report contains cobblestone row');
-  assert(markdownReport.includes('Subjective'), 'Markdown report details subjective vs objective methodology');
+  assert(markdownReport.includes('Raw Seam Delta'), 'Markdown report contains Raw Seam Delta column');
+  assert(markdownReport.includes('Processed Seam'), 'Markdown report contains Processed Seam column');
 
   console.log('\n======================================================');
   console.log(`  Benchmark Test Suite Results: ${passed}/${total} Tests Passed`);

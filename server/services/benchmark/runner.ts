@@ -4,9 +4,10 @@
  */
 
 import { tileProcessor } from '../../image/tileProcessor';
+import { seamAnalysisService } from '../seamAnalysisService';
 import { ImageGenerationProvider } from '../providers/types';
 import { calculateWeightedQualityScore, extractProviderMetadata } from './metrics';
-import { BENCHMARK_FRAMEWORK_VERSION, getBenchmarkMaterial, BENCHMARK_MATERIALS } from './prompts';
+import { BENCHMARK_FRAMEWORK_VERSION, BENCHMARK_MATERIALS, getBenchmarkMaterial } from './prompts';
 import {
   BenchmarkMaterialId,
   BenchmarkRunOptions,
@@ -19,7 +20,10 @@ import {
  * Provider-Agnostic Benchmark Runner
  *
  * Executes benchmark evaluations across canonical materials using an ImageGenerationProvider.
- * Processes output through Tiler's tile processor and seam analysis engine.
+ * Evaluates dual seam measurements:
+ * 1. Raw Provider Tileability (direct seam analysis of raw AI output before processing)
+ * 2. Processed Tileability (seam analysis after Tiler tile processing pipeline)
+ *
  * Records objective metrics and handles failures per material without crashing the run.
  */
 export class BenchmarkRunner {
@@ -30,7 +34,6 @@ export class BenchmarkRunner {
     provider: ImageGenerationProvider,
     options: BenchmarkRunOptions = {}
   ): Promise<BenchmarkRunResult> {
-    const startTime = performance.now();
     const resolution = options.resolution || 512;
     const baseSeed = options.seed ?? 42;
     const blendMarginPercent = options.blendMarginPercent ?? 10;
@@ -109,15 +112,22 @@ export class BenchmarkRunner {
 
     let rawGenerationTimeMs: number | null = null;
     let tileProcessingTimeMs: number | null = null;
-    let seamScore: number | null = null;
-    let tileabilityScore: number | null = null;
-    let pass: boolean | null = null;
+
+    let rawSeamScore: number | null = null;
+    let rawTileabilityScore: number | null = null;
+    let rawPass: boolean | null = null;
+    let rawSeamResult: any = undefined;
+
+    let processedSeamScore: number | null = null;
+    let processedTileabilityScore: number | null = null;
+    let processedPass: boolean | null = null;
+    let processedSeamResult: any = undefined;
+
     let processedImageDataUrl: string | undefined = undefined;
-    let seamResult: any = undefined;
     const errors: string[] = [];
 
     try {
-      // 1. Image Generation via Provider
+      // 1. Raw Image Generation via Provider
       const genStartTime = performance.now();
       const genResult = await provider.generate({
         material: matConfig.id,
@@ -133,7 +143,20 @@ export class BenchmarkRunner {
         throw new Error(`Provider '${provider.id}' returned empty image response for material '${matConfig.id}'.`);
       }
 
-      // 2. Tile Processing & Seam Analysis Pipeline
+      // 2. RAW SEAM ANALYSIS (Evaluates raw provider image BEFORE TileProcessor)
+      try {
+        rawSeamResult = await seamAnalysisService.analyzeSeams(genResult.imageDataUrl, {
+          diagnosticMode: false,
+        });
+        if (rawSeamResult && typeof rawSeamResult.overallScore === 'number') {
+          rawSeamScore = rawSeamResult.overallScore;
+          rawPass = rawSeamResult.pass ?? (rawSeamScore <= 0.05);
+        }
+      } catch (rawErr) {
+        console.warn(`Raw seam analysis failed for material '${matConfig.id}':`, rawErr);
+      }
+
+      // 3. PROCESSED TILE PIPELINE & SEAM ANALYSIS (Evaluates image AFTER TileProcessor)
       const processStartTime = performance.now();
       const tileResult = await tileProcessor.processTile(genResult.imageDataUrl, {
         targetWidth: resolution as any,
@@ -147,10 +170,10 @@ export class BenchmarkRunner {
         processedImageDataUrl = tileResult.processedImageDataUrl;
       }
 
-      seamResult = tileResult.seamResult;
-      if (seamResult && typeof seamResult.overallScore === 'number') {
-        seamScore = seamResult.overallScore;
-        pass = seamResult.pass ?? (seamScore <= 0.05);
+      processedSeamResult = tileResult.seamResult;
+      if (processedSeamResult && typeof processedSeamResult.overallScore === 'number') {
+        processedSeamScore = processedSeamResult.overallScore;
+        processedPass = processedSeamResult.pass ?? (processedSeamScore <= 0.05);
       }
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -161,11 +184,13 @@ export class BenchmarkRunner {
     const latencyMs = Math.round((itemEndTime - itemStartTime) * 100) / 100;
 
     const weightedQualityScore = calculateWeightedQualityScore({
-      seamScore,
-      latencyMs,
+      rawSeamScore,
+      processedSeamScore,
+      rawGenerationTimeMs,
     });
 
-    tileabilityScore = weightedQualityScore.components.tileability;
+    rawTileabilityScore = weightedQualityScore.components.tileability;
+    processedTileabilityScore = weightedQualityScore.components.processedTileability;
 
     return {
       material: matConfig.id,
@@ -176,11 +201,26 @@ export class BenchmarkRunner {
       seed,
       success: errors.length === 0,
       latencyMs,
-      seamScore,
-      tileabilityScore,
-      pass,
       rawGenerationTimeMs,
       tileProcessingTimeMs,
+
+      // Raw Provider Tileability Metrics
+      rawSeamScore,
+      rawTileabilityScore,
+      rawPass,
+      rawSeamResult,
+
+      // Processed Tileability Metrics
+      processedSeamScore,
+      processedTileabilityScore,
+      processedPass,
+      seamResult: processedSeamResult,
+
+      // Aliases (point to raw provider tileability)
+      seamScore: rawSeamScore,
+      tileabilityScore: rawTileabilityScore,
+      pass: rawPass,
+
       subjectiveScores: {
         textureQuality: null,
         promptAdherence: null,
@@ -191,42 +231,67 @@ export class BenchmarkRunner {
       errors,
       timestamp,
       processedImageDataUrl,
-      seamResult,
     };
   }
 
   /**
-   * Compiles aggregated summary metrics across benchmark results
+   * Compiles aggregated summary statistics across benchmark results
    */
   private compileSummary(results: MaterialBenchmarkResult[]): BenchmarkSummary {
     const total = results.length;
     const successful = results.filter((r) => r.success).length;
     const failed = total - successful;
 
+    const validGenTimes = results
+      .map((r) => r.rawGenerationTimeMs)
+      .filter((t): t is number => typeof t === 'number' && !isNaN(t));
+
+    const averageRawGenerationTimeMs =
+      validGenTimes.length > 0
+        ? Math.round((validGenTimes.reduce((acc, t) => acc + t, 0) / validGenTimes.length) * 10) / 10
+        : 0;
+
     const totalLatency = results.reduce((acc, r) => acc + r.latencyMs, 0);
     const averageLatencyMs = total > 0 ? Math.round((totalLatency / total) * 10) / 10 : 0;
 
-    const validSeamScores = results
-      .map((r) => r.seamScore)
+    const validRawSeams = results
+      .map((r) => r.rawSeamScore)
       .filter((s): s is number => typeof s === 'number' && !isNaN(s));
 
-    const averageSeamScore =
-      validSeamScores.length > 0
+    const averageRawSeamScore =
+      validRawSeams.length > 0
         ? Math.round(
-            (validSeamScores.reduce((acc, s) => acc + s, 0) / validSeamScores.length) * 10000
+            (validRawSeams.reduce((acc, s) => acc + s, 0) / validRawSeams.length) * 10000
           ) / 10000
         : null;
 
-    const passedCount = results.filter((r) => r.pass === true).length;
-    const overallPassRate = total > 0 ? Math.round((passedCount / total) * 100) : 0;
+    const validProcessedSeams = results
+      .map((r) => r.processedSeamScore)
+      .filter((s): s is number => typeof s === 'number' && !isNaN(s));
+
+    const averageProcessedSeamScore =
+      validProcessedSeams.length > 0
+        ? Math.round(
+            (validProcessedSeams.reduce((acc, s) => acc + s, 0) / validProcessedSeams.length) * 10000
+          ) / 10000
+        : null;
+
+    const rawPassedCount = results.filter((r) => r.rawPass === true).length;
+    const rawPassRate = total > 0 ? Math.round((rawPassedCount / total) * 100) : 0;
+
+    const processedPassedCount = results.filter((r) => r.processedPass === true).length;
+    const processedPassRate = total > 0 ? Math.round((processedPassedCount / total) * 100) : 0;
 
     return {
       total,
       successful,
       failed,
+      averageRawGenerationTimeMs,
       averageLatencyMs,
-      averageSeamScore,
-      overallPassRate,
+      averageRawSeamScore,
+      averageProcessedSeamScore,
+      rawPassRate,
+      processedPassRate,
     };
   }
 }

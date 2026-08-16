@@ -14,11 +14,11 @@ import {
  * Benchmark quality weightings defined in Tiler protocol
  */
 export const QUALITY_WEIGHTS = {
-  TILEABILITY: 0.3, // 30%
-  TEXTURE_QUALITY: 0.25, // 25%
-  PROMPT_ADHERENCE: 0.2, // 20%
-  STYLE_CONSISTENCY: 0.15, // 15%
-  GENERATION_SPEED: 0.1, // 10%
+  TILEABILITY: 0.3, // 30% (Primary metric based on raw provider image)
+  TEXTURE_QUALITY: 0.25, // 25% (Subjective / manual)
+  PROMPT_ADHERENCE: 0.2, // 20% (Subjective / manual)
+  STYLE_CONSISTENCY: 0.15, // 15% (Subjective / manual)
+  GENERATION_SPEED: 0.1, // 10% (Objective metric based strictly on raw generation time)
 } as const;
 
 /**
@@ -35,30 +35,45 @@ export function calculateTileabilityScore(seamScore: number | null): number | nu
 }
 
 /**
- * Calculates objective generation speed score (0 - 100) from latency in milliseconds.
+ * Calculates objective generation speed score (0 - 100) from raw model inference time in milliseconds.
  * Latencies under 500ms score 90-100; latencies over 5000ms degrade to 0.
  */
-export function calculateSpeedScore(latencyMs: number): number {
-  if (latencyMs <= 0) return 100;
+export function calculateSpeedScore(rawGenerationTimeMs: number | null): number | null {
+  if (typeof rawGenerationTimeMs !== 'number' || isNaN(rawGenerationTimeMs)) {
+    return null;
+  }
+  if (rawGenerationTimeMs <= 0) return 100;
   // Linear scale: 0ms -> 100, 5000ms -> 0
-  const score = 100 - latencyMs / 50;
+  const score = 100 - rawGenerationTimeMs / 50;
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 /**
  * Calculates overall weighted quality score adhering to Tiler benchmark protocol.
+ * The primary tileability score (30%) is calculated strictly from RAW provider output.
+ * Generation speed (10%) is calculated strictly from RAW model inference duration.
  * Subjective metrics are only included when explicitly provided (e.g., during manual review).
- * Subjective fields default to `null` and are not replaced with arbitrary placeholders.
  */
 export function calculateWeightedQualityScore(params: {
-  seamScore: number | null;
-  latencyMs: number;
+  rawSeamScore: number | null;
+  processedSeamScore?: number | null;
+  rawGenerationTimeMs: number | null;
   subjectiveScores?: Partial<SubjectiveScores>;
 }): WeightedQualityScore {
-  const { seamScore, latencyMs, subjectiveScores = {} } = params;
+  const {
+    rawSeamScore,
+    processedSeamScore = null,
+    rawGenerationTimeMs,
+    subjectiveScores = {},
+  } = params;
 
-  const tileabilityScore = calculateTileabilityScore(seamScore);
-  const speedScore = calculateSpeedScore(latencyMs);
+  // Primary tileability score derived from RAW provider image
+  const rawTileabilityScore = calculateTileabilityScore(rawSeamScore);
+  // Secondary diagnostic tileability score derived from PROCESSED Tiler image
+  const processedTileabilityScore = calculateTileabilityScore(processedSeamScore);
+
+  // Speed score derived strictly from RAW model inference duration
+  const speedScore = calculateSpeedScore(rawGenerationTimeMs);
 
   const textureQuality =
     typeof subjectiveScores.textureQuality === 'number'
@@ -76,7 +91,8 @@ export function calculateWeightedQualityScore(params: {
       : null;
 
   const components: ScoreComponents = {
-    tileability: tileabilityScore,
+    tileability: rawTileabilityScore,
+    processedTileability: processedTileabilityScore,
     textureQuality,
     promptAdherence,
     styleConsistency,
@@ -86,8 +102,8 @@ export function calculateWeightedQualityScore(params: {
   let totalWeightedScore = 0;
   let evaluatedWeightSum = 0;
 
-  if (tileabilityScore !== null) {
-    totalWeightedScore += tileabilityScore * QUALITY_WEIGHTS.TILEABILITY;
+  if (rawTileabilityScore !== null) {
+    totalWeightedScore += rawTileabilityScore * QUALITY_WEIGHTS.TILEABILITY;
     evaluatedWeightSum += QUALITY_WEIGHTS.TILEABILITY;
   }
 
@@ -112,13 +128,12 @@ export function calculateWeightedQualityScore(params: {
   }
 
   const finalScore = evaluatedWeightSum > 0 ? Math.round(totalWeightedScore * 100) / 100 : null;
-
   const maxEvaluatedWeight = Math.round(evaluatedWeightSum * 100);
 
   const isFullyEvaluated = evaluatedWeightSum >= 0.99;
   const note = isFullyEvaluated
-    ? 'Fully evaluated score combining objective (40%) and human subjective (60%) assessments.'
-    : `Objective score evaluated from available machine metrics (${maxEvaluatedWeight}% weight: Tileability 30% + Speed 10%). Subjective metrics require human evaluation.`;
+    ? 'Fully evaluated score combining raw objective (40%) and human subjective (60%) assessments.'
+    : `Objective score evaluated from raw provider metrics (${maxEvaluatedWeight}% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation.`;
 
   return {
     score: finalScore,

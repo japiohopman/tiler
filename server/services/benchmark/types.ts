@@ -45,10 +45,17 @@ export interface SubjectiveScores {
  * Component scores contributing to weighted total score
  */
 export interface ScoreComponents {
+  /** Primary objective tileability score derived from raw generated image (Weight: 30%) */
   tileability: number | null;
+  /** Secondary tileability score derived after Tiler tile processing (Diagnostic) */
+  processedTileability: number | null;
+  /** Subjective texture visual quality (Weight: 25%) */
   textureQuality: number | null;
+  /** Subjective prompt adherence (Weight: 20%) */
   promptAdherence: number | null;
+  /** Subjective style consistency (Weight: 15%) */
   styleConsistency: number | null;
+  /** Objective generation speed derived from raw generation latency (Weight: 10%) */
   generationSpeed: number | null;
 }
 
@@ -90,19 +97,36 @@ export interface MaterialBenchmarkResult {
   height: number;
   seed?: number;
   success: boolean;
+  /** End-to-end total latency (generation + processing) in ms */
   latencyMs: number;
+  /** Raw AI model generation time in ms (used for Generation Speed metric) */
+  rawGenerationTimeMs: number | null;
+  /** Duration of Tiler tile processing pipeline in ms */
+  tileProcessingTimeMs: number | null;
+
+  // 1. RAW PROVIDER TILEABILITY (Primary metric evaluating raw provider output)
+  rawSeamScore: number | null;
+  rawTileabilityScore: number | null;
+  rawPass: boolean | null;
+  rawSeamResult?: SeamAnalysisResult;
+
+  // 2. PROCESSED TILEABILITY (Secondary metric evaluating Tiler pipeline output)
+  processedSeamScore: number | null;
+  processedTileabilityScore: number | null;
+  processedPass: boolean | null;
+  seamResult?: SeamAnalysisResult;
+
+  // Compatibility aliases (point to raw provider tileability)
   seamScore: number | null;
   tileabilityScore: number | null;
   pass: boolean | null;
-  rawGenerationTimeMs: number | null;
-  tileProcessingTimeMs: number | null;
+
   subjectiveScores: SubjectiveScores;
   providerMetadata: ProviderMetadata;
   weightedQualityScore: WeightedQualityScore;
   errors: string[];
   timestamp: string;
   processedImageDataUrl?: string;
-  seamResult?: SeamAnalysisResult;
 }
 
 /**
@@ -112,9 +136,12 @@ export interface BenchmarkSummary {
   total: number;
   successful: number;
   failed: number;
+  averageRawGenerationTimeMs: number;
   averageLatencyMs: number;
-  averageSeamScore: number | null;
-  overallPassRate: number;
+  averageRawSeamScore: number | null;
+  averageProcessedSeamScore: number | null;
+  rawPassRate: number;
+  processedPassRate: number;
 }
 
 /**
