@@ -70,7 +70,7 @@ A minimal, experimental provider implementation was created at `server/services/
 
 ### Key Characteristics:
 - Implements `ImageGenerationProvider` interface.
-- Isolate Hugging Face REST communication behind the unified `generate(request: GenerationRequest)` contract.
+- Isolates Hugging Face REST communication behind the unified `generate(request: GenerationRequest)` contract.
 - Clearly marked as an **experimental Proof-of-Concept** (not the default provider).
 - Requires `HF_TOKEN` or `HUGGINGFACE_API_KEY` for live remote inference, but provides a safe fallback when credentials are absent.
 - Converts raw binary responses into normalized `GeneratedImage` objects.
