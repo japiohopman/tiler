@@ -4,7 +4,9 @@
  */
 
 import { bootstrapProviders } from '../../bootstrap';
+import { tileProcessor } from '../../image/tileProcessor';
 import { generationService, GenerationService } from '../generationService';
+import { seamAnalysisService } from '../seamAnalysisService';
 import { geminiProvider } from './geminiProvider';
 import { mockProvider } from './mockProvider';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
@@ -109,13 +111,46 @@ export async function runProviderTestSuite() {
   assert(typeof geminiProvider.isConfigured === 'function', 'GeminiProvider implements isConfigured');
   assert(typeof geminiProvider.generate === 'function', 'GeminiProvider implements generate');
 
-  // Test 7: Bootstrap layer sets default provider from environment configuration
-  process.env.IMAGE_PROVIDER = 'mock';
+  // Test 7: Bootstrap explicitly prefers MockProvider by default to protect API quota
+  delete process.env.IMAGE_PROVIDER;
+  delete process.env.DEFAULT_PROVIDER;
   bootstrapProviders();
-  assert(generationService.getDefaultProviderId() === 'mock', 'Bootstrap respects IMAGE_PROVIDER=mock');
+  assert(generationService.getDefaultProviderId() === 'mock', 'Bootstrap explicitly prefers MockProvider by default');
+
+  // Test 8: Bootstrap respects explicit IMAGE_PROVIDER=gemini opt-in
+  process.env.IMAGE_PROVIDER = 'gemini';
+  bootstrapProviders();
+  assert(generationService.getDefaultProviderId() === 'gemini', 'Bootstrap respects explicit IMAGE_PROVIDER=gemini opt-in');
   delete process.env.IMAGE_PROVIDER;
 
-  // Test 8: Unconfigured provider errors are caught cleanly as ProviderError
+  // Test 9: Complete End-to-End Local Pipeline Integration Test
+  // MockProvider -> GenerationService -> TileProcessor -> SeamAnalyzer
+  // Runs 100% offline without Gemini, network access, API credentials, or GPU
+  generationService.setDefaultProvider('mock');
+  const rawTile = await generationService.generate({
+    material: 'cobblestone',
+    style: 'stylized',
+    resolution: 256,
+    seed: 8888,
+  });
+  assert(rawTile.imageDataUrl.startsWith('data:image/png'), 'End-to-End Local Pipeline Step 1: Raw Mock Image Generated');
+
+  const processedTile = await tileProcessor.processTile(rawTile.imageDataUrl, {
+    algorithm: 'offset-crossfade',
+    blendMarginPercent: 10,
+    targetWidth: 256,
+    targetHeight: 256,
+  });
+  assert(processedTile.processedImageDataUrl.startsWith('data:image/png'), 'End-to-End Local Pipeline Step 2: Sharp Offset Tile Processed');
+
+  const seamReport = await seamAnalysisService.analyzeSeams(processedTile.processedImageDataUrl, {
+    threshold: 0.05,
+    edgeRegion: 4,
+  });
+  assert(typeof seamReport.overallScore === 'number', 'End-to-End Local Pipeline Step 3: Seam Score Analyzed');
+  assert(seamReport.pass === true, 'End-to-End Local Pipeline Step 4: Seam Validation Passed');
+
+  // Test 10: Unconfigured provider errors are caught cleanly as ProviderError
   custom.configured = false;
   let caughtError = false;
   try {
@@ -127,7 +162,7 @@ export async function runProviderTestSuite() {
   }
   assert(caughtError, 'Unconfigured provider throws normalized ProviderError');
 
-  // Test 9: Unknown provider ID throws ProviderError
+  // Test 11: Unknown provider ID throws ProviderError
   let unknownCaught = false;
   try {
     isolatedService.getProvider('non-existent-provider');

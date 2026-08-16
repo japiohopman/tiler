@@ -10,24 +10,26 @@ import { mockProvider } from './services/providers/mockProvider';
 /**
  * Application Composition & Provider Bootstrap Layer
  * Registers concrete image generation providers into the GenerationService container.
- * Configures the active/default provider based on environment configuration or availability.
+ *
+ * SAFETY PRINCIPLE:
+ * Development/test configuration explicitly prefers `mockProvider` by default.
+ * This prevents local development from accidentally consuming paid/limited API quota
+ * even if GEMINI_API_KEY happens to exist in the environment.
+ * To use Gemini explicitly, set `IMAGE_PROVIDER=gemini` in your environment.
  */
 export function bootstrapProviders(): void {
   // Register available providers
   generationService.registerProvider(mockProvider);
   generationService.registerProvider(geminiProvider);
 
-  // Environment-driven provider selection
+  // Environment-driven provider selection (Explicit opt-in required for 'gemini')
   const envProvider = (process.env.IMAGE_PROVIDER || process.env.DEFAULT_PROVIDER || '').toLowerCase().trim();
 
-  if (envProvider && (envProvider === 'mock' || envProvider === 'gemini')) {
-    generationService.setDefaultProvider(envProvider);
-  } else if (geminiProvider.isConfigured()) {
-    // Default to Gemini if GEMINI_API_KEY is configured
-    generationService.setDefaultProvider(geminiProvider.id);
+  if (envProvider === 'gemini') {
+    generationService.setDefaultProvider('gemini');
   } else {
-    // Fallback automatically to deterministic Mock provider if no API key is present
-    generationService.setDefaultProvider(mockProvider.id);
+    // Default explicitly to deterministic Mock provider to protect API quota
+    generationService.setDefaultProvider('mock');
   }
 }
 
