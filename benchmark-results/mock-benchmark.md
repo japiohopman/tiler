@@ -1,6 +1,6 @@
 # Tiler Benchmark Report — Deterministic Mock Provider (Development/Test Only)
 
-**Date & Time:** `2026-08-16T23:13:59.921Z`
+**Date & Time:** `2026-08-17T07:01:05.983Z`
 **Benchmark Version:** `1.0.0`
 **Provider:** `mock` (Deterministic Mock Provider (Development/Test Only))
 **Model:** `mock`
@@ -14,8 +14,8 @@
 | **Total Materials Tested** | 6 |
 | **Successful Generations** | 6 / 6 (100%) |
 | **Failed Generations** | 0 |
-| **Avg Raw Generation Time** | 26.4 ms |
-| **Avg End-to-End Latency** | 146.9 ms |
+| **Avg Raw Generation Time** | 27.1 ms |
+| **Avg End-to-End Latency** | 144.1 ms |
 | **Avg Raw Seam Delta (Primary)** | 0.1198 (Lower is better, ≤0.05 passes) |
 | **Raw Provider Pass Rate** | 0% |
 | **Avg Processed Seam Delta (Pipeline)** | 0.0098 (Lower is better, ≤0.05 passes) |
@@ -25,12 +25,12 @@
 
 | Material | Raw Status | Raw Seam Delta | Raw Tile % | Processed Seam | Processed Tile % | Gen / Total Latency | Objective Score | Errors |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **cobblestone** | ⚠️ Discontinuous | `0.0904` | 91% | `0.0098` | 99% | 41ms / 181ms | `37.2 / 40%` | None |
-| **grass** | ⚠️ Discontinuous | `0.0915` | 91% | `0.0075` | 99% | 23ms / 159ms | `37.3 / 40%` | None |
-| **sand** | ⚠️ Discontinuous | `0.1521` | 85% | `0.0127` | 99% | 22ms / 136ms | `35.5 / 40%` | None |
-| **water** | ⚠️ Discontinuous | `0.1245` | 88% | `0.0103` | 99% | 22ms / 136ms | `36.4 / 40%` | None |
-| **wood** | ⚠️ Discontinuous | `0.1139` | 89% | `0.0074` | 99% | 25ms / 130ms | `36.7 / 40%` | None |
-| **lava** | ⚠️ Discontinuous | `0.1466` | 85% | `0.0110` | 99% | 26ms / 139ms | `35.4 / 40%` | None |
+| **cobblestone** | ⚠️ Discontinuous | `0.0904` | 91% | `0.0098` | 99% | 40ms / 179ms | `37.2 / 40%` | None |
+| **grass** | ⚠️ Discontinuous | `0.0915` | 91% | `0.0075` | 99% | 23ms / 153ms | `37.3 / 40%` | None |
+| **sand** | ⚠️ Discontinuous | `0.1521` | 85% | `0.0127` | 99% | 21ms / 138ms | `35.5 / 40%` | None |
+| **water** | ⚠️ Discontinuous | `0.1245` | 88% | `0.0103` | 99% | 33ms / 141ms | `36.3 / 40%` | None |
+| **wood** | ⚠️ Discontinuous | `0.1139` | 89% | `0.0074` | 99% | 21ms / 121ms | `36.7 / 40%` | None |
+| **lava** | ⚠️ Discontinuous | `0.1466` | 85% | `0.0110` | 99% | 24ms / 133ms | `35.5 / 40%` | None |
 
 ## Quality Score Methodology & Weightings
 

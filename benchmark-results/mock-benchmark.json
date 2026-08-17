@@ -3,7 +3,7 @@
   "providerId": "mock",
   "providerName": "Deterministic Mock Provider (Development/Test Only)",
   "model": "mock",
-  "timestamp": "2026-08-16T23:13:59.921Z",
+  "timestamp": "2026-08-17T07:01:05.983Z",
   "options": {
     "resolution": 512,
     "seed": 42,
@@ -21,8 +21,8 @@
     "total": 6,
     "successful": 6,
     "failed": 0,
-    "averageRawGenerationTimeMs": 26.4,
-    "averageLatencyMs": 146.9,
+    "averageRawGenerationTimeMs": 27.1,
+    "averageLatencyMs": 144.1,
     "averageRawSeamScore": 0.1198,
     "averageProcessedSeamScore": 0.0098,
     "rawPassRate": 0,
@@ -37,9 +37,9 @@
       "height": 512,
       "seed": 42,
       "success": true,
-      "latencyMs": 180.66,
-      "rawGenerationTimeMs": 40.79,
-      "tileProcessingTimeMs": 132.03,
+      "latencyMs": 179.05,
+      "rawGenerationTimeMs": 40.12,
+      "tileProcessingTimeMs": 131.22,
       "rawSeamScore": 0.0904,
       "rawTileabilityScore": 91,
       "rawPass": false,
@@ -117,7 +117,7 @@
         "note": "Objective score evaluated from raw provider metrics (40% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [],
-      "timestamp": "2026-08-16T23:13:59.921Z"
+      "timestamp": "2026-08-17T07:01:05.983Z"
     },
     {
       "material": "grass",
@@ -127,9 +127,9 @@
       "height": 512,
       "seed": 142,
       "success": true,
-      "latencyMs": 158.91,
-      "rawGenerationTimeMs": 22.77,
-      "tileProcessingTimeMs": 130.34,
+      "latencyMs": 153.06,
+      "rawGenerationTimeMs": 23.25,
+      "tileProcessingTimeMs": 124.5,
       "rawSeamScore": 0.0915,
       "rawTileabilityScore": 91,
       "rawPass": false,
@@ -207,7 +207,7 @@
         "note": "Objective score evaluated from raw provider metrics (40% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [],
-      "timestamp": "2026-08-16T23:14:00.102Z"
+      "timestamp": "2026-08-17T07:01:06.163Z"
     },
     {
       "material": "sand",
@@ -217,9 +217,9 @@
       "height": 512,
       "seed": 242,
       "success": true,
-      "latencyMs": 136.48,
-      "rawGenerationTimeMs": 22.15,
-      "tileProcessingTimeMs": 109.93,
+      "latencyMs": 137.51,
+      "rawGenerationTimeMs": 21.43,
+      "tileProcessingTimeMs": 111.21,
       "rawSeamScore": 0.1521,
       "rawTileabilityScore": 85,
       "rawPass": false,
@@ -297,7 +297,7 @@
         "note": "Objective score evaluated from raw provider metrics (40% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [],
-      "timestamp": "2026-08-16T23:14:00.261Z"
+      "timestamp": "2026-08-17T07:01:06.316Z"
     },
     {
       "material": "water",
@@ -307,9 +307,9 @@
       "height": 512,
       "seed": 342,
       "success": true,
-      "latencyMs": 136.38,
-      "rawGenerationTimeMs": 22.34,
-      "tileProcessingTimeMs": 109,
+      "latencyMs": 140.79,
+      "rawGenerationTimeMs": 32.59,
+      "tileProcessingTimeMs": 103.59,
       "rawSeamScore": 0.1245,
       "rawTileabilityScore": 88,
       "rawPass": false,
@@ -374,7 +374,7 @@
         "supportsSeed": true
       },
       "weightedQualityScore": {
-        "score": 36.4,
+        "score": 36.3,
         "maxEvaluatedWeight": 40,
         "components": {
           "tileability": 88,
@@ -382,12 +382,12 @@
           "textureQuality": null,
           "promptAdherence": null,
           "styleConsistency": null,
-          "generationSpeed": 100
+          "generationSpeed": 99
         },
         "note": "Objective score evaluated from raw provider metrics (40% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [],
-      "timestamp": "2026-08-16T23:14:00.398Z"
+      "timestamp": "2026-08-17T07:01:06.453Z"
     },
     {
       "material": "wood",
@@ -397,9 +397,9 @@
       "height": 512,
       "seed": 442,
       "success": true,
-      "latencyMs": 129.63,
-      "rawGenerationTimeMs": 24.62,
-      "tileProcessingTimeMs": 100.02,
+      "latencyMs": 120.96,
+      "rawGenerationTimeMs": 21.11,
+      "tileProcessingTimeMs": 95.24,
       "rawSeamScore": 0.1139,
       "rawTileabilityScore": 89,
       "rawPass": false,
@@ -477,7 +477,7 @@
         "note": "Objective score evaluated from raw provider metrics (40% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [],
-      "timestamp": "2026-08-16T23:14:00.534Z"
+      "timestamp": "2026-08-17T07:01:06.594Z"
     },
     {
       "material": "lava",
@@ -487,9 +487,9 @@
       "height": 512,
       "seed": 542,
       "success": true,
-      "latencyMs": 139.18,
-      "rawGenerationTimeMs": 25.87,
-      "tileProcessingTimeMs": 108.23,
+      "latencyMs": 133.49,
+      "rawGenerationTimeMs": 23.98,
+      "tileProcessingTimeMs": 104.96,
       "rawSeamScore": 0.1466,
       "rawTileabilityScore": 85,
       "rawPass": false,
@@ -554,7 +554,7 @@
         "supportsSeed": true
       },
       "weightedQualityScore": {
-        "score": 35.4,
+        "score": 35.5,
         "maxEvaluatedWeight": 40,
         "components": {
           "tileability": 85,
@@ -562,12 +562,12 @@
           "textureQuality": null,
           "promptAdherence": null,
           "styleConsistency": null,
-          "generationSpeed": 99
+          "generationSpeed": 100
         },
         "note": "Objective score evaluated from raw provider metrics (40% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [],
-      "timestamp": "2026-08-16T23:14:00.664Z"
+      "timestamp": "2026-08-17T07:01:06.715Z"
     }
   ]
 }
