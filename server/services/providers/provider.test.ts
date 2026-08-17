@@ -8,6 +8,7 @@ import { tileProcessor } from '../../image/tileProcessor';
 import { generationService, GenerationService } from '../generationService';
 import { seamAnalysisService } from '../seamAnalysisService';
 import { geminiProvider } from './geminiProvider';
+import { huggingFacePoCProvider } from './huggingFacePoCProvider';
 import { mockProvider } from './mockProvider';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
 
@@ -106,24 +107,40 @@ export async function runProviderTestSuite() {
   assert(mockRes1.metadata?.isDevelopmentMock === true, 'MockProvider metadata marks asset as development/test mock');
   assert(mockRes1.metadata?.seed === 12345, 'MockProvider preserves request seed');
 
-  // Test 6: GeminiProvider satisfies ImageGenerationProvider interface
+  // Test 6: HuggingFacePoCProvider satisfies ImageGenerationProvider contract and handles missing tokens
+  assert(huggingFacePoCProvider.id === 'huggingface', 'HuggingFacePoCProvider has correct id');
+  const prevHfToken = process.env.HF_TOKEN;
+  delete process.env.HF_TOKEN;
+  delete process.env.HUGGINGFACE_API_KEY;
+  assert(huggingFacePoCProvider.isConfigured() === false, 'HuggingFacePoCProvider returns false when HF_TOKEN is absent');
+
+  process.env.HF_TOKEN = 'test_hf_token';
+  assert(huggingFacePoCProvider.isConfigured() === true, 'HuggingFacePoCProvider returns true when HF_TOKEN is present');
+  delete process.env.HF_TOKEN;
+  if (prevHfToken) process.env.HF_TOKEN = prevHfToken;
+
+  // Test 7: GeminiProvider satisfies ImageGenerationProvider interface
   assert(geminiProvider.id === 'gemini', 'GeminiProvider has correct id');
   assert(typeof geminiProvider.isConfigured === 'function', 'GeminiProvider implements isConfigured');
   assert(typeof geminiProvider.generate === 'function', 'GeminiProvider implements generate');
 
-  // Test 7: Bootstrap explicitly prefers MockProvider by default to protect API quota
+  // Test 8: Bootstrap explicitly prefers MockProvider by default to protect API quota
   delete process.env.IMAGE_PROVIDER;
   delete process.env.DEFAULT_PROVIDER;
   bootstrapProviders();
   assert(generationService.getDefaultProviderId() === 'mock', 'Bootstrap explicitly prefers MockProvider by default');
 
-  // Test 8: Bootstrap respects explicit IMAGE_PROVIDER=gemini opt-in
+  // Test 9: Bootstrap respects explicit IMAGE_PROVIDER=gemini and IMAGE_PROVIDER=huggingface
   process.env.IMAGE_PROVIDER = 'gemini';
   bootstrapProviders();
   assert(generationService.getDefaultProviderId() === 'gemini', 'Bootstrap respects explicit IMAGE_PROVIDER=gemini opt-in');
+
+  process.env.IMAGE_PROVIDER = 'huggingface';
+  bootstrapProviders();
+  assert(generationService.getDefaultProviderId() === 'huggingface', 'Bootstrap respects explicit IMAGE_PROVIDER=huggingface opt-in');
   delete process.env.IMAGE_PROVIDER;
 
-  // Test 9: Complete End-to-End Local Pipeline Integration Test
+  // Test 10: Complete End-to-End Local Pipeline Integration Test
   // MockProvider -> GenerationService -> TileProcessor -> SeamAnalyzer
   // Runs 100% offline without Gemini, network access, API credentials, or GPU
   generationService.setDefaultProvider('mock');
@@ -150,7 +167,7 @@ export async function runProviderTestSuite() {
   assert(typeof seamReport.overallScore === 'number', 'End-to-End Local Pipeline Step 3: Seam Score Analyzed');
   assert(seamReport.pass === true, 'End-to-End Local Pipeline Step 4: Seam Validation Passed');
 
-  // Test 10: Unconfigured provider errors are caught cleanly as ProviderError
+  // Test 11: Unconfigured provider errors are caught cleanly as ProviderError
   custom.configured = false;
   let caughtError = false;
   try {
@@ -162,7 +179,7 @@ export async function runProviderTestSuite() {
   }
   assert(caughtError, 'Unconfigured provider throws normalized ProviderError');
 
-  // Test 11: Unknown provider ID throws ProviderError
+  // Test 12: Unknown provider ID throws ProviderError
   let unknownCaught = false;
   try {
     isolatedService.getProvider('non-existent-provider');
