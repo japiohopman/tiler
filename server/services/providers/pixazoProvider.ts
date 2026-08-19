@@ -18,7 +18,7 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  * - Status Polling Endpoint: https://gateway.pixazo.ai/v2/requests/status/{request_id}
  * - Authentication Header: Ocp-Apim-Subscription-Key
  * - Resolution Support: 512x512
- * - Request Schema: prompt, negative_prompt, width, height, num_steps, guidance_scale, seed
+ * - Request Schema: prompt, negative_prompt, height, width, num_steps, guidance, seed
  * - Response Schema: imageUrl
  */
 export class PixazoImageGenerationProvider implements ImageGenerationProvider {
@@ -88,7 +88,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       height: resolution,
       width: resolution,
       num_steps: 20,
-      guidance_scale: 5,
+      guidance: 5,
     };
 
     if (typeof request.seed === 'number') {
@@ -111,34 +111,36 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
           errorDetails = await response.text();
         }
 
+        const debugInfo = `[URL: POST ${endpoint} | Status: ${response.status} ${response.statusText} | Body: ${errorDetails.trim()}]`;
+
         if (response.status === 401) {
           throw new ProviderError(
             this.id,
-            `Pixazo API returned 401 Unauthorized. Check your API subscription key. (${errorDetails})`
+            `Pixazo API returned 401 Unauthorized. Check your API subscription key. ${debugInfo}`
           );
         }
         if (response.status === 402) {
           throw new ProviderError(
             this.id,
-            `Pixazo API returned 402 Insufficient Balance / Quota Exceeded. (${errorDetails})`
+            `Pixazo API returned 402 Insufficient Balance / Quota Exceeded. ${debugInfo}`
           );
         }
         if (response.status === 404) {
           throw new ProviderError(
             this.id,
-            `Pixazo API returned 404 Resource Not Found at ${endpoint}. Check endpoint URL. (${errorDetails})`
+            `Pixazo API returned 404 Resource Not Found. ${debugInfo}`
           );
         }
         if (response.status === 429) {
           throw new ProviderError(
             this.id,
-            `Pixazo API returned 429 Rate Limit Exceeded. (${errorDetails})`
+            `Pixazo API returned 429 Rate Limit Exceeded. ${debugInfo}`
           );
         }
 
         throw new ProviderError(
           this.id,
-          `Pixazo API HTTP error ${response.status}: ${response.statusText} (${errorDetails})`
+          `Pixazo API HTTP error ${response.status}: ${response.statusText}. ${debugInfo}`
         );
       }
 

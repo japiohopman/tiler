@@ -103,7 +103,7 @@ async function runTests() {
     assert(capturedUrl === 'https://gateway.pixazo.ai/getImage/v1/getSDXLImage', 'Requests official Pixazo SDXL Base gateway endpoint');
     assert(capturedHeaders['Ocp-Apim-Subscription-Key'] === 'test-subscription-key-12345', 'Includes Ocp-Apim-Subscription-Key header');
     assert(capturedBody.height === 512 && capturedBody.width === 512, 'Specifies height=512 and width=512 resolution parameters');
-    assert(capturedBody.num_steps === 20 && capturedBody.guidance_scale === 5, 'Includes num_steps=20 and guidance_scale=5');
+    assert(capturedBody.num_steps === 20 && capturedBody.guidance === 5, 'Includes num_steps=20 and guidance=5');
     assert(capturedBody.seed === 42, 'Includes seed parameter');
     assert(capturedBody.negative_prompt.length > 0, 'Includes negative_prompt parameter');
     assert(syncResult.imageDataUrl.startsWith('data:image/'), 'Returns normalized base64 Data URL');

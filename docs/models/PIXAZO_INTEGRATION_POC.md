@@ -52,7 +52,7 @@ The implementation was built against current official Pixazo API documentation:
   "height": 512,
   "width": 512,
   "num_steps": 20,
-  "guidance_scale": 5,
+  "guidance": 5,
   "seed": 42
 }
 ```
