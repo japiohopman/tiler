@@ -9,20 +9,20 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
 /**
  * Pixazo AI Image Generation Provider (Proof of Concept - Issue #15 / Phase 2C.1)
  *
- * Integrates Pixazo Serverless AI Gateway API for text-to-image texture generation.
+ * Integrates Pixazo Serverless AI Gateway API targeting the FREE SDXL text-to-image model.
  *
  * Official Specs & Sources:
- * - Free Tier Documentation: https://www.pixazo.ai/api/free
- * - GPT Image API Reference: https://www.pixazo.ai/models/gpt-image
- * - Gateway Endpoint: https://gateway.pixazo.ai/gpt-image-2/v1/text-to-image
- * - Status Endpoint: https://gateway.pixazo.ai/v2/requests/status/{request_id}
- * - Authentication: Ocp-Apim-Subscription-Key header
- * - Output Resolution: Supports 512x512 resolution
- * - Free Tier / Open Beta: Free API access upon registration (requires API subscription key)
+ * - Free API Overview: https://www.pixazo.ai/api/free
+ * - SDXL Model Documentation: https://www.pixazo.ai/models/stable-diffusion
+ * - Default Gateway Endpoint: https://gateway.pixazo.ai/sdxl/v1/text-to-image
+ * - Status Polling Endpoint: https://gateway.pixazo.ai/v2/requests/status/{request_id}
+ * - Authentication Header: Ocp-Apim-Subscription-Key
+ * - Resolution Support: 512x512
+ * - Pricing Tier: Free Tier / Open Beta (requires subscription key)
  */
 export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   public readonly id = 'pixazo';
-  public readonly name = 'Pixazo AI Provider (PoC)';
+  public readonly name = 'Pixazo AI Provider (SDXL PoC)';
 
   private getApiKey(): string | undefined {
     return process.env.PIXAZO_API_KEY || process.env.PIXAZO_SUBSCRIPTION_KEY;
@@ -31,12 +31,12 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   private getEndpoint(): string {
     return (
       process.env.PIXAZO_ENDPOINT ||
-      'https://gateway.pixazo.ai/gpt-image-2/v1/text-to-image'
+      'https://gateway.pixazo.ai/sdxl/v1/text-to-image'
     );
   }
 
   private getModelName(): string {
-    return process.env.PIXAZO_MODEL || 'gpt-image-2';
+    return process.env.PIXAZO_MODEL || 'sdxl';
   }
 
   /**
@@ -48,7 +48,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   }
 
   /**
-   * Generates visual texture using Pixazo text-to-image API
+   * Generates visual texture using Pixazo SDXL text-to-image API
    */
   public async generate(request: GenerationRequest): Promise<GeneratedImage> {
     const apiKey = this.getApiKey();
@@ -84,6 +84,8 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
     const payload = {
       prompt: builtPrompt,
+      width: resolution,
+      height: resolution,
       size: formattedSize,
       image_size: formattedSize,
       format: 'png',
@@ -169,6 +171,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
         generationTimeMs,
         metadata: {
           providerId: this.id,
+          model,
           isFree: true,
           pricingTier: 'free-tier/open-beta',
           supportsSeed: false,

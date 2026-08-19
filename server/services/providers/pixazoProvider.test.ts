@@ -8,13 +8,13 @@ import { PixazoImageGenerationProvider, pixazoProvider } from './pixazoProvider'
 import { ProviderError } from './types';
 
 /**
- * Unit Test Suite for Pixazo AI Provider (Issue #15 / Phase 2C.1)
- * Tests provider configuration detection, API request construction, async queue polling,
+ * Unit Test Suite for Pixazo AI Provider (SDXL PoC - Issue #15 / Phase 2C.1)
+ * Tests provider configuration detection, SDXL API request construction, async queue polling,
  * HTTP error normalization, and benchmark runner compatibility using mocked fetch responses.
  */
 async function runTests() {
   console.log('======================================================');
-  console.log('  [PixazoProvider] Starting Unit Test Suite');
+  console.log('  [PixazoProvider] Starting Unit Test Suite (SDXL)');
   console.log('======================================================\n');
 
   let passed = 0;
@@ -64,7 +64,7 @@ async function runTests() {
     assert(pixazoProvider.isConfigured() === true, 'isConfigured returns true when PIXAZO_API_KEY is present');
 
     // 4. Request Construction & Synchronous Response Mock
-    console.log('\n--- Request Construction & Sync Response Mock ---');
+    console.log('\n--- SDXL Request Construction & Sync Response Mock ---');
     let capturedUrl = '';
     let capturedHeaders: Record<string, string> = {};
     let capturedBody: any = {};
@@ -88,7 +88,7 @@ async function runTests() {
       return new Response(
         JSON.stringify({
           status: 'COMPLETED',
-          request_id: 'test-req-001',
+          request_id: 'test-sdxl-001',
           output: {
             media_url: [dummyBase64Png],
             media_type: 'image/png',
@@ -104,11 +104,11 @@ async function runTests() {
       resolution: 512,
     });
 
-    assert(capturedUrl === 'https://gateway.pixazo.ai/gpt-image-2/v1/text-to-image', 'Requests default Pixazo gateway endpoint');
+    assert(capturedUrl === 'https://gateway.pixazo.ai/sdxl/v1/text-to-image', 'Requests default Pixazo SDXL gateway endpoint');
     assert(capturedHeaders['Ocp-Apim-Subscription-Key'] === 'test-subscription-key-12345', 'Includes Ocp-Apim-Subscription-Key header');
-    assert(capturedBody.size === '512x512', 'Specifies 512x512 resolution size parameter');
+    assert(capturedBody.width === 512 && capturedBody.height === 512, 'Specifies 512x512 resolution parameters');
     assert(syncResult.imageDataUrl.startsWith('data:image/'), 'Returns normalized base64 Data URL');
-    assert(syncResult.model === 'gpt-image-2', 'Returns model name gpt-image-2');
+    assert(syncResult.model === 'sdxl', 'Returns model name sdxl');
     assert(syncResult.metadata?.isFree === true, 'Metadata identifies free-tier offering');
 
     // 5. Asynchronous Queue Polling
