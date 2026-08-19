@@ -3,11 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { mockProvider } from '../providers/mockProvider';
 import { benchmarkReporter } from './reporter';
 import { benchmarkRunner } from './runner';
+
+// Load environment variables from .env or .env.local
+dotenv.config();
 
 async function main() {
   console.log('======================================================');
