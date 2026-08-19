@@ -19,7 +19,7 @@ import { pixazoProvider } from './services/providers/pixazoProvider';
  * To use an external provider explicitly, set `IMAGE_PROVIDER=pixazo` or `IMAGE_PROVIDER=gemini`.
  */
 export function bootstrapProviders(): void {
-  // Register available providers
+  // Register available image generation providers
   generationService.registerProvider(mockProvider);
   generationService.registerProvider(geminiProvider);
   generationService.registerProvider(pixazoProvider);

@@ -3,12 +3,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { pixazoProvider } from '../providers/pixazoProvider';
 import { benchmarkReporter } from './reporter';
 import { benchmarkRunner } from './runner';
 
+// Load environment variables from .env or .env.local
+dotenv.config();
+
+/**
+ * Benchmark Framework CLI Execution for Pixazo AI Provider (Issue #15 / Phase 2C.1)
+ *
+ * Runs the 6 canonical benchmark materials (512x512) against Pixazo AI.
+ * Generates machine-readable JSON and human-readable Markdown report artifacts in `benchmark-results/`.
+ */
 async function main() {
   console.log('======================================================');
   console.log('  [Tiler Benchmark Framework] Pixazo AI PoC Execution');
