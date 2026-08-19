@@ -121,3 +121,9 @@ Do not present results as directly comparable when model versions or major infer
 ## Acceptance
 
 A model can become a production candidate only after all six benchmark materials have been tested and the results have been reviewed.
+
+---
+
+## Benchmark Framework Implementation
+
+The automated, provider-agnostic implementation of this protocol is documented in [`BENCHMARK_FRAMEWORK.md`](BENCHMARK_FRAMEWORK.md). It can be executed locally offline using `npm run benchmark` or tested with `npm run test:benchmark`.
