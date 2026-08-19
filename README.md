@@ -2,19 +2,41 @@
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# Tiler - AI Tile Generator
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/af892e62-79ad-40cd-8287-dcc8160b306a
+Seamless 2D game texture generator using AI models and local seam processing/analysis.
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js (v18+)
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+2. Configure environment variables (optional for local/mock execution):
+   ```bash
+   cp .env.example .env.local
+   ```
+   - For Gemini API: Set `GEMINI_API_KEY` in `.env.local`
+   - For Pixazo AI PoC: Set `PIXAZO_API_KEY` in `.env.local`
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Testing & Benchmarks
+
+- **Run all unit test suites:**
+  ```bash
+  npm test
+  ```
+- **Run local deterministic benchmark (Mock provider):**
+  ```bash
+  npm run benchmark
+  ```
+- **Run Pixazo AI PoC benchmark:**
+  ```bash
+  npm run benchmark:pixazo
+  ```
+  *(Requires `PIXAZO_API_KEY` set in environment for real API execution. Reports clear notice if unconfigured.)*
