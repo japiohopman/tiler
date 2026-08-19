@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { benchmarkRunner } from '../benchmark';
+import { benchmarkRunner, extractProviderMetadata } from '../benchmark';
 import { PixazoImageGenerationProvider, pixazoProvider } from './pixazoProvider';
 import { ProviderError } from './types';
 
 /**
  * Unit Test Suite for Pixazo AI Provider (SDXL Base 1.0 PoC - Issue #15 / Phase 2C.1)
  * Tests provider configuration detection, SDXL Base API request construction, async queue polling,
- * HTTP error normalization, and benchmark runner compatibility using mocked fetch responses.
+ * HTTP error normalization, single-stream body reading, and benchmark runner compatibility.
  */
 async function runTests() {
   console.log('======================================================');
@@ -40,6 +40,10 @@ async function runTests() {
     console.log('--- Provider Properties & Metadata ---');
     assert(pixazoProvider.id === 'pixazo', 'Provider id is pixazo');
     assert(pixazoProvider.name.includes('Pixazo'), 'Provider name includes Pixazo');
+    assert(pixazoProvider.model === 'sdxl-base-1.0', 'Provider model property is sdxl-base-1.0');
+
+    const metadata = extractProviderMetadata(pixazoProvider as any);
+    assert(metadata.model === 'sdxl-base-1.0', 'extractProviderMetadata retrieves model sdxl-base-1.0');
 
     // 2. Unconfigured State
     console.log('\n--- Configuration Detection ---');
@@ -154,10 +158,10 @@ async function runTests() {
     assert(pollCount >= 2, 'Polls status endpoint until status is COMPLETED');
     assert(asyncResult.imageDataUrl.startsWith('data:image/'), 'Returns image upon async completion');
 
-    // 6. HTTP Error Handling
-    console.log('\n--- HTTP Error Handling ---');
+    // 6. Single-Read HTTP Error Handling
+    console.log('\n--- HTTP Error Handling & Single-Stream Reading ---');
     globalThis.fetch = (async (): Promise<Response> => {
-      return new Response(JSON.stringify({ message: 'Invalid subscription key' }), { status: 401 });
+      return new Response('<html>401 Unauthorized</html>', { status: 401, headers: { 'content-type': 'text/html' } });
     }) as typeof fetch;
 
     let authError: any;
@@ -166,7 +170,10 @@ async function runTests() {
     } catch (err) {
       authError = err;
     }
-    assert(authError instanceof ProviderError && authError.message.includes('401 Unauthorized'), 'Handles 401 Unauthorized error cleanly');
+    assert(
+      authError instanceof ProviderError && authError.message.includes('401 Unauthorized'),
+      'Handles plain HTML 401 error cleanly without body re-read failure'
+    );
 
     globalThis.fetch = (async (): Promise<Response> => {
       return new Response(JSON.stringify({ message: 'Insufficient balance' }), { status: 402 });
@@ -207,6 +214,7 @@ async function runTests() {
     const benchmarkResult = await benchmarkRunner.run(mockPixazo, { resolution: 512, seed: 123 });
 
     assert(benchmarkResult.providerId === 'pixazo', 'Benchmark runner executes with pixazo provider');
+    assert(benchmarkResult.model === 'sdxl-base-1.0', 'Benchmark run result records model sdxl-base-1.0');
     assert(benchmarkResult.summary.total === 6, 'Benchmark runner evaluates all 6 materials');
     assert(benchmarkResult.summary.successful === 6, 'All 6 mocked material generations succeed');
 

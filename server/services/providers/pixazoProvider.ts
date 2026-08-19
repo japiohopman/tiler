@@ -25,6 +25,10 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   public readonly id = 'pixazo';
   public readonly name = 'Pixazo AI Provider (SDXL Base 1.0 PoC)';
 
+  public get model(): string {
+    return this.getModelName();
+  }
+
   private getApiKey(): string | undefined {
     return process.env.PIXAZO_API_KEY || process.env.PIXAZO_SUBSCRIPTION_KEY;
   }
@@ -104,11 +108,14 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
       if (!response.ok) {
         let errorDetails = '';
-        try {
-          const errJson = await response.json();
-          errorDetails = errJson.message || errJson.error || JSON.stringify(errJson);
-        } catch {
-          errorDetails = await response.text();
+        const rawText = await response.text().catch(() => '');
+        if (rawText) {
+          try {
+            const errJson = JSON.parse(rawText);
+            errorDetails = errJson.message || errJson.error || JSON.stringify(errJson);
+          } catch {
+            errorDetails = rawText;
+          }
         }
 
         const debugInfo = `[URL: POST ${endpoint} | Status: ${response.status} ${response.statusText} | Body: ${errorDetails.trim()}]`;
@@ -226,9 +233,10 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       });
 
       if (!response.ok) {
+        const errText = await response.text().catch(() => '');
         throw new ProviderError(
           this.id,
-          `Polling Pixazo status failed HTTP ${response.status}: ${response.statusText}`
+          `Polling Pixazo status failed HTTP ${response.status}: ${response.statusText} (${errText})`
         );
       }
 
@@ -262,9 +270,15 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
     const res = await fetch(urlOrDataUrl);
     if (!res.ok) {
+      let errText = '';
+      try {
+        errText = await res.text();
+      } catch {
+        // ignore
+      }
       throw new ProviderError(
         this.id,
-        `Failed to download generated image from ${urlOrDataUrl} (HTTP ${res.status})`
+        `Failed to download generated image from ${urlOrDataUrl} (HTTP ${res.status} ${res.statusText}): ${errText}`
       );
     }
 
