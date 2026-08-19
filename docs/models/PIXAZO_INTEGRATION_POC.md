@@ -1,4 +1,4 @@
-# Pixazo AI Provider Integration (Phase 2C.1 PoC)
+# Pixazo AI Provider Integration (Phase 2C.1 PoC — Issue #15)
 
 ## Executive Summary
 

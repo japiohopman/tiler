@@ -7,6 +7,11 @@ import { benchmarkRunner } from '../benchmark';
 import { PixazoImageGenerationProvider, pixazoProvider } from './pixazoProvider';
 import { ProviderError } from './types';
 
+/**
+ * Unit Test Suite for Pixazo AI Provider (Issue #15 / Phase 2C.1)
+ * Tests provider configuration detection, API request construction, async queue polling,
+ * HTTP error normalization, and benchmark runner compatibility using mocked fetch responses.
+ */
 async function runTests() {
   console.log('======================================================');
   console.log('  [PixazoProvider] Starting Unit Test Suite');
@@ -26,7 +31,7 @@ async function runTests() {
     }
   }
 
-  // Preserve global fetch
+  // Preserve global fetch & env
   const originalFetch = globalThis.fetch;
   const originalEnv = { ...process.env };
 

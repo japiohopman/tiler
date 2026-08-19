@@ -7,16 +7,18 @@ import { PromptBuilder } from '../promptBuilder';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
 
 /**
- * Pixazo AI Image Generation Provider (Proof of Concept)
+ * Pixazo AI Image Generation Provider (Proof of Concept - Issue #15 / Phase 2C.1)
  *
  * Integrates Pixazo Serverless AI Gateway API for text-to-image texture generation.
  *
- * Official Specs:
+ * Official Specs & Sources:
+ * - Free Tier Documentation: https://www.pixazo.ai/api/free
+ * - GPT Image API Reference: https://www.pixazo.ai/models/gpt-image
  * - Gateway Endpoint: https://gateway.pixazo.ai/gpt-image-2/v1/text-to-image
  * - Status Endpoint: https://gateway.pixazo.ai/v2/requests/status/{request_id}
  * - Authentication: Ocp-Apim-Subscription-Key header
  * - Output Resolution: Supports 512x512 resolution
- * - Free Tier / Open Beta: Free API access upon registration (requires subscription key)
+ * - Free Tier / Open Beta: Free API access upon registration (requires API subscription key)
  */
 export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   public readonly id = 'pixazo';

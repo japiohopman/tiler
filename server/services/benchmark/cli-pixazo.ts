@@ -9,6 +9,12 @@ import { pixazoProvider } from '../providers/pixazoProvider';
 import { benchmarkReporter } from './reporter';
 import { benchmarkRunner } from './runner';
 
+/**
+ * Benchmark Framework CLI Execution for Pixazo AI Provider (Issue #15 / Phase 2C.1)
+ *
+ * Runs the 6 canonical benchmark materials (512x512) against Pixazo AI.
+ * Generates machine-readable JSON and human-readable Markdown report artifacts in `benchmark-results/`.
+ */
 async function main() {
   console.log('======================================================');
   console.log('  [Tiler Benchmark Framework] Pixazo AI PoC Execution');
