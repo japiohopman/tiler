@@ -1,10 +1,10 @@
-# Pixazo AI Provider Integration (Phase 2C.1 SDXL PoC — Issue #15)
+# Pixazo AI Provider Integration (Phase 2C.1 SDXL Base 1.0 PoC — Issue #15)
 
 ## Executive Summary
 
-This document details the controlled Proof of Concept (PoC) integration of **Pixazo AI** as Tiler's first external `ImageGenerationProvider` targeting Pixazo's **FREE SDXL** model.
+This document details the controlled Proof of Concept (PoC) integration of **Pixazo AI** as Tiler's first external `ImageGenerationProvider` targeting Pixazo's **FREE SDXL Base 1.0** model.
 
-The objective of Phase 2C.1 (Issue #15) is to evaluate whether Pixazo's free SDXL endpoint can reliably generate 512×512 2D game textures through Tiler's provider abstraction and benchmark pipeline.
+The objective of Phase 2C.1 (Issue #15) is to evaluate whether Pixazo's free SDXL Base 1.0 endpoint can reliably generate 512×512 2D game textures through Tiler's provider abstraction and benchmark pipeline.
 
 > **Status Notice:** This integration is a controlled Proof of Concept and does **NOT** represent a final provider selection or winner declaration.
 
@@ -17,7 +17,7 @@ Pixazo integration is implemented in `server/services/providers/pixazoProvider.t
 ```typescript
 export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   public readonly id = 'pixazo';
-  public readonly name = 'Pixazo AI Provider (SDXL PoC)';
+  public readonly name = 'Pixazo AI Provider (SDXL Base 1.0 PoC)';
   public isConfigured(): boolean;
   public generate(request: GenerationRequest): Promise<GeneratedImage>;
 }
@@ -32,18 +32,37 @@ The concrete provider is registered in `server/bootstrap.ts`. Application startu
 The implementation was built against current official Pixazo API documentation:
 
 - **Free Tier Documentation:** [https://www.pixazo.ai/api/free](https://www.pixazo.ai/api/free)
-- **SDXL Model Documentation:** [https://www.pixazo.ai/models/stable-diffusion](https://www.pixazo.ai/models/stable-diffusion)
+- **SDXL Base 1.0 Documentation:** [https://www.pixazo.ai/models/sdxl](https://www.pixazo.ai/models/sdxl)
 
 ### Key Technical Specs
 
 | Spec | Value |
 | :--- | :--- |
-| **API Gateway Endpoint** | `https://gateway.pixazo.ai/sdxl/v1/text-to-image` |
+| **API Gateway Endpoint** | `https://gateway.pixazo.ai/getImage/v1/getSDXLImage` |
 | **Status Polling Endpoint** | `https://gateway.pixazo.ai/v2/requests/status/{request_id}` |
 | **Authentication Header** | `Ocp-Apim-Subscription-Key: <YOUR_API_KEY>` |
-| **Supported Dimensions** | `512x512` (`width: 512`, `height: 512`, `size: "512x512"`) |
-| **Output Format** | PNG (`format: "png"`) |
-| **Default Model** | `sdxl` (configurable via `PIXAZO_MODEL`) |
+| **Supported Dimensions** | `512x512` (`width: 512`, `height: 512`) |
+| **Default Model** | `sdxl-base-1.0` (configurable via `PIXAZO_MODEL`) |
+
+### Request Payload Schema
+```json
+{
+  "prompt": "canonical texture prompt",
+  "negative_prompt": "blurry, distorted, low quality, 3d render, perspective view, character, face",
+  "height": 512,
+  "width": 512,
+  "num_steps": 20,
+  "guidance_scale": 5,
+  "seed": 42
+}
+```
+
+### Response Schema
+```json
+{
+  "imageUrl": "https://pixazo.ai/output/...png"
+}
+```
 
 ---
 
@@ -55,7 +74,7 @@ The implementation was built against current official Pixazo API documentation:
 
 2. **Free Tier Access:**
    - Free registration at [pixazo.ai](https://www.pixazo.ai/) activates free tier API access without requiring a credit card upon registration.
-   - Provides access to free models including SDXL (`sdxl`), SD 1.5, and Flux Schnell.
+   - Provides access to free models including SDXL Base 1.0 (`sdxl-base-1.0`).
 
 3. **Classification:**
    - **FREE WITH LIMITS / OPEN BETA** — API key required; rate limits (429) and account balance/quota limits (402) apply.
@@ -69,7 +88,7 @@ The implementation was built against current official Pixazo API documentation:
 | `PIXAZO_API_KEY` | Yes (for real API) | Pixazo subscription API key (`Ocp-Apim-Subscription-Key`) |
 | `PIXAZO_SUBSCRIPTION_KEY` | Optional | Alias for `PIXAZO_API_KEY` |
 | `PIXAZO_ENDPOINT` | Optional | Override gateway endpoint URL |
-| `PIXAZO_MODEL` | Optional | Model identifier (defaults to `sdxl`) |
+| `PIXAZO_MODEL` | Optional | Model identifier (defaults to `sdxl-base-1.0`) |
 
 If credentials are absent, `pixazoProvider.isConfigured()` returns `false`, preventing unauthenticated network attempts.
 

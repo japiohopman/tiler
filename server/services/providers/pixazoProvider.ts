@@ -9,20 +9,21 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
 /**
  * Pixazo AI Image Generation Provider (Proof of Concept - Issue #15 / Phase 2C.1)
  *
- * Integrates Pixazo Serverless AI Gateway API targeting the FREE SDXL text-to-image model.
+ * Integrates Pixazo Serverless AI Gateway API targeting the FREE SDXL Base 1.0 model.
  *
  * Official Specs & Sources:
  * - Free API Overview: https://www.pixazo.ai/api/free
- * - SDXL Model Documentation: https://www.pixazo.ai/models/stable-diffusion
- * - Default Gateway Endpoint: https://gateway.pixazo.ai/sdxl/v1/text-to-image
+ * - SDXL Base 1.0 Model Documentation: https://www.pixazo.ai/models/sdxl
+ * - Default Gateway Endpoint: https://gateway.pixazo.ai/getImage/v1/getSDXLImage
  * - Status Polling Endpoint: https://gateway.pixazo.ai/v2/requests/status/{request_id}
  * - Authentication Header: Ocp-Apim-Subscription-Key
  * - Resolution Support: 512x512
- * - Pricing Tier: Free Tier / Open Beta (requires subscription key)
+ * - Request Schema: prompt, negative_prompt, width, height, num_steps, guidance_scale, seed
+ * - Response Schema: imageUrl
  */
 export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   public readonly id = 'pixazo';
-  public readonly name = 'Pixazo AI Provider (SDXL PoC)';
+  public readonly name = 'Pixazo AI Provider (SDXL Base 1.0 PoC)';
 
   private getApiKey(): string | undefined {
     return process.env.PIXAZO_API_KEY || process.env.PIXAZO_SUBSCRIPTION_KEY;
@@ -31,12 +32,12 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   private getEndpoint(): string {
     return (
       process.env.PIXAZO_ENDPOINT ||
-      'https://gateway.pixazo.ai/sdxl/v1/text-to-image'
+      'https://gateway.pixazo.ai/getImage/v1/getSDXLImage'
     );
   }
 
   private getModelName(): string {
-    return process.env.PIXAZO_MODEL || 'sdxl';
+    return process.env.PIXAZO_MODEL || 'sdxl-base-1.0';
   }
 
   /**
@@ -48,7 +49,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   }
 
   /**
-   * Generates visual texture using Pixazo SDXL text-to-image API
+   * Generates visual texture using Pixazo SDXL Base 1.0 text-to-image API
    */
   public async generate(request: GenerationRequest): Promise<GeneratedImage> {
     const apiKey = this.getApiKey();
@@ -61,7 +62,6 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
     const startTime = performance.now();
     const resolution = request.resolution || 512;
-    const formattedSize = `${resolution}x${resolution}`;
 
     const builtPrompt =
       request.customPrompt ||
@@ -82,15 +82,18 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       'Ocp-Apim-Subscription-Key': apiKey,
     };
 
-    const payload = {
+    const payload: Record<string, any> = {
       prompt: builtPrompt,
-      width: resolution,
+      negative_prompt: 'blurry, distorted, low quality, 3d render, perspective view, character, face',
       height: resolution,
-      size: formattedSize,
-      image_size: formattedSize,
-      format: 'png',
-      output_format: 'png',
+      width: resolution,
+      num_steps: 20,
+      guidance_scale: 5,
     };
+
+    if (typeof request.seed === 'number') {
+      payload.seed = request.seed;
+    }
 
     try {
       const response = await fetch(endpoint, {
@@ -120,6 +123,12 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
             `Pixazo API returned 402 Insufficient Balance / Quota Exceeded. (${errorDetails})`
           );
         }
+        if (response.status === 404) {
+          throw new ProviderError(
+            this.id,
+            `Pixazo API returned 404 Resource Not Found at ${endpoint}. Check endpoint URL. (${errorDetails})`
+          );
+        }
         if (response.status === 429) {
           throw new ProviderError(
             this.id,
@@ -136,10 +145,12 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       const body = await response.json();
 
       let imageUrl: string | undefined;
-      let requestId: string | undefined = body.request_id;
+      let requestId: string | undefined = body.request_id || body.requestId;
 
-      // Handle async queue status flow if returned
-      if (body.status === 'QUEUED' || body.status === 'PROCESSING' || (requestId && !body.output)) {
+      // Primary SDXL Base 1.0 schema: { imageUrl: "..." }
+      if (body.imageUrl) {
+        imageUrl = body.imageUrl;
+      } else if (body.status === 'QUEUED' || body.status === 'PROCESSING' || (requestId && !body.output)) {
         imageUrl = await this.pollQueueStatus(requestId!, apiKey, body.polling_url);
       } else if (body.output?.media_url && body.output.media_url.length > 0) {
         imageUrl = body.output.media_url[0];
@@ -154,7 +165,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       if (!imageUrl) {
         throw new ProviderError(
           this.id,
-          `Pixazo API response missing output image media URL: ${JSON.stringify(body)}`
+          `Pixazo API response missing output image URL: ${JSON.stringify(body)}`
         );
       }
 
@@ -174,7 +185,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
           model,
           isFree: true,
           pricingTier: 'free-tier/open-beta',
-          supportsSeed: false,
+          supportsSeed: typeof request.seed === 'number',
           requestId,
           resolution,
           requestedMaterial: request.material,
@@ -221,8 +232,8 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
       const body = await response.json();
 
-      if (body.status === 'COMPLETED' && body.output?.media_url?.length > 0) {
-        return body.output.media_url[0];
+      if (body.status === 'COMPLETED' && (body.imageUrl || body.output?.media_url?.length > 0)) {
+        return body.imageUrl || body.output.media_url[0];
       }
 
       if (body.status === 'FAILED' || body.status === 'ERROR') {
