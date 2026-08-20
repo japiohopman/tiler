@@ -110,7 +110,7 @@ async function runHuggingFaceProviderTests() {
     console.log('\n--- Official Request Construction & Binary Response Mock ---');
     // ------------------------------------------------------------------------
 
-    await test('Requests official Hugging Face router endpoint (default fal-ai) with headers & body', async () => {
+    await test('Requests official Hugging Face router endpoint (default provider=auto) with headers & body', async () => {
       process.env.HF_TOKEN = 'hf_mock_test_token_abc';
       delete process.env.HF_PROVIDER;
       delete process.env.HUGGINGFACE_PROVIDER;
@@ -147,7 +147,7 @@ async function runHuggingFaceProviderTests() {
 
       assert.strictEqual(
         capturedUrl,
-        'https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell'
+        'https://router.huggingface.co/auto/models/black-forest-labs/FLUX.1-schnell'
       );
       assert.strictEqual(capturedMethod, 'POST');
       assert.strictEqual(capturedHeaders['Authorization'], 'Bearer hf_mock_test_token_abc');
@@ -160,7 +160,7 @@ async function runHuggingFaceProviderTests() {
       assert.ok(result.imageDataUrl.startsWith('data:image/png;base64,'));
       assert.strictEqual(result.model, 'black-forest-labs/FLUX.1-schnell');
       assert.strictEqual(result.metadata?.underlyingInferenceProvider, 'fal-ai');
-      assert.strictEqual(result.metadata?.routingMode, 'explicit-provider');
+      assert.strictEqual(result.metadata?.routingMode, 'auto');
       assert.strictEqual(result.metadata?.pricingClassification, 'FREE WITH LIMITED MONTHLY CREDITS');
     });
 
@@ -168,9 +168,9 @@ async function runHuggingFaceProviderTests() {
     console.log('\n--- Custom Provider Routing & Model Override ---');
     // ------------------------------------------------------------------------
 
-    await test('Supports automatic provider routing (auto)', async () => {
+    await test('Supports explicit provider routing override (e.g. HF_PROVIDER=fal-ai)', async () => {
       process.env.HF_TOKEN = 'hf_mock_token';
-      process.env.HF_PROVIDER = 'auto';
+      process.env.HF_PROVIDER = 'fal-ai';
       const provider = new HuggingFaceImageGenerationProvider();
 
       let capturedUrl = '';
@@ -189,9 +189,9 @@ async function runHuggingFaceProviderTests() {
 
       assert.strictEqual(
         capturedUrl,
-        'https://router.huggingface.co/auto/models/black-forest-labs/FLUX.1-schnell'
+        'https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell'
       );
-      assert.strictEqual(res.metadata?.routingMode, 'auto');
+      assert.strictEqual(res.metadata?.routingMode, 'explicit-provider');
       assert.strictEqual(res.metadata?.underlyingInferenceProvider, 'fal-ai');
     });
 
@@ -246,13 +246,13 @@ async function runHuggingFaceProviderTests() {
     console.log('\n--- HTTP Error Handling, Status Codes & Redaction ---');
     // ------------------------------------------------------------------------
 
-    await test('Handles 401 Unauthorized error and redacts token', async () => {
+    await test('Handles 401 Unauthorized error, specifies fine-grained token requirement, and redacts token', async () => {
       const secretToken = 'hf_super_secret_token_12345';
       process.env.HF_TOKEN = secretToken;
       const provider = new HuggingFaceImageGenerationProvider();
 
       globalThis.fetch = (async () => {
-        return new Response(JSON.stringify({ error: `Invalid token ${secretToken}` }), {
+        return new Response(JSON.stringify({ error: `Invalid username or password.` }), {
           status: 401,
           statusText: 'Unauthorized',
         });
@@ -265,8 +265,8 @@ async function runHuggingFaceProviderTests() {
         (err: any) => {
           assert.strictEqual(err.providerId, 'huggingface');
           assert.ok(err.message.includes('401 Unauthorized'));
+          assert.ok(err.message.includes('Make calls to Inference Providers'));
           assert.ok(!err.message.includes(secretToken));
-          assert.ok(err.message.includes('[REDACTED_HF_TOKEN]'));
           return true;
         }
       );

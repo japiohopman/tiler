@@ -3,7 +3,7 @@
 **Status:** Complete (Phase 2C.3 - GitHub Issue #18)
 **Provider Classification:** **FREE WITH LIMITED MONTHLY CREDITS**
 **Default Model:** `black-forest-labs/FLUX.1-schnell`
-**Primary Endpoint:** `https://router.huggingface.co/{provider}/models/{model}` (default provider routing: `fal-ai`, or `auto`)
+**Primary Endpoint:** `https://router.huggingface.co/auto/models/black-forest-labs/FLUX.1-schnell` (automatic routing mode: `auto`)
 
 ---
 
@@ -22,7 +22,7 @@ This document evaluates the Hugging Face Inference Providers API for seamless 2D
 - **Access Classification:** `FREE WITH LIMITED MONTHLY CREDITS`
 - **Monthly Free Credits:** `$0.10` (Free Users) / `$2.00` (PRO Users)
 - **Extra Usage:** Requires credit purchase / payment details
-- **Pricing per Request:** Provider/model dependent (no hard-coded cost assumptions made)
+- **Pricing per Request:** Provider and model dependent (no hard-coded cost estimates presented as verified facts)
 - **Policy:** Tiler does not purchase credits, store credit card details, or spend beyond available free credit allowance.
 
 ---
@@ -40,21 +40,28 @@ The integration was implemented adhering strictly to current official Hugging Fa
 
 ## 3. Technical Integration Details
 
+### Authentication Requirements
+
+Hugging Face requires a fine-grained User Access Token with:
+- Permission: **"Make calls to Inference Providers"** (`inference.serverless.write`)
+- Generated from: [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+
+Standard classic read/write tokens or provider-specific credentials (e.g. fal keys) are not valid substitutes.
+
 ### Architecture & Routing
 
 - **Provider Abstraction:** Implements `ImageGenerationProvider` in `server/services/providers/huggingFaceProvider.ts` behind `id: "huggingface"`.
 - **Target Model:** `black-forest-labs/FLUX.1-schnell`
 - **Inference Router Endpoint:** `https://router.huggingface.co/{provider}/models/{model}`
-  - Default routing: `fal-ai` (as documented in HF's First API Call guide for FLUX.1-schnell)
-  - Automatic routing mode: `auto` (set `HF_PROVIDER=auto`)
-  - Configurable via `HF_PROVIDER` env variable
+  - Default routing: `auto` (`https://router.huggingface.co/auto/models/black-forest-labs/FLUX.1-schnell`)
+  - Optional provider overrides: `fal-ai`, `replicate`, `together` (via `HF_PROVIDER` env variable)
 - **Authentication:** `Authorization: Bearer ${HF_TOKEN}`
 - **Resolution:** `512x512`
 - **Parameters Supported:** `inputs` (prompt), `parameters.width`, `parameters.height`, `parameters.seed` (seed: 42 preserved)
 - **Metadata Captured:**
   - `model`: Model identifier (`black-forest-labs/FLUX.1-schnell`)
   - `underlyingInferenceProvider`: Actual compute provider handling request (`fal-ai`, etc.)
-  - `routingMode`: `explicit-provider` or `auto`
+  - `routingMode`: `auto` or `explicit-provider`
   - `pricingClassification`: `FREE WITH LIMITED MONTHLY CREDITS`
 - **Response Handling:** Parses binary image streams (`image/png`, `image/jpeg`) as well as JSON payload responses (`generated_image`, `b64_json`, `url`), normalizing all outputs to base64 Data URLs (`data:image/png;base64,...`).
 
@@ -67,7 +74,7 @@ The provider adapter handles all error states cleanly without throwing unhandled
 | HTTP Status | Trigger / Condition | Normalized Behavior |
 | :--- | :--- | :--- |
 | **Missing Token** | `HF_TOKEN` / `HUGGINGFACE_API_KEY` absent | Throws `ProviderError` prompting user to configure token |
-| **401 Unauthorized** | Invalid or expired token | Throws `ProviderError` (redacting token strings from debug message) |
+| **401 Unauthorized** | Token missing "Make calls to Inference Providers" permission or invalid | Throws `ProviderError` ("Invalid username or password. Ensure HF_TOKEN is a valid fine-grained User Access Token with 'Make calls to Inference Providers' permission.") |
 | **402 Payment Required** | Insufficient free monthly credits | Throws `ProviderError` ("Insufficient Free Credits / $0.10 monthly free credit allowance exhausted") |
 | **403 Forbidden** | Model access denied / unaccepted terms | Throws `ProviderError` ("Access denied for model or provider") |
 | **404 Not Found** | Incorrect endpoint or model ID | Throws `ProviderError` ("Model Not Found") |
@@ -76,23 +83,31 @@ The provider adapter handles all error states cleanly without throwing unhandled
 
 ---
 
-## 5. Benchmark Execution & Credit Feasibility
+## 5. Real Benchmark Execution & Status
 
-### Execution Policy
+### Execution Command
 
-To run the real benchmark against Hugging Face:
 ```bash
 npm run benchmark:huggingface
 ```
 
-The CLI benchmark script (`server/services/benchmark/cli-huggingface.ts`) automatically verifies whether `HF_TOKEN` is present in the environment before executing requests.
+### Real Benchmark Execution Result
 
-### Real Benchmark Execution Status
+When invoking `npm run benchmark:huggingface` against the router endpoint:
+`https://router.huggingface.co/auto/models/black-forest-labs/FLUX.1-schnell`
 
-- **Configured Token:** `HF_TOKEN` was **not present** in the environment during local run.
-- **Execution Output:** The CLI benchmark script (`npm run benchmark:huggingface`) detected that `HF_TOKEN` was not set, cleanly outputting a notice and instructions without faking results or throwing unhandled errors.
-- **Free Credit Feasibility:** Free users receive $0.10/month in credits. Actual request cost depends on the specific provider/model pricing. Tiler never automatically purchases credits or uses pay-as-you-go billing.
-- **Artifact Generation Notice:** Because no real API token was present, real benchmark artifacts (`benchmark-results/huggingface-benchmark.json` and `benchmark-results/huggingface-benchmark.md`) were not created. Full mock validation is covered by unit tests (`npm run test:huggingface`).
+The API returned:
+- **HTTP Status:** `401 Unauthorized`
+- **Body:** `"Invalid username or password."`
+
+### Blocker Analysis
+
+The test token currently set in the execution environment lacks the fine-grained permission **"Make calls to Inference Providers"** or is invalid. As per our core directives:
+- No benchmark results were fabricated.
+- No paid credits or billing additions were attempted.
+- The execution stopped cleanly, logging the sanitized status code and response body without leaking the token.
+
+**Status:** The real benchmark remains blocked until a valid fine-grained Hugging Face token with "Make calls to Inference Providers" permission is supplied in the local environment and at least one real image is successfully generated. Offline mock integration and error normalization are 100% verified via `npm run test:huggingface`.
 
 ---
 
@@ -115,4 +130,4 @@ npm run build            # Runs Vite & Esbuild bundle builds
 | :--- | :--- | :--- | :--- | :--- |
 | **Pixazo** (Phase 2C.1) | SDXL Base 1.0 | Free API Gateway / Open Beta | Yes | Complete |
 | **Pollinations** (Phase 2C.2) | FLUX.1 Schnell | Paid Pollen Credits ($0.0000 free) | Blocked (HTTP 402) | Complete (Blocked) |
-| **Hugging Face** (Phase 2C.3) | FLUX.1 Schnell | **FREE WITH LIMITED MONTHLY CREDITS** ($0.10/mo) | No (`HF_TOKEN` unconfigured) | **Complete** |
+| **Hugging Face** (Phase 2C.3) | FLUX.1 Schnell | **FREE WITH LIMITED MONTHLY CREDITS** ($0.10/mo) | Blocked (HTTP 401: Token permissions) | **PoC Complete (Benchmark Blocked by Token Scope)** |

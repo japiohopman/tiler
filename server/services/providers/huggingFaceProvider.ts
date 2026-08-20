@@ -13,17 +13,20 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  * Default candidate model: black-forest-labs/FLUX.1-schnell
  *
  * Official Specs & Sources:
- * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call (Uses fal-ai & auto)
+ * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call (Uses provider="auto")
  * - Pricing & Billing: https://huggingface.co/docs/inference-providers/en/pricing
  *   (Free users receive limited monthly credits: $0.10, subject to change)
  * - Text-to-Image Task: https://huggingface.co/docs/inference-providers/tasks/text-to-image
  * - Main Index: https://huggingface.co/docs/inference-providers/main/index
  *
  * Authentication:
- * - Bearer Token (HF_TOKEN or HUGGINGFACE_API_KEY) in Authorization header
- * - Endpoint routing format: https://router.huggingface.co/{provider}/models/{model}
- *   Default provider routing for FLUX.1-schnell: fal-ai (or auto)
- *   Default model: black-forest-labs/FLUX.1-schnell
+ * - Bearer Token (HF_TOKEN or HUGGINGFACE_API_KEY) in Authorization header.
+ *   Requires a fine-grained User Access Token with "Make calls to Inference Providers" permission
+ *   from https://huggingface.co/settings/tokens
+ *
+ * Endpoint routing format: https://router.huggingface.co/{provider}/models/{model}
+ * - Default provider routing: auto
+ * - Default model: black-forest-labs/FLUX.1-schnell
  *
  * Resolution Support:
  * - 512x512
@@ -44,7 +47,7 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
   }
 
   private getProviderRouting(): string {
-    return process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'fal-ai';
+    return process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'auto';
   }
 
   private getModelName(): string {
@@ -80,7 +83,7 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
     if (!apiKey) {
       throw new ProviderError(
         this.id,
-        'Hugging Face API token (HF_TOKEN or HUGGINGFACE_API_KEY) is not configured in environment.'
+        'Hugging Face API token (HF_TOKEN or HUGGINGFACE_API_KEY) is not configured in environment. Requires a fine-grained token with "Make calls to Inference Providers" permission from https://huggingface.co/settings/tokens.'
       );
     }
 
@@ -154,7 +157,7 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         if (response.status === 401) {
           throw new ProviderError(
             this.id,
-            `Hugging Face API returned 401 Unauthorized. A valid HF token is required. ${debugInfo}`
+            `Hugging Face API returned 401 Unauthorized ("${errorDetails.trim()}"). Ensure HF_TOKEN is a valid fine-grained User Access Token with "Make calls to Inference Providers" permission from https://huggingface.co/settings/tokens. ${debugInfo}`
           );
         }
         if (response.status === 402) {

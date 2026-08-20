@@ -29,7 +29,7 @@ async function main() {
       '\n[NOTICE] Real Hugging Face benchmark could not be executed because HF_TOKEN (or HUGGINGFACE_API_KEY) is not configured in environment.'
     );
     console.log(
-      'To run a real API benchmark against Hugging Face, obtain a token from https://huggingface.co/settings/tokens and set:'
+      'To run a real API benchmark against Hugging Face, obtain a fine-grained User Access Token with "Make calls to Inference Providers" permission from https://huggingface.co/settings/tokens and set:'
     );
     console.log('  export HF_TOKEN="your_token_here"');
     console.log(
