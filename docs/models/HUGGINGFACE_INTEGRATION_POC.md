@@ -3,7 +3,7 @@
 **Status:** Complete (Phase 2C.3 - GitHub Issue #18)
 **Provider Classification:** **FREE WITH LIMITED MONTHLY CREDITS**
 **Default Model:** `black-forest-labs/FLUX.1-schnell`
-**Underlying Provider:** `fal-ai`
+**Default Provider Routing:** `auto` (optional explicit provider override via `HF_PROVIDER`, e.g. `together`, `replicate`, `fal-ai`)
 **Official SDK:** `@huggingface/inference` (`InferenceClient.textToImage`)
 
 ---
@@ -54,26 +54,24 @@ Provider-specific credentials (e.g. fal keys) or classic read/write tokens witho
 
 - **Provider Abstraction:** Implements `ImageGenerationProvider` in `server/services/providers/huggingFaceProvider.ts` behind `id: "huggingface"`.
 - **Target Model:** `black-forest-labs/FLUX.1-schnell`
-- **Underlying Provider:** `fal-ai` (explicit default)
+- **Provider Routing:** `provider: "auto"` (default) or explicit provider override via `HF_PROVIDER` (e.g. `together`, `replicate`, `fal-ai`)
 - **Official Client SDK:** Uses `@huggingface/inference` `InferenceClient` to invoke:
   ```ts
   const client = new InferenceClient(HF_TOKEN);
   const imageBlob = await client.textToImage({
     model: "black-forest-labs/FLUX.1-schnell",
     inputs: builtPrompt,
-    provider: "fal-ai", // or process.env.HF_PROVIDER
+    provider: "auto", // or process.env.HF_PROVIDER
     parameters: { width: 512, height: 512, seed: 42 }
   });
   ```
-- **Why SDK is Used:**
-  The official `@huggingface/inference` SDK encapsulates provider-specific request structures (e.g., `fal-ai` async queue polling vs `together` OpenAI-compatible image endpoints) into a single unified `textToImage` call.
 - **Authentication:** `Authorization: Bearer ${HF_TOKEN}`
 - **Resolution:** `512x512`
 - **Parameters Supported:** `inputs` (prompt), `parameters.width`, `parameters.height`, `parameters.seed` (seed: 42 preserved)
 - **Metadata Captured:**
   - `model`: Model identifier (`black-forest-labs/FLUX.1-schnell`)
-  - `underlyingInferenceProvider`: Concrete compute provider (`fal-ai`)
-  - `routingMode`: `explicit-provider` (or `auto` if explicitly set in `HF_PROVIDER`)
+  - `underlyingInferenceProvider`: Provider identifier or `"auto"`
+  - `routingMode`: `"auto"` (default) or `"explicit-provider"`
   - `pricingClassification`: `FREE WITH LIMITED MONTHLY CREDITS`
 - **Response Handling:** Converts the SDK `Blob` output or data URL string to base64 Data URLs (`data:image/png;base64,...`).
 
@@ -107,7 +105,7 @@ npm run benchmark:huggingface
 
 When `HF_TOKEN` is unconfigured in the execution environment, `npm run benchmark:huggingface` cleanly outputs a notice and token setup instructions without faking results or making billing commitments.
 
-When `HF_TOKEN` with "Make calls to Inference Providers" permission is present, the SDK routes requests to `fal-ai` (`black-forest-labs/FLUX.1-schnell`).
+When `HF_TOKEN` with "Make calls to Inference Providers" permission is present, the SDK routes requests dynamically (`provider: "auto"`).
 
 No benchmark results are fabricated. Offline mock integration and error normalization are 100% verified via unit tests (`npm run test:huggingface`).
 

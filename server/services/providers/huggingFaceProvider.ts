@@ -12,7 +12,7 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  *
  * Integrates Hugging Face Inference Providers API using the official `@huggingface/inference` SDK.
  * Default candidate model: black-forest-labs/FLUX.1-schnell
- * Default underlying provider: fal-ai
+ * Default provider routing: auto
  *
  * Official Specs & Sources:
  * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call
@@ -27,10 +27,10 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  *   from https://huggingface.co/settings/tokens
  *
  * Architecture & Provider Selection:
- * - ImageGenerationProvider -> HuggingFaceImageGenerationProvider -> InferenceClient -> fal-ai -> FLUX.1-schnell
+ * - ImageGenerationProvider -> HuggingFaceImageGenerationProvider -> InferenceClient -> provider="auto" -> FLUX.1-schnell
  * - Uses client.textToImage({ model, inputs, provider, parameters })
- * - provider defaults to 'fal-ai'
- * - Can be overridden via HF_PROVIDER environment variable (e.g. HF_PROVIDER=together, HF_PROVIDER=replicate, HF_PROVIDER=auto)
+ * - provider defaults to 'auto' (automatic selection & failover managed by Hugging Face)
+ * - Can be overridden via HF_PROVIDER environment variable (e.g. HF_PROVIDER=together, HF_PROVIDER=replicate, HF_PROVIDER=fal-ai)
  *
  * Resolution Support:
  * - 512x512
@@ -51,8 +51,8 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
   }
 
   private getProviderRouting(): string {
-    const raw = process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'fal-ai';
-    return raw.trim() || 'fal-ai';
+    const raw = process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'auto';
+    return raw.trim() || 'auto';
   }
 
   private getModelName(): string {
@@ -155,7 +155,7 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         metadata: {
           providerId: this.id,
           model,
-          underlyingInferenceProvider: providerRouting === 'auto' ? 'auto' : providerRouting,
+          underlyingInferenceProvider: providerRouting,
           routingMode: providerRouting === 'auto' ? 'auto' : 'explicit-provider',
           providerRouting,
           isFree: true,
