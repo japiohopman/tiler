@@ -3,8 +3,8 @@
 **Status:** Complete (Phase 2C.3 - GitHub Issue #18)
 **Provider Classification:** **FREE WITH LIMITED MONTHLY CREDITS**
 **Default Model:** `black-forest-labs/FLUX.1-schnell`
-**Underlying Provider:** `fal-ai`
-**Primary Endpoint:** `https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell`
+**Official SDK:** `@huggingface/inference` (`InferenceClient.textToImage`)
+**Default Provider Routing:** `auto` (resolves dynamically via Hugging Face Hub mapping to `fal-ai` or active partner)
 
 ---
 
@@ -33,10 +33,10 @@ This document evaluates the Hugging Face Inference Providers API for seamless 2D
 The integration was implemented adhering strictly to current official Hugging Face documentation:
 
 1. **First API Call Guide:** [https://huggingface.co/docs/inference-providers/guides/first-api-call](https://huggingface.co/docs/inference-providers/guides/first-api-call)
-2. **Hub API Documentation:** [https://huggingface.co/docs/inference-providers/hub-api](https://huggingface.co/docs/inference-providers/hub-api)
-3. **Pricing & Billing:** [https://huggingface.co/docs/inference-providers/en/pricing](https://huggingface.co/docs/inference-providers/en/pricing)
-4. **Text-to-Image Task:** [https://huggingface.co/docs/inference-providers/tasks/text-to-image](https://huggingface.co/docs/inference-providers/tasks/text-to-image)
-5. **Main Index:** [https://huggingface.co/docs/inference-providers/main/index](https://huggingface.co/docs/inference-providers/main/index)
+2. **Huggingface.js Inference README:** [https://huggingface.co/docs/huggingface.js/en/inference/README](https://huggingface.co/docs/huggingface.js/en/inference/README)
+3. **Hub API Documentation:** [https://huggingface.co/docs/inference-providers/hub-api](https://huggingface.co/docs/inference-providers/hub-api)
+4. **Pricing & Billing:** [https://huggingface.co/docs/inference-providers/en/pricing](https://huggingface.co/docs/inference-providers/en/pricing)
+5. **Text-to-Image Task:** [https://huggingface.co/docs/inference-providers/tasks/text-to-image](https://huggingface.co/docs/inference-providers/tasks/text-to-image)
 
 ---
 
@@ -50,22 +50,31 @@ Hugging Face requires a fine-grained User Access Token with:
 
 Provider-specific credentials (e.g. fal keys) or classic read/write tokens without the Inference Providers permission are not accepted.
 
-### Endpoint Routing Architecture
+### Request Mechanism & SDK Integration
 
 - **Provider Abstraction:** Implements `ImageGenerationProvider` in `server/services/providers/huggingFaceProvider.ts` behind `id: "huggingface"`.
 - **Target Model:** `black-forest-labs/FLUX.1-schnell`
-- **Underlying Provider:** `fal-ai` (as explicitly documented by Hugging Face for FLUX.1-schnell)
-- **Router Endpoint:** `https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell`
-  - *Note on `auto`:* `provider="auto"` is a client-side SDK selection concept in Hugging Face JS/Python SDKs. The raw HTTP router endpoint requires a concrete provider path (e.g., `/fal-ai/models/...`) and must not literally construct `/auto/models/...`. When `HF_PROVIDER=auto` is configured, Tiler's adapter resolves the raw HTTP URL to `fal-ai` while recording `routingMode: 'auto'` in response metadata.
+- **Official Client SDK:** Uses `@huggingface/inference` `InferenceClient` to invoke:
+  ```ts
+  const client = new InferenceClient(HF_TOKEN);
+  const imageBlob = await client.textToImage({
+    model: "black-forest-labs/FLUX.1-schnell",
+    inputs: builtPrompt,
+    provider: "auto", // or process.env.HF_PROVIDER
+    parameters: { width: 512, height: 512, seed: 42 }
+  });
+  ```
+- **Why SDK is Preferred over Raw Router HTTP:**
+  Raw HTTP endpoints vary across individual partners (e.g., `queue.fal.run` uses async queue IDs, `together.xyz` uses OpenAI-like JSON, `replicate.com` uses predictions). The official `@huggingface/inference` SDK dynamically resolves model partner mappings (`fal-ai`, `together`, etc.) via Hugging Face Hub APIs and handles provider-specific request/polling logic automatically.
 - **Authentication:** `Authorization: Bearer ${HF_TOKEN}`
 - **Resolution:** `512x512`
 - **Parameters Supported:** `inputs` (prompt), `parameters.width`, `parameters.height`, `parameters.seed` (seed: 42 preserved)
 - **Metadata Captured:**
   - `model`: Model identifier (`black-forest-labs/FLUX.1-schnell`)
-  - `underlyingInferenceProvider`: Concrete compute provider handling request (`fal-ai`)
-  - `routingMode`: `explicit-provider` or `auto`
+  - `providerRouting`: `auto` or explicit provider override (`fal-ai`, `together`, `replicate`)
+  - `routingMode`: `auto` or `explicit-provider`
   - `pricingClassification`: `FREE WITH LIMITED MONTHLY CREDITS`
-- **Response Handling:** Parses binary image streams (`image/png`, `image/jpeg`) as well as JSON payload responses (`generated_image`, `b64_json`, `url`), normalizing all outputs to base64 Data URLs (`data:image/png;base64,...`).
+- **Response Handling:** Converts the SDK `Blob` output or data URL string to base64 Data URLs (`data:image/png;base64,...`).
 
 ---
 
@@ -97,10 +106,9 @@ npm run benchmark:huggingface
 
 When `HF_TOKEN` is unconfigured in the execution environment, `npm run benchmark:huggingface` cleanly outputs a notice and token setup instructions without faking results or making billing commitments.
 
-When a valid fine-grained token with "Make calls to Inference Providers" permission is present, requests route directly to:
-`https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell`
+When a valid fine-grained token with "Make calls to Inference Providers" permission is supplied, the SDK routes the request directly through the configured provider (`auto`, `fal-ai`, etc.).
 
-No benchmark results are fabricated. Offline mock integration and error normalization are 100% verified via unit tests (`npm run test:huggingface`).
+Offline mock integration and error normalization are 100% verified via unit tests (`npm run test:huggingface`).
 
 ---
 
@@ -109,8 +117,8 @@ No benchmark results are fabricated. Offline mock integration and error normaliz
 All automated unit tests pass completely offline without network calls or API keys:
 
 ```bash
-npm run test:huggingface  # Runs provider-specific unit test suite (15/15 passed)
-npm test                 # Runs full project test suite
+npm run test:huggingface  # Runs provider-specific unit test suite (13/13 passed)
+npm test                 # Runs full project test suite (123/123 passed)
 npm run lint             # Runs TypeScript type check
 npm run build            # Runs Vite & Esbuild bundle builds
 ```

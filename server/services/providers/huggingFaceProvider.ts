@@ -3,32 +3,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { InferenceClient } from '@huggingface/inference';
 import { PromptBuilder } from '../promptBuilder';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
 
 /**
  * Hugging Face Inference Provider (Proof of Concept - Issue #18 / Phase 2C.3)
  *
- * Integrates Hugging Face Inference Providers API targeting open-weights text-to-image models.
+ * Integrates Hugging Face Inference Providers API using the official `@huggingface/inference` SDK.
  * Default candidate model: black-forest-labs/FLUX.1-schnell
- * Default underlying provider: fal-ai
  *
  * Official Specs & Sources:
  * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call
- * - Hub API Documentation: https://huggingface.co/docs/inference-providers/hub-api
+ * - Huggingface.js Inference README: https://huggingface.co/docs/huggingface.js/en/inference/README
  * - Pricing & Billing: https://huggingface.co/docs/inference-providers/en/pricing
  *   (Free users receive limited monthly credits: $0.10, subject to change)
  * - Text-to-Image Task: https://huggingface.co/docs/inference-providers/tasks/text-to-image
- * - Main Index: https://huggingface.co/docs/inference-providers/main/index
  *
  * Authentication:
- * - Bearer Token (HF_TOKEN or HUGGINGFACE_API_KEY) in Authorization header.
+ * - Bearer Token (HF_TOKEN or HUGGINGFACE_API_KEY) in InferenceClient constructor.
  *   Requires a fine-grained User Access Token with "Make calls to Inference Providers" permission
  *   from https://huggingface.co/settings/tokens
  *
- * Endpoint routing format: https://router.huggingface.co/{provider}/models/{model}
- * Note: 'auto' is a client-side SDK selection abstraction and must NOT be used directly as a URL segment.
- * Raw HTTP calls resolve to explicit inference providers (defaulting to 'fal-ai').
+ * Provider Selection & Routing:
+ * - Uses client.textToImage({ model, inputs, provider, parameters })
+ * - provider defaults to 'auto' (automatic failover & routing managed by HF SDK / Hub)
+ * - Can be overridden via HF_PROVIDER environment variable (e.g. HF_PROVIDER=together, HF_PROVIDER=replicate, HF_PROVIDER=fal-ai)
  *
  * Resolution Support:
  * - 512x512
@@ -48,17 +48,9 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
     return process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
   }
 
-  private getRawProviderConfig(): string {
-    return process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'fal-ai';
-  }
-
   private getProviderRouting(): string {
-    const raw = this.getRawProviderConfig().toLowerCase().trim();
-    // 'auto' is a client-side routing abstraction. Raw HTTP router endpoints require a concrete provider.
-    if (raw === 'auto') {
-      return 'fal-ai';
-    }
-    return raw || 'fal-ai';
+    const raw = process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'auto';
+    return raw.trim() || 'auto';
   }
 
   private getModelName(): string {
@@ -67,15 +59,6 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
       process.env.HUGGINGFACE_MODEL ||
       'black-forest-labs/FLUX.1-schnell'
     );
-  }
-
-  private getEndpoint(): string {
-    if (process.env.HF_ENDPOINT || process.env.HUGGINGFACE_ENDPOINT) {
-      return (process.env.HF_ENDPOINT || process.env.HUGGINGFACE_ENDPOINT)!;
-    }
-    const provider = this.getProviderRouting();
-    const model = this.getModelName();
-    return `https://router.huggingface.co/${provider}/models/${model}`;
   }
 
   /**
@@ -87,7 +70,7 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
   }
 
   /**
-   * Generates visual texture using Hugging Face Inference Providers API
+   * Generates visual texture using Hugging Face Inference Providers API via @huggingface/inference SDK
    */
   public async generate(request: GenerationRequest): Promise<GeneratedImage> {
     const apiKey = this.getApiKey();
@@ -111,17 +94,8 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         resolution,
       });
 
-    const endpoint = this.getEndpoint();
     const model = this.getModelName();
     const providerRouting = this.getProviderRouting();
-    const rawConfig = this.getRawProviderConfig().toLowerCase().trim();
-    const routingMode = rawConfig === 'auto' ? 'auto' : 'explicit-provider';
-
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'X-Use-Cache': 'false',
-    };
 
     const parameters: Record<string, any> = {
       width: resolution,
@@ -132,126 +106,45 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
       parameters.seed = request.seed;
     }
 
-    const payload = {
-      inputs: builtPrompt,
-      parameters,
-    };
-
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
+      const client = new InferenceClient(apiKey);
 
-      if (!response.ok) {
-        let errorDetails = '';
-        const rawText = await response.text().catch(() => '');
-        if (rawText) {
-          try {
-            const errJson = JSON.parse(rawText);
-            errorDetails =
-              errJson.error?.message ||
-              errJson.error ||
-              errJson.message ||
-              JSON.stringify(errJson);
-          } catch {
-            errorDetails = rawText;
-          }
-        }
+      const requestArgs: Record<string, any> = {
+        model,
+        inputs: builtPrompt,
+        parameters,
+      };
 
-        // Sanitize error details to ensure tokens are never leaked
-        if (apiKey) {
-          errorDetails = errorDetails.split(apiKey).join('[REDACTED_HF_TOKEN]');
-        }
-
-        const debugInfo = `[URL: POST ${endpoint} | Status: ${response.status} ${response.statusText} | Body: ${errorDetails.trim()}]`;
-
-        if (response.status === 401) {
-          throw new ProviderError(
-            this.id,
-            `Hugging Face API returned 401 Unauthorized ("${errorDetails.trim()}"). Ensure HF_TOKEN is a valid fine-grained User Access Token with "Make calls to Inference Providers" permission from https://huggingface.co/settings/tokens. ${debugInfo}`
-          );
-        }
-        if (response.status === 402) {
-          throw new ProviderError(
-            this.id,
-            `Hugging Face API returned 402 Payment Required / Insufficient Free Credits. Free monthly credit allowance ($0.10) may be exhausted. ${debugInfo}`
-          );
-        }
-        if (response.status === 403) {
-          throw new ProviderError(
-            this.id,
-            `Hugging Face API returned 403 Forbidden. Access denied for model or provider. ${debugInfo}`
-          );
-        }
-        if (response.status === 404) {
-          throw new ProviderError(
-            this.id,
-            `Hugging Face API returned 404 Resource / Model Not Found. ${debugInfo}`
-          );
-        }
-        if (response.status === 429) {
-          throw new ProviderError(
-            this.id,
-            `Hugging Face API returned 429 Rate Limit Exceeded. ${debugInfo}`
-          );
-        }
-        if (response.status === 503) {
-          throw new ProviderError(
-            this.id,
-            `Hugging Face API returned 503 Provider / Model Currently Unavailable or Loading. ${debugInfo}`
-          );
-        }
-
-        throw new ProviderError(
-          this.id,
-          `Hugging Face API HTTP error ${response.status}: ${response.statusText}. ${debugInfo}`
-        );
+      if (providerRouting && providerRouting !== 'auto') {
+        requestArgs.provider = providerRouting as any;
+      } else {
+        requestArgs.provider = 'auto';
       }
 
-      // Check header for actual provider if returned by router
-      const actualProviderHeader =
-        response.headers.get('x-compute-provider') ||
-        response.headers.get('x-provider') ||
-        response.headers.get('x-inference-provider');
+      // Execute text-to-image request using official Hugging Face SDK
+      const imageResult: any = await client.textToImage(requestArgs as any);
 
-      const underlyingProvider = actualProviderHeader || providerRouting;
-
-      const contentType = response.headers.get('content-type') || '';
       let imageDataUrl = '';
 
-      if (contentType.includes('application/json')) {
-        const body = await response.json();
-
-        let rawImgStr: string | undefined;
-        if (Array.isArray(body) && body[0]) {
-          rawImgStr = body[0].generated_image || body[0].image || body[0].url;
-        } else if (typeof body === 'object' && body !== null) {
-          rawImgStr = body.generated_image || body.image || body.url || body.b64_json;
-        }
-
-        if (!rawImgStr) {
-          throw new ProviderError(
-            this.id,
-            `Hugging Face JSON response missing expected image data: ${JSON.stringify(body)}`
-          );
-        }
-
-        if (rawImgStr.startsWith('data:image/')) {
-          imageDataUrl = rawImgStr;
-        } else if (rawImgStr.startsWith('http://') || rawImgStr.startsWith('https://')) {
-          imageDataUrl = await this.fetchImageAsDataUrl(rawImgStr);
+      if (typeof imageResult === 'object' && imageResult !== null && typeof imageResult.arrayBuffer === 'function') {
+        const arrayBuf = await imageResult.arrayBuffer();
+        const buffer = Buffer.from(arrayBuf);
+        const mimeType = imageResult.type || 'image/png';
+        imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+      } else if (typeof imageResult === 'string') {
+        const rawStr = imageResult as string;
+        if (rawStr.startsWith('data:image/')) {
+          imageDataUrl = rawStr;
+        } else if (rawStr.startsWith('http://') || rawStr.startsWith('https://')) {
+          imageDataUrl = await this.fetchImageAsDataUrl(rawStr);
         } else {
-          // Assume raw base64 string
-          imageDataUrl = `data:image/png;base64,${rawImgStr}`;
+          imageDataUrl = `data:image/png;base64,${rawStr}`;
         }
       } else {
-        // Direct binary image response payload
-        const arrayBuf = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuf);
-        const mimeType = contentType.startsWith('image/') ? contentType : 'image/jpeg';
-        imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+        throw new ProviderError(
+          this.id,
+          `Hugging Face SDK returned an unexpected response format: ${typeof imageResult}`
+        );
       }
 
       const endTime = performance.now();
@@ -265,9 +158,8 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         metadata: {
           providerId: this.id,
           model,
-          underlyingInferenceProvider: underlyingProvider,
-          routingMode,
-          endpoint,
+          providerRouting,
+          routingMode: providerRouting === 'auto' ? 'auto' : 'explicit-provider',
           isFree: true,
           pricingClassification: 'FREE WITH LIMITED MONTHLY CREDITS',
           monthlyCreditsAllowanceUSD: 0.1,
@@ -280,9 +172,49 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
       if (err instanceof ProviderError) {
         throw err;
       }
+
+      let errorMsg = err?.message || String(err);
+      const httpStatus = err?.response?.status || err?.status;
+
+      // Sanitize error details to ensure tokens are never leaked
+      if (apiKey) {
+        errorMsg = errorMsg.split(apiKey).join('[REDACTED_HF_TOKEN]');
+      }
+
+      if (httpStatus === 401 || errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('Invalid username or password')) {
+        throw new ProviderError(
+          this.id,
+          `Hugging Face API returned 401 Unauthorized ("${errorMsg}"). Ensure HF_TOKEN is a valid fine-grained User Access Token with "Make calls to Inference Providers" permission from https://huggingface.co/settings/tokens.`
+        );
+      }
+      if (httpStatus === 402 || errorMsg.includes('402') || errorMsg.includes('Payment Required') || errorMsg.includes('credit')) {
+        throw new ProviderError(
+          this.id,
+          `Hugging Face API returned 402 Payment Required / Insufficient Free Credits ("${errorMsg}"). Free monthly credit allowance ($0.10) may be exhausted.`
+        );
+      }
+      if (httpStatus === 403 || errorMsg.includes('403') || errorMsg.includes('Forbidden')) {
+        throw new ProviderError(
+          this.id,
+          `Hugging Face API returned 403 Forbidden ("${errorMsg}"). Access denied for model or provider.`
+        );
+      }
+      if (httpStatus === 404 || errorMsg.includes('404') || errorMsg.includes('Not Found')) {
+        throw new ProviderError(
+          this.id,
+          `Hugging Face API returned 404 Resource / Model Not Found ("${errorMsg}").`
+        );
+      }
+      if (httpStatus === 429 || errorMsg.includes('429') || errorMsg.includes('Rate Limit')) {
+        throw new ProviderError(
+          this.id,
+          `Hugging Face API returned 429 Rate Limit Exceeded ("${errorMsg}").`
+        );
+      }
+
       throw new ProviderError(
         this.id,
-        `Failed to generate image via Hugging Face API: ${err.message}`,
+        `Failed to generate image via Hugging Face API: ${errorMsg}`,
         err
       );
     }

@@ -8,11 +8,44 @@ import { benchmarkRunner } from '../benchmark/runner';
 import { HuggingFaceImageGenerationProvider } from './huggingFaceProvider';
 import { ProviderError } from './types';
 
-// Helper to create a 1x1 valid PNG image buffer
+// Helper to create a 1x1 valid PNG Blob
 const MOCK_PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   'base64'
 );
+
+function createPngResponse(status = 200, statusText = 'OK') {
+  return new Response(MOCK_PNG_BUFFER.slice(), {
+    status,
+    statusText,
+    headers: { 'content-type': 'image/png' },
+  });
+}
+
+function createJsonResponse(data: any, status = 200, statusText = 'OK') {
+  return new Response(JSON.stringify(data), {
+    status,
+    statusText,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+function createMockModelMappingResponse() {
+  return createJsonResponse({
+    inferenceProviderMapping: {
+      'fal-ai': {
+        status: 'live',
+        providerId: 'fal-ai/flux/schnell',
+        task: 'text-to-image',
+      },
+      together: {
+        status: 'live',
+        providerId: 'black-forest-labs/FLUX.1-schnell',
+        task: 'text-to-image',
+      },
+    },
+  });
+}
 
 /**
  * Test Suite for HuggingFaceImageGenerationProvider (Issue #18 / Phase 2C.3)
@@ -107,34 +140,35 @@ async function runHuggingFaceProviderTests() {
     });
 
     // ------------------------------------------------------------------------
-    console.log('\n--- Official Request Construction & Binary Response Mock ---');
+    console.log('\n--- SDK Request Construction & Blob Response Mock ---');
     // ------------------------------------------------------------------------
 
-    await test('Requests official Hugging Face router endpoint (default fal-ai) with headers & body', async () => {
+    await test('Executes textToImage with SDK and parses Blob response', async () => {
       process.env.HF_TOKEN = 'hf_mock_test_token_abc';
       delete process.env.HF_PROVIDER;
       delete process.env.HUGGINGFACE_PROVIDER;
       const provider = new HuggingFaceImageGenerationProvider();
 
-      let capturedUrl = '';
-      let capturedMethod = '';
-      let capturedHeaders: Record<string, string> = {};
-      let capturedBody: any = null;
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const urlStr = input.toString();
 
-      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        capturedUrl = input.toString();
-        capturedMethod = init?.method || 'GET';
-        capturedHeaders = (init?.headers as Record<string, string>) || {};
-        if (init?.body) {
-          capturedBody = JSON.parse(init.body as string);
+        if (urlStr.includes('/api/models/')) {
+          return createMockModelMappingResponse();
         }
 
-        return new Response(MOCK_PNG_BUFFER, {
-          status: 200,
-          headers: {
-            'content-type': 'image/png',
-            'x-compute-provider': 'fal-ai',
-          },
+        if (urlStr.includes('/status')) {
+          return createJsonResponse({ status: 'COMPLETED' });
+        }
+
+        if (urlStr.includes('fal.media')) {
+          return createPngResponse();
+        }
+
+        return createJsonResponse({
+          request_id: 'req_123',
+          response_url: 'https://queue.fal.run/fal-ai/flux/schnell',
+          status: 'COMPLETED',
+          images: [{ url: 'https://fal.media/mock.png' }],
         });
       }) as typeof fetch;
 
@@ -145,102 +179,41 @@ async function runHuggingFaceProviderTests() {
         seed: 42,
       });
 
-      assert.strictEqual(
-        capturedUrl,
-        'https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell'
-      );
-      assert.strictEqual(capturedMethod, 'POST');
-      assert.strictEqual(capturedHeaders['Authorization'], 'Bearer hf_mock_test_token_abc');
-      assert.strictEqual(capturedHeaders['Content-Type'], 'application/json');
-
-      assert.strictEqual(capturedBody.parameters.width, 512);
-      assert.strictEqual(capturedBody.parameters.height, 512);
-      assert.strictEqual(capturedBody.parameters.seed, 42);
-
       assert.ok(result.imageDataUrl.startsWith('data:image/png;base64,'));
       assert.strictEqual(result.model, 'black-forest-labs/FLUX.1-schnell');
-      assert.strictEqual(result.metadata?.underlyingInferenceProvider, 'fal-ai');
-      assert.strictEqual(result.metadata?.routingMode, 'explicit-provider');
+      assert.strictEqual(result.metadata?.routingMode, 'auto');
       assert.strictEqual(result.metadata?.pricingClassification, 'FREE WITH LIMITED MONTHLY CREDITS');
     });
 
     // ------------------------------------------------------------------------
-    console.log('\n--- Custom Provider Routing & Auto-Routing Handling ---');
+    console.log('\n--- Custom Provider Routing Override ---');
     // ------------------------------------------------------------------------
 
-    await test('HF_PROVIDER=auto does NOT generate a literal /auto/models/... URL', async () => {
+    await test('Supports explicit provider routing override via HF_PROVIDER (e.g. together)', async () => {
       process.env.HF_TOKEN = 'hf_mock_token';
-      process.env.HF_PROVIDER = 'auto';
+      process.env.HF_PROVIDER = 'together';
       const provider = new HuggingFaceImageGenerationProvider();
 
       let capturedUrl = '';
       globalThis.fetch = (async (input: RequestInfo | URL) => {
-        capturedUrl = input.toString();
-        return new Response(MOCK_PNG_BUFFER, {
-          status: 200,
-          headers: {
-            'content-type': 'image/png',
-            'x-compute-provider': 'fal-ai',
-          },
-        });
+        const urlStr = input.toString();
+        if (urlStr.includes('/api/models/')) {
+          return createMockModelMappingResponse();
+        }
+        if (urlStr.includes('together')) {
+          capturedUrl = urlStr;
+          return createJsonResponse({
+            data: [{ b64_json: MOCK_PNG_BUFFER.toString('base64') }],
+          });
+        }
+        return createPngResponse();
       }) as typeof fetch;
 
       const res = await provider.generate({ material: 'grass', style: 'stylized', resolution: 512 });
 
-      assert.ok(!capturedUrl.includes('/auto/models/'), `Endpoint URL should not contain /auto/models/, got: ${capturedUrl}`);
-      assert.strictEqual(
-        capturedUrl,
-        'https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell'
-      );
-      assert.strictEqual(res.metadata?.routingMode, 'auto');
-      assert.strictEqual(res.metadata?.underlyingInferenceProvider, 'fal-ai');
-    });
-
-    // ------------------------------------------------------------------------
-    console.log('\n--- JSON Response Schema Parsing Mock ---');
-    // ------------------------------------------------------------------------
-
-    await test('Parses array JSON response with base64 data URL cleanly', async () => {
-      process.env.HF_TOKEN = 'hf_mock_token';
-      delete process.env.HF_PROVIDER;
-      const provider = new HuggingFaceImageGenerationProvider();
-
-      const mockJsonBody = [
-        {
-          generated_image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-        },
-      ];
-
-      globalThis.fetch = (async () => {
-        return new Response(JSON.stringify(mockJsonBody), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }) as typeof fetch;
-
-      const result = await provider.generate({ material: 'sand', style: 'stylized' });
-      assert.ok(result.imageDataUrl.startsWith('data:image/png;base64,'));
-    });
-
-    await test('Throws ProviderError on malformed JSON missing image fields', async () => {
-      process.env.HF_TOKEN = 'hf_mock_token';
-      const provider = new HuggingFaceImageGenerationProvider();
-
-      globalThis.fetch = (async () => {
-        return new Response(JSON.stringify({ unexpected: 'field' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }) as typeof fetch;
-
-      await assert.rejects(
-        async () => {
-          await provider.generate({ material: 'water', style: 'stylized' });
-        },
-        (err: any) => {
-          return err instanceof ProviderError && err.message.includes('missing expected image data');
-        }
-      );
+      assert.ok(capturedUrl.includes('together'), `URL should target together, got ${capturedUrl}`);
+      assert.strictEqual(res.metadata?.routingMode, 'explicit-provider');
+      assert.strictEqual(res.metadata?.providerRouting, 'together');
     });
 
     // ------------------------------------------------------------------------
@@ -252,11 +225,17 @@ async function runHuggingFaceProviderTests() {
       process.env.HF_TOKEN = secretToken;
       const provider = new HuggingFaceImageGenerationProvider();
 
-      globalThis.fetch = (async () => {
-        return new Response(JSON.stringify({ error: `Invalid username or password.` }), {
-          status: 401,
-          statusText: 'Unauthorized',
-        });
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const urlStr = input.toString();
+        if (urlStr.includes('/api/models/')) {
+          return createMockModelMappingResponse();
+        }
+
+        return createJsonResponse(
+          { error: `401 Unauthorized: Invalid token ${secretToken}` },
+          401,
+          'Unauthorized'
+        );
       }) as typeof fetch;
 
       await assert.rejects(
@@ -277,11 +256,17 @@ async function runHuggingFaceProviderTests() {
       process.env.HF_TOKEN = 'hf_token';
       const provider = new HuggingFaceImageGenerationProvider();
 
-      globalThis.fetch = (async () => {
-        return new Response(JSON.stringify({ error: 'Monthly quota / credit limit reached' }), {
-          status: 402,
-          statusText: 'Payment Required',
-        });
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const urlStr = input.toString();
+        if (urlStr.includes('/api/models/')) {
+          return createMockModelMappingResponse();
+        }
+
+        return createJsonResponse(
+          { error: '402 Payment Required: Monthly credit limit reached' },
+          402,
+          'Payment Required'
+        );
       }) as typeof fetch;
 
       await assert.rejects(
@@ -297,10 +282,16 @@ async function runHuggingFaceProviderTests() {
 
     await test('Handles 403 Forbidden, 404 Not Found, and 429 Rate Limit cleanly', async () => {
       process.env.HF_TOKEN = 'hf_token';
+      process.env.HF_PROVIDER = 'together';
       const provider = new HuggingFaceImageGenerationProvider();
 
-      globalThis.fetch = (async () => {
-        return new Response('Rate limit exceeded', { status: 429, statusText: 'Too Many Requests' });
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const urlStr = input.toString();
+        if (urlStr.includes('/api/models/')) {
+          return createMockModelMappingResponse();
+        }
+
+        return createJsonResponse({ error: '429 Rate Limit Exceeded' }, 429, 'Too Many Requests');
       }) as typeof fetch;
 
       await assert.rejects(
@@ -320,10 +311,22 @@ async function runHuggingFaceProviderTests() {
       delete process.env.HF_PROVIDER;
       const provider = new HuggingFaceImageGenerationProvider();
 
-      globalThis.fetch = (async () => {
-        return new Response(MOCK_PNG_BUFFER, {
-          status: 200,
-          headers: { 'content-type': 'image/png' },
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const urlStr = input.toString();
+        if (urlStr.includes('/api/models/')) {
+          return createMockModelMappingResponse();
+        }
+        if (urlStr.includes('/status')) {
+          return createJsonResponse({ status: 'COMPLETED' });
+        }
+        if (urlStr.includes('fal.media')) {
+          return createPngResponse();
+        }
+        return createJsonResponse({
+          request_id: 'req_123',
+          response_url: 'https://queue.fal.run/fal-ai/flux/schnell',
+          status: 'COMPLETED',
+          images: [{ url: 'https://fal.media/mock.png' }],
         });
       }) as typeof fetch;
 
