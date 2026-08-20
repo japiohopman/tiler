@@ -3,7 +3,7 @@
   "providerId": "huggingface",
   "providerName": "Hugging Face Provider (FLUX.1 Schnell PoC)",
   "model": "black-forest-labs/FLUX.1-schnell",
-  "timestamp": "2026-08-20T07:41:43.766Z",
+  "timestamp": "2026-08-20T08:09:42.786Z",
   "options": {
     "resolution": 512,
     "seed": 42,
@@ -22,7 +22,7 @@
     "successful": 0,
     "failed": 6,
     "averageRawGenerationTimeMs": 0,
-    "averageLatencyMs": 171,
+    "averageLatencyMs": 149.8,
     "averageRawSeamScore": null,
     "averageProcessedSeamScore": null,
     "rawPassRate": 0,
@@ -37,7 +37,7 @@
       "height": 512,
       "seed": 42,
       "success": false,
-      "latencyMs": 453.21,
+      "latencyMs": 340.23,
       "rawGenerationTimeMs": null,
       "tileProcessingTimeMs": null,
       "rawSeamScore": null,
@@ -76,9 +76,9 @@
         "note": "Objective score evaluated from raw provider metrics (0% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [
-        "[Provider:huggingface] Hugging Face API returned 401 Unauthorized. A valid HF token is required. [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 401  | Body: Invalid username or password.]"
+        "[Provider:huggingface] Hugging Face API HTTP error 400: . [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 400  | Body: Model not supported by provider fal-ai]"
       ],
-      "timestamp": "2026-08-20T07:41:43.768Z"
+      "timestamp": "2026-08-20T08:09:42.787Z"
     },
     {
       "material": "grass",
@@ -88,7 +88,7 @@
       "height": 512,
       "seed": 142,
       "success": false,
-      "latencyMs": 118.46,
+      "latencyMs": 117.8,
       "rawGenerationTimeMs": null,
       "tileProcessingTimeMs": null,
       "rawSeamScore": null,
@@ -127,9 +127,9 @@
         "note": "Objective score evaluated from raw provider metrics (0% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [
-        "[Provider:huggingface] Hugging Face API returned 401 Unauthorized. A valid HF token is required. [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 401  | Body: Invalid username or password.]"
+        "[Provider:huggingface] Hugging Face API HTTP error 400: . [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 400  | Body: Model not supported by provider fal-ai]"
       ],
-      "timestamp": "2026-08-20T07:41:44.222Z"
+      "timestamp": "2026-08-20T08:09:43.128Z"
     },
     {
       "material": "sand",
@@ -139,7 +139,7 @@
       "height": 512,
       "seed": 242,
       "success": false,
-      "latencyMs": 112.26,
+      "latencyMs": 110.08,
       "rawGenerationTimeMs": null,
       "tileProcessingTimeMs": null,
       "rawSeamScore": null,
@@ -178,9 +178,9 @@
         "note": "Objective score evaluated from raw provider metrics (0% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [
-        "[Provider:huggingface] Hugging Face API returned 401 Unauthorized. A valid HF token is required. [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 401  | Body: Invalid username or password.]"
+        "[Provider:huggingface] Hugging Face API HTTP error 400: . [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 400  | Body: Model not supported by provider fal-ai]"
       ],
-      "timestamp": "2026-08-20T07:41:44.340Z"
+      "timestamp": "2026-08-20T08:09:43.246Z"
     },
     {
       "material": "water",
@@ -190,7 +190,7 @@
       "height": 512,
       "seed": 342,
       "success": false,
-      "latencyMs": 112.45,
+      "latencyMs": 107.54,
       "rawGenerationTimeMs": null,
       "tileProcessingTimeMs": null,
       "rawSeamScore": null,
@@ -229,9 +229,9 @@
         "note": "Objective score evaluated from raw provider metrics (0% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [
-        "[Provider:huggingface] Hugging Face API returned 401 Unauthorized. A valid HF token is required. [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 401  | Body: Invalid username or password.]"
+        "[Provider:huggingface] Hugging Face API HTTP error 400: . [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 400  | Body: Model not supported by provider fal-ai]"
       ],
-      "timestamp": "2026-08-20T07:41:44.453Z"
+      "timestamp": "2026-08-20T08:09:43.356Z"
     },
     {
       "material": "wood",
@@ -241,7 +241,7 @@
       "height": 512,
       "seed": 442,
       "success": false,
-      "latencyMs": 117.01,
+      "latencyMs": 109.94,
       "rawGenerationTimeMs": null,
       "tileProcessingTimeMs": null,
       "rawSeamScore": null,
@@ -280,9 +280,9 @@
         "note": "Objective score evaluated from raw provider metrics (0% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [
-        "[Provider:huggingface] Hugging Face API returned 401 Unauthorized. A valid HF token is required. [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 401  | Body: Invalid username or password.]"
+        "[Provider:huggingface] Hugging Face API HTTP error 400: . [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 400  | Body: Model not supported by provider fal-ai]"
       ],
-      "timestamp": "2026-08-20T07:41:44.565Z"
+      "timestamp": "2026-08-20T08:09:43.463Z"
     },
     {
       "material": "lava",
@@ -292,7 +292,7 @@
       "height": 512,
       "seed": 542,
       "success": false,
-      "latencyMs": 112.5,
+      "latencyMs": 113.44,
       "rawGenerationTimeMs": null,
       "tileProcessingTimeMs": null,
       "rawSeamScore": null,
@@ -331,9 +331,9 @@
         "note": "Objective score evaluated from raw provider metrics (0% weight: Raw Tileability 30% + Raw Generation Speed 10%). Subjective metrics require human evaluation."
       },
       "errors": [
-        "[Provider:huggingface] Hugging Face API returned 401 Unauthorized. A valid HF token is required. [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 401  | Body: Invalid username or password.]"
+        "[Provider:huggingface] Hugging Face API HTTP error 400: . [URL: POST https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell | Status: 400  | Body: Model not supported by provider fal-ai]"
       ],
-      "timestamp": "2026-08-20T07:41:44.682Z"
+      "timestamp": "2026-08-20T08:09:43.573Z"
     }
   ]
 }
