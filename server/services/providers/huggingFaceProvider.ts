@@ -12,6 +12,7 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  *
  * Integrates Hugging Face Inference Providers API using the official `@huggingface/inference` SDK.
  * Default candidate model: black-forest-labs/FLUX.1-schnell
+ * Default underlying provider: fal-ai
  *
  * Official Specs & Sources:
  * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call
@@ -25,10 +26,11 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  *   Requires a fine-grained User Access Token with "Make calls to Inference Providers" permission
  *   from https://huggingface.co/settings/tokens
  *
- * Provider Selection & Routing:
+ * Architecture & Provider Selection:
+ * - ImageGenerationProvider -> HuggingFaceImageGenerationProvider -> InferenceClient -> fal-ai -> FLUX.1-schnell
  * - Uses client.textToImage({ model, inputs, provider, parameters })
- * - provider defaults to 'auto' (automatic failover & routing managed by HF SDK / Hub)
- * - Can be overridden via HF_PROVIDER environment variable (e.g. HF_PROVIDER=together, HF_PROVIDER=replicate, HF_PROVIDER=fal-ai)
+ * - provider defaults to 'fal-ai'
+ * - Can be overridden via HF_PROVIDER environment variable (e.g. HF_PROVIDER=together, HF_PROVIDER=replicate, HF_PROVIDER=auto)
  *
  * Resolution Support:
  * - 512x512
@@ -49,8 +51,8 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
   }
 
   private getProviderRouting(): string {
-    const raw = process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'auto';
-    return raw.trim() || 'auto';
+    const raw = process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'fal-ai';
+    return raw.trim() || 'fal-ai';
   }
 
   private getModelName(): string {
@@ -113,13 +115,8 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         model,
         inputs: builtPrompt,
         parameters,
+        provider: providerRouting as any,
       };
-
-      if (providerRouting && providerRouting !== 'auto') {
-        requestArgs.provider = providerRouting as any;
-      } else {
-        requestArgs.provider = 'auto';
-      }
 
       // Execute text-to-image request using official Hugging Face SDK
       const imageResult: any = await client.textToImage(requestArgs as any);
@@ -158,8 +155,9 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         metadata: {
           providerId: this.id,
           model,
-          providerRouting,
+          underlyingInferenceProvider: providerRouting === 'auto' ? 'auto' : providerRouting,
           routingMode: providerRouting === 'auto' ? 'auto' : 'explicit-provider',
+          providerRouting,
           isFree: true,
           pricingClassification: 'FREE WITH LIMITED MONTHLY CREDITS',
           monthlyCreditsAllowanceUSD: 0.1,

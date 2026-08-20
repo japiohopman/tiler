@@ -143,7 +143,7 @@ async function runHuggingFaceProviderTests() {
     console.log('\n--- SDK Request Construction & Blob Response Mock ---');
     // ------------------------------------------------------------------------
 
-    await test('Executes textToImage with SDK and parses Blob response', async () => {
+    await test('Executes textToImage with SDK defaulting provider to fal-ai and parses Blob response', async () => {
       process.env.HF_TOKEN = 'hf_mock_test_token_abc';
       delete process.env.HF_PROVIDER;
       delete process.env.HUGGINGFACE_PROVIDER;
@@ -164,6 +164,7 @@ async function runHuggingFaceProviderTests() {
           return createPngResponse();
         }
 
+        // Default initial call to queue API for fal-ai
         return createJsonResponse({
           request_id: 'req_123',
           response_url: 'https://queue.fal.run/fal-ai/flux/schnell',
@@ -181,7 +182,8 @@ async function runHuggingFaceProviderTests() {
 
       assert.ok(result.imageDataUrl.startsWith('data:image/png;base64,'));
       assert.strictEqual(result.model, 'black-forest-labs/FLUX.1-schnell');
-      assert.strictEqual(result.metadata?.routingMode, 'auto');
+      assert.strictEqual(result.metadata?.underlyingInferenceProvider, 'fal-ai');
+      assert.strictEqual(result.metadata?.routingMode, 'explicit-provider');
       assert.strictEqual(result.metadata?.pricingClassification, 'FREE WITH LIMITED MONTHLY CREDITS');
     });
 
@@ -285,13 +287,8 @@ async function runHuggingFaceProviderTests() {
       process.env.HF_PROVIDER = 'together';
       const provider = new HuggingFaceImageGenerationProvider();
 
-      globalThis.fetch = (async (input: RequestInfo | URL) => {
-        const urlStr = input.toString();
-        if (urlStr.includes('/api/models/')) {
-          return createMockModelMappingResponse();
-        }
-
-        return createJsonResponse({ error: '429 Rate Limit Exceeded' }, 429, 'Too Many Requests');
+      globalThis.fetch = (async () => {
+        return createJsonResponse({ error: '429 Rate limit exceeded' }, 429, 'Too Many Requests');
       }) as typeof fetch;
 
       await assert.rejects(
