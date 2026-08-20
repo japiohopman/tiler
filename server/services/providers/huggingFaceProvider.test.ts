@@ -110,7 +110,7 @@ async function runHuggingFaceProviderTests() {
     console.log('\n--- Official Request Construction & Binary Response Mock ---');
     // ------------------------------------------------------------------------
 
-    await test('Requests official Hugging Face router endpoint (default provider=auto) with headers & body', async () => {
+    await test('Requests official Hugging Face router endpoint (default fal-ai) with headers & body', async () => {
       process.env.HF_TOKEN = 'hf_mock_test_token_abc';
       delete process.env.HF_PROVIDER;
       delete process.env.HUGGINGFACE_PROVIDER;
@@ -147,7 +147,7 @@ async function runHuggingFaceProviderTests() {
 
       assert.strictEqual(
         capturedUrl,
-        'https://router.huggingface.co/auto/models/black-forest-labs/FLUX.1-schnell'
+        'https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell'
       );
       assert.strictEqual(capturedMethod, 'POST');
       assert.strictEqual(capturedHeaders['Authorization'], 'Bearer hf_mock_test_token_abc');
@@ -160,17 +160,17 @@ async function runHuggingFaceProviderTests() {
       assert.ok(result.imageDataUrl.startsWith('data:image/png;base64,'));
       assert.strictEqual(result.model, 'black-forest-labs/FLUX.1-schnell');
       assert.strictEqual(result.metadata?.underlyingInferenceProvider, 'fal-ai');
-      assert.strictEqual(result.metadata?.routingMode, 'auto');
+      assert.strictEqual(result.metadata?.routingMode, 'explicit-provider');
       assert.strictEqual(result.metadata?.pricingClassification, 'FREE WITH LIMITED MONTHLY CREDITS');
     });
 
     // ------------------------------------------------------------------------
-    console.log('\n--- Custom Provider Routing & Model Override ---');
+    console.log('\n--- Custom Provider Routing & Auto-Routing Handling ---');
     // ------------------------------------------------------------------------
 
-    await test('Supports explicit provider routing override (e.g. HF_PROVIDER=fal-ai)', async () => {
+    await test('HF_PROVIDER=auto does NOT generate a literal /auto/models/... URL', async () => {
       process.env.HF_TOKEN = 'hf_mock_token';
-      process.env.HF_PROVIDER = 'fal-ai';
+      process.env.HF_PROVIDER = 'auto';
       const provider = new HuggingFaceImageGenerationProvider();
 
       let capturedUrl = '';
@@ -187,11 +187,12 @@ async function runHuggingFaceProviderTests() {
 
       const res = await provider.generate({ material: 'grass', style: 'stylized', resolution: 512 });
 
+      assert.ok(!capturedUrl.includes('/auto/models/'), `Endpoint URL should not contain /auto/models/, got: ${capturedUrl}`);
       assert.strictEqual(
         capturedUrl,
         'https://router.huggingface.co/fal-ai/models/black-forest-labs/FLUX.1-schnell'
       );
-      assert.strictEqual(res.metadata?.routingMode, 'explicit-provider');
+      assert.strictEqual(res.metadata?.routingMode, 'auto');
       assert.strictEqual(res.metadata?.underlyingInferenceProvider, 'fal-ai');
     });
 

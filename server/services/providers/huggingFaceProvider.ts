@@ -11,9 +11,11 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  *
  * Integrates Hugging Face Inference Providers API targeting open-weights text-to-image models.
  * Default candidate model: black-forest-labs/FLUX.1-schnell
+ * Default underlying provider: fal-ai
  *
  * Official Specs & Sources:
- * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call (Uses provider="auto")
+ * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call
+ * - Hub API Documentation: https://huggingface.co/docs/inference-providers/hub-api
  * - Pricing & Billing: https://huggingface.co/docs/inference-providers/en/pricing
  *   (Free users receive limited monthly credits: $0.10, subject to change)
  * - Text-to-Image Task: https://huggingface.co/docs/inference-providers/tasks/text-to-image
@@ -25,8 +27,8 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  *   from https://huggingface.co/settings/tokens
  *
  * Endpoint routing format: https://router.huggingface.co/{provider}/models/{model}
- * - Default provider routing: auto
- * - Default model: black-forest-labs/FLUX.1-schnell
+ * Note: 'auto' is a client-side SDK selection abstraction and must NOT be used directly as a URL segment.
+ * Raw HTTP calls resolve to explicit inference providers (defaulting to 'fal-ai').
  *
  * Resolution Support:
  * - 512x512
@@ -46,8 +48,17 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
     return process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
   }
 
+  private getRawProviderConfig(): string {
+    return process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'fal-ai';
+  }
+
   private getProviderRouting(): string {
-    return process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'auto';
+    const raw = this.getRawProviderConfig().toLowerCase().trim();
+    // 'auto' is a client-side routing abstraction. Raw HTTP router endpoints require a concrete provider.
+    if (raw === 'auto') {
+      return 'fal-ai';
+    }
+    return raw || 'fal-ai';
   }
 
   private getModelName(): string {
@@ -103,6 +114,8 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
     const endpoint = this.getEndpoint();
     const model = this.getModelName();
     const providerRouting = this.getProviderRouting();
+    const rawConfig = this.getRawProviderConfig().toLowerCase().trim();
+    const routingMode = rawConfig === 'auto' ? 'auto' : 'explicit-provider';
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${apiKey}`,
@@ -204,7 +217,6 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         response.headers.get('x-inference-provider');
 
       const underlyingProvider = actualProviderHeader || providerRouting;
-      const routingMode = providerRouting === 'auto' ? 'auto' : 'explicit-provider';
 
       const contentType = response.headers.get('content-type') || '';
       let imageDataUrl = '';
