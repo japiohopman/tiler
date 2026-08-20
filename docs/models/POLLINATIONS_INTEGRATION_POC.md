@@ -2,7 +2,7 @@
 
 **Issue / Feature:** GitHub Issue #17 — Phase 2C.2: Pollinations Provider PoC & Benchmark
 **Author:** Jules (Agentic Software Engineer)
-**Status:** Completed PoC Implementation & Benchmark Framework Integration
+**Status:** PoC Implementation Completed & Real Benchmark Executed (Blocked by Pollen Balance)
 
 ---
 
@@ -118,7 +118,7 @@ Upon execution, reports are saved to:
 
 ---
 
-## 6. Execution Status & Results Summary
+## 6. Real Execution Results & Status Summary
 
 ### 6.1 Unit Test Verification
 All 24 provider unit tests in `server/services/providers/pollinationsProvider.test.ts` pass with 100% code coverage across mocked HTTP endpoints, error status codes, request parameter URL construction, Bearer token headers, and single-stream response parsing.
@@ -128,5 +128,17 @@ npm run test:pollinations
 # Result: 24/24 Tests Passed
 ```
 
-### 6.2 Real Benchmark Execution Status
-When `POLLINATIONS_API_KEY` is configured in the environment, `npm run benchmark:pollinations` executes live against Pollinations' `flux` (FLUX.1 Schnell) model. If `POLLINATIONS_API_KEY` is unset, the CLI outputs a clear notice and skips live execution without failing build processes.
+### 6.2 Real Benchmark Execution Findings
+The real benchmark CLI (`npm run benchmark:pollinations`) was executed against Pollinations AI (`https://gen.pollinations.ai/image/{prompt}`) using a configured API key.
+
+#### Key Findings:
+1. **Integration Success:** The provider integration itself works as designed and successfully connects to the current official Pollinations API endpoint (`gen.pollinations.ai`).
+2. **Account Balance Status:** All generation requests returned **HTTP 402 Payment Required** with the explicit Pollinations API error response:
+   > `"This request costs ~0.0020 pollen, but your available balance is 0.0000."`
+3. **Execution Outcome:** 0/6 materials could be generated due to 0.0000 Pollen balance on the tested API key.
+4. **Classification & Limitations:**
+   * Pollinations **MUST NOT** be classified as an immediately usable free provider for our current benchmark account.
+   * Free image generation on the official API is **not unlimited** and requires an active Pollen credit balance (each request costs ~0.0020 Pollen).
+5. **Benchmark Status:** The real benchmark run status is marked as **BLOCKED BY PROVIDER CREDIT/BALANCE (HTTP 402)**, rather than a model-quality or software failure.
+6. **No Fabricated Data:** In accordance with benchmark methodology, no image quality scores, seam measurements, or latency figures have been fabricated or estimated.
+7. **Implementation Preservation:** The provider implementation is fully preserved in the codebase as a functional provider that can be utilized immediately whenever Pollen credits are topped up or assigned to the account.
