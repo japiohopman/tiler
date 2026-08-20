@@ -13,16 +13,16 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  * Default candidate model: black-forest-labs/FLUX.1-schnell
  *
  * Official Specs & Sources:
+ * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call (Uses fal-ai & auto)
  * - Pricing & Billing: https://huggingface.co/docs/inference-providers/en/pricing
  *   (Free users receive limited monthly credits: $0.10, subject to change)
- * - First API Call Guide: https://huggingface.co/docs/inference-providers/guides/first-api-call
  * - Text-to-Image Task: https://huggingface.co/docs/inference-providers/tasks/text-to-image
  * - Main Index: https://huggingface.co/docs/inference-providers/main/index
  *
  * Authentication:
  * - Bearer Token (HF_TOKEN or HUGGINGFACE_API_KEY) in Authorization header
  * - Endpoint routing format: https://router.huggingface.co/{provider}/models/{model}
- *   Default provider routing: hf-inference
+ *   Default provider routing for FLUX.1-schnell: fal-ai (or auto)
  *   Default model: black-forest-labs/FLUX.1-schnell
  *
  * Resolution Support:
@@ -44,7 +44,7 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
   }
 
   private getProviderRouting(): string {
-    return process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'hf-inference';
+    return process.env.HF_PROVIDER || process.env.HUGGINGFACE_PROVIDER || 'fal-ai';
   }
 
   private getModelName(): string {
@@ -160,7 +160,7 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         if (response.status === 402) {
           throw new ProviderError(
             this.id,
-            `Hugging Face API returned 402 Payment Required / Insufficient Free Credits. ${debugInfo}`
+            `Hugging Face API returned 402 Payment Required / Insufficient Free Credits. Free monthly credit allowance ($0.10) may be exhausted. ${debugInfo}`
           );
         }
         if (response.status === 403) {
@@ -193,6 +193,15 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
           `Hugging Face API HTTP error ${response.status}: ${response.statusText}. ${debugInfo}`
         );
       }
+
+      // Check header for actual provider if returned by router
+      const actualProviderHeader =
+        response.headers.get('x-compute-provider') ||
+        response.headers.get('x-provider') ||
+        response.headers.get('x-inference-provider');
+
+      const underlyingProvider = actualProviderHeader || providerRouting;
+      const routingMode = providerRouting === 'auto' ? 'auto' : 'explicit-provider';
 
       const contentType = response.headers.get('content-type') || '';
       let imageDataUrl = '';
@@ -241,7 +250,8 @@ export class HuggingFaceImageGenerationProvider implements ImageGenerationProvid
         metadata: {
           providerId: this.id,
           model,
-          providerRouting,
+          underlyingInferenceProvider: underlyingProvider,
+          routingMode,
           endpoint,
           isFree: true,
           pricingClassification: 'FREE WITH LIMITED MONTHLY CREDITS',
