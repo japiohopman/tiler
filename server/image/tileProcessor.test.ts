@@ -9,6 +9,7 @@ import {
   SUPPORTED_RESOLUTIONS,
   ALLOWED_BLEND_MARGINS,
 } from './tileProcessor';
+import { tileProcessingExperimentService } from '../services/benchmark/experiments';
 import {
   BlendMarginPercent,
   ProcessorTestSuiteResult,
@@ -232,6 +233,57 @@ export async function runTileProcessorTestSuite(): Promise<ProcessorTestSuiteRes
         durationMs: Math.round(performance.now() - testStart),
         details: `Exception: ${err.message}`,
       });
+    }
+  }
+
+  // Test 5: Controlled Blend-Margin Experiment Service Verification
+  {
+    const testStart = performance.now();
+    try {
+      const testImg = await createTestImage(512, 512);
+      const expSummary = await tileProcessingExperimentService.runExperimentOnImage(
+        testImg,
+        'cobblestone'
+      );
+
+      const hasAllMargins =
+        typeof expSummary.resultsByMargin[0] === 'number' &&
+        typeof expSummary.resultsByMargin[5] === 'number' &&
+        typeof expSummary.resultsByMargin[10] === 'number' &&
+        typeof expSummary.resultsByMargin[15] === 'number' &&
+        typeof expSummary.resultsByMargin[20] === 'number';
+
+      const passed =
+        expSummary.material === 'cobblestone' &&
+        hasAllMargins &&
+        typeof expSummary.optimalBlendMarginPercent === 'number';
+
+      const durationMs = Math.round(performance.now() - testStart);
+
+      testResults.push({
+        name: 'Controlled Blend Margin Experiment Harness',
+        resolution: 512,
+        blendPercent: expSummary.optimalBlendMarginPercent,
+        passed,
+        durationMs,
+        details: passed
+          ? `Successfully evaluated blend margins [0%, 5%, 10%, 15%, 20%]. Optimal margin: ${expSummary.optimalBlendMarginPercent}%`
+          : 'Failed experiment execution or incomplete margin scores.',
+      });
+
+      console.log(
+        `  ${passed ? '✓' : '✗'} Controlled Experiment Harness: ${passed ? 'PASSED' : 'FAILED'} (${durationMs}ms)`
+      );
+    } catch (err: any) {
+      testResults.push({
+        name: 'Controlled Blend Margin Experiment Harness',
+        resolution: 512,
+        blendPercent: 10,
+        passed: false,
+        durationMs: Math.round(performance.now() - testStart),
+        details: `Exception: ${err.message}`,
+      });
+      console.error('  ✗ Controlled Experiment Harness ERROR:', err.message);
     }
   }
 

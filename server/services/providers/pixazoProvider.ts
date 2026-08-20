@@ -7,7 +7,7 @@ import { PromptBuilder } from '../promptBuilder';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
 
 /**
- * Pixazo AI Image Generation Provider (Proof of Concept - Issue #15 / Phase 2C.1)
+ * Pixazo AI Image Generation Provider (Phase 2D Production-Hardened Integration)
  *
  * Integrates Pixazo Serverless AI Gateway API targeting the FREE SDXL Base 1.0 model.
  *
@@ -23,7 +23,7 @@ import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderErr
  */
 export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   public readonly id = 'pixazo';
-  public readonly name = 'Pixazo AI Provider (SDXL Base 1.0 PoC)';
+  public readonly name = 'Pixazo AI Provider (SDXL Base 1.0)';
 
   public get model(): string {
     return this.getModelName();
@@ -42,6 +42,36 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
   private getModelName(): string {
     return process.env.PIXAZO_MODEL || 'sdxl-base-1.0';
+  }
+
+  private getTimeoutMs(): number {
+    const envVal = process.env.PIXAZO_TIMEOUT_MS;
+    if (envVal) {
+      const parsed = parseInt(envVal, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+    return 30000; // 30 seconds default request timeout
+  }
+
+  /**
+   * Redacts sensitive API keys or subscription tokens from error messages or debug logs
+   */
+  private sanitizeErrorMessage(message: string, apiKey?: string): string {
+    let sanitized = message;
+    if (apiKey) {
+      sanitized = sanitized.split(apiKey).join('[REDACTED_API_KEY]');
+    }
+    const envKey1 = process.env.PIXAZO_API_KEY;
+    if (envKey1) {
+      sanitized = sanitized.split(envKey1).join('[REDACTED_API_KEY]');
+    }
+    const envKey2 = process.env.PIXAZO_SUBSCRIPTION_KEY;
+    if (envKey2) {
+      sanitized = sanitized.split(envKey2).join('[REDACTED_API_KEY]');
+    }
+    return sanitized;
   }
 
   /**
@@ -79,6 +109,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
     const endpoint = this.getEndpoint();
     const model = this.getModelName();
+    const timeoutMs = this.getTimeoutMs();
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -99,11 +130,15 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       payload.seed = request.seed;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -118,7 +153,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
           }
         }
 
-        const debugInfo = `[URL: POST ${endpoint} | Status: ${response.status} ${response.statusText} | Body: ${errorDetails.trim()}]`;
+        const debugInfo = `[URL: POST ${endpoint} | Status: ${response.status} ${response.statusText} | Body: ${this.sanitizeErrorMessage(errorDetails.trim(), apiKey)}]`;
 
         if (response.status === 401) {
           throw new ProviderError(
@@ -151,7 +186,22 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
         );
       }
 
-      const body = await response.json();
+      let body: any;
+      try {
+        body = await response.json();
+      } catch (jsonErr) {
+        throw new ProviderError(
+          this.id,
+          'Failed to parse Pixazo API response as JSON: malformed payload.'
+        );
+      }
+
+      if (!body || typeof body !== 'object') {
+        throw new ProviderError(
+          this.id,
+          'Pixazo API returned invalid non-object response payload.'
+        );
+      }
 
       let imageUrl: string | undefined;
       let requestId: string | undefined = body.request_id || body.requestId;
@@ -160,7 +210,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       if (body.imageUrl) {
         imageUrl = body.imageUrl;
       } else if (body.status === 'QUEUED' || body.status === 'PROCESSING' || (requestId && !body.output)) {
-        imageUrl = await this.pollQueueStatus(requestId!, apiKey, body.polling_url);
+        imageUrl = await this.pollQueueStatus(requestId!, apiKey, body.polling_url, controller.signal);
       } else if (body.output?.media_url && body.output.media_url.length > 0) {
         imageUrl = body.output.media_url[0];
       } else if (body.image_url) {
@@ -174,12 +224,12 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       if (!imageUrl) {
         throw new ProviderError(
           this.id,
-          `Pixazo API response missing output image URL: ${JSON.stringify(body)}`
+          'Pixazo API response missing output image URL.'
         );
       }
 
       // Ensure normalized base64 Data URL output
-      const imageDataUrl = await this.fetchImageAsDataUrl(imageUrl);
+      const imageDataUrl = await this.fetchImageAsDataUrl(imageUrl, controller.signal);
 
       const endTime = performance.now();
       const generationTimeMs = Math.round((endTime - startTime) * 100) / 100;
@@ -201,10 +251,24 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
         },
       };
     } catch (err: any) {
+      if (err.name === 'AbortError' || controller.signal.aborted) {
+        throw new ProviderError(
+          this.id,
+          `Pixazo API generation request timed out after ${timeoutMs}ms.`
+        );
+      }
       if (err instanceof ProviderError) {
+        err.message = this.sanitizeErrorMessage(err.message, apiKey);
         throw err;
       }
-      throw new ProviderError(this.id, `Failed to generate image via Pixazo API: ${err.message}`, err);
+      const errMsg = err?.message || String(err);
+      throw new ProviderError(
+        this.id,
+        this.sanitizeErrorMessage(`Failed to generate image via Pixazo API: ${errMsg}`, apiKey),
+        err
+      );
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -214,42 +278,67 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   private async pollQueueStatus(
     requestId: string,
     apiKey: string,
-    pollingUrlOverride?: string
+    pollingUrlOverride?: string,
+    signal?: AbortSignal
   ): Promise<string> {
     const pollingUrl =
       pollingUrlOverride || `https://gateway.pixazo.ai/v2/requests/status/${requestId}`;
 
-    const maxAttempts = 30; // 30 seconds max timeout
+    const maxAttempts = 30; // 30 seconds max polling iterations
     const pollIntervalMs = 1000;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (signal?.aborted) {
+        throw new ProviderError(
+          this.id,
+          `Pixazo async polling aborted for request_id ${requestId}.`
+        );
+      }
+
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+
+      if (signal?.aborted) {
+        throw new ProviderError(
+          this.id,
+          `Pixazo async polling aborted for request_id ${requestId}.`
+        );
+      }
 
       const response = await fetch(pollingUrl, {
         method: 'GET',
         headers: {
           'Ocp-Apim-Subscription-Key': apiKey,
         },
+        signal,
       });
 
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         throw new ProviderError(
           this.id,
-          `Polling Pixazo status failed HTTP ${response.status}: ${response.statusText} (${errText})`
+          `Polling Pixazo status failed HTTP ${response.status}: ${response.statusText} (${this.sanitizeErrorMessage(errText, apiKey)})`
         );
       }
 
-      const body = await response.json();
+      let body: any;
+      try {
+        body = await response.json();
+      } catch {
+        throw new ProviderError(
+          this.id,
+          `Polling Pixazo status returned invalid JSON response for request_id ${requestId}.`
+        );
+      }
 
       if (body.status === 'COMPLETED' && (body.imageUrl || body.output?.media_url?.length > 0)) {
         return body.imageUrl || body.output.media_url[0];
       }
 
       if (body.status === 'FAILED' || body.status === 'ERROR') {
+        const errDetail = body.error || 'Unknown error';
         throw new ProviderError(
           this.id,
-          `Pixazo async generation failed: ${body.error || 'Unknown error'}`
+          `Pixazo async generation failed: ${this.sanitizeErrorMessage(errDetail, apiKey)}`
         );
       }
     }
@@ -263,12 +352,12 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
   /**
    * Fetches hosted image URL and converts to base64 Data URL if needed
    */
-  private async fetchImageAsDataUrl(urlOrDataUrl: string): Promise<string> {
+  private async fetchImageAsDataUrl(urlOrDataUrl: string, signal?: AbortSignal): Promise<string> {
     if (urlOrDataUrl.startsWith('data:image/')) {
       return urlOrDataUrl;
     }
 
-    const res = await fetch(urlOrDataUrl);
+    const res = await fetch(urlOrDataUrl, { signal });
     if (!res.ok) {
       let errText = '';
       try {
@@ -278,7 +367,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       }
       throw new ProviderError(
         this.id,
-        `Failed to download generated image from ${urlOrDataUrl} (HTTP ${res.status} ${res.statusText}): ${errText}`
+        `Failed to download generated image from ${urlOrDataUrl} (HTTP ${res.status} ${res.statusText}): ${this.sanitizeErrorMessage(errText)}`
       );
     }
 
