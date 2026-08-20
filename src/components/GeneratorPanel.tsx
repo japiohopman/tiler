@@ -42,6 +42,8 @@ interface GeneratorPanelProps {
   generationState: GenerationState;
   onGenerate: () => void;
   currentTile?: Tile | null;
+  activeProvider?: string;
+  providerConfigured?: boolean;
 }
 
 // Icon helper for target materials
@@ -79,6 +81,8 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
   generationState,
   onGenerate,
   currentTile,
+  activeProvider = 'pixazo',
+  providerConfigured = true,
 }) => {
   const [showPromptDetails, setShowPromptDetails] = useState<boolean>(false);
   const selectedMaterial = TARGET_MATERIALS.find((m) => m.id === params.material) || TARGET_MATERIALS[0];
@@ -110,6 +114,15 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
     });
   };
 
+  const getProviderBadgeLabel = (): string => {
+    if (activeProvider === 'pixazo') return 'Pixazo SDXL';
+    if (activeProvider === 'mock') return 'Mock Provider';
+    if (activeProvider === 'gemini') return 'Gemini AI';
+    if (activeProvider === 'pollinations') return 'Pollinations AI';
+    if (activeProvider === 'huggingface') return 'Hugging Face';
+    return activeProvider.toUpperCase();
+  };
+
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col gap-5 shadow-lg">
       {/* Panel Header */}
@@ -117,7 +130,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
         <div className="flex items-center space-x-2">
           <Sparkles className="w-4 h-4 text-sky-400" />
           <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
-            1. Gemini Texture Generator
+            1. AI Texture Generator
           </h2>
         </div>
         <div className="flex items-center space-x-2">
@@ -125,7 +138,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
             512×512 PNG
           </span>
           <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-            Server Gemini
+            {getProviderBadgeLabel()}
           </span>
         </div>
       </div>
@@ -141,7 +154,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
             {generationState.errorMessage}
           </p>
           <p className="text-[10px] text-rose-300/70 pt-1">
-            Ensure your GEMINI_API_KEY is configured in AI Studio Settings or check your API quota.
+            Ensure your provider configuration (e.g., PIXAZO_API_KEY) is set in your server environment.
           </p>
         </div>
       )}
@@ -312,7 +325,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
               className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
             >
               <option value="offset-crossfade">Offset + Alpha Crossfade</option>
-              <option value="none">Direct Passthrough (Raw Gemini)</option>
+              <option value="none">Direct Passthrough (Raw AI)</option>
             </select>
           </div>
 
@@ -381,7 +394,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
 
         {/* Pipeline Architecture Note */}
         <div className="text-[11px] text-slate-500 flex items-center justify-between px-1">
-          <span>Gemini AI → Sharp Offset → Seam Analysis</span>
+          <span>AI Provider → Sharp Offset → Seam Analysis</span>
           <span className="text-emerald-400 font-mono flex items-center space-x-1">
             <CheckCircle className="w-3 h-3 inline" />
             <span>Strict Verification</span>
