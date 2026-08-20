@@ -17,6 +17,7 @@ AI generation must never be treated as proof that an image is seamless. Seamless
 
 ## Documentation structure
 
+- `docs/ROADMAP.md` — canonical development phases, goals, dependencies, and exit criteria.
 - `docs/architecture/` — system architecture and component boundaries.
 - `docs/models/` — image-model research, benchmarks, licensing and provider decisions.
 - `docs/tile-engine/` — tile processing and seamlessness algorithms.
@@ -25,7 +26,13 @@ AI generation must never be treated as proof that an image is seamless. Seamless
 
 ## Current development state
 
-The repository is being prepared for an agentic development workflow. The first task is repository reconnaissance and architecture planning. Agents must not prematurely implement the full product.
+The provider research phase is transitioning into productionization. The canonical next target is **Phase 2D: Pixazo productionization**. See `docs/ROADMAP.md` for the complete phase map and exit criteria.
+
+The immediate goal is a minimal but genuinely working vertical slice:
+
+`prompt → generation → processing → validation → preview → export`
+
+The project should not prematurely expand into a large feature set before this path works reliably.
 
 ## Core rule
 
