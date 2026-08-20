@@ -6,6 +6,7 @@
 import { generationService } from './services/generationService';
 import { geminiProvider } from './services/providers/geminiProvider';
 import { mockProvider } from './services/providers/mockProvider';
+import { huggingFaceProvider } from './services/providers/huggingFaceProvider';
 import { pixazoProvider } from './services/providers/pixazoProvider';
 import { pollinationsProvider } from './services/providers/pollinationsProvider';
 
@@ -17,7 +18,7 @@ import { pollinationsProvider } from './services/providers/pollinationsProvider'
  * Development/test configuration explicitly prefers `mockProvider` by default.
  * This prevents local development from accidentally consuming paid/limited API quota
  * even if API keys exist in the environment.
- * To use an external provider explicitly, set `IMAGE_PROVIDER=pollinations`, `IMAGE_PROVIDER=pixazo`, or `IMAGE_PROVIDER=gemini`.
+ * To use an external provider explicitly, set `IMAGE_PROVIDER=huggingface`, `IMAGE_PROVIDER=pollinations`, `IMAGE_PROVIDER=pixazo`, or `IMAGE_PROVIDER=gemini`.
  */
 export function bootstrapProviders(): void {
   // Register available image generation providers
@@ -25,6 +26,7 @@ export function bootstrapProviders(): void {
   generationService.registerProvider(geminiProvider);
   generationService.registerProvider(pixazoProvider);
   generationService.registerProvider(pollinationsProvider);
+  generationService.registerProvider(huggingFaceProvider);
 
   // Environment-driven provider selection (Explicit opt-in required)
   const envProvider = (process.env.IMAGE_PROVIDER || process.env.DEFAULT_PROVIDER || '').toLowerCase().trim();
@@ -35,6 +37,8 @@ export function bootstrapProviders(): void {
     generationService.setDefaultProvider('pixazo');
   } else if (envProvider === 'pollinations') {
     generationService.setDefaultProvider('pollinations');
+  } else if (envProvider === 'huggingface' || envProvider === 'hf') {
+    generationService.setDefaultProvider('huggingface');
   } else {
     // Default explicitly to deterministic Mock provider to protect API quota
     generationService.setDefaultProvider('mock');
