@@ -1,10 +1,11 @@
 # Hugging Face Inference Provider Integration Proof of Concept (PoC)
 
-**Status:** Complete (Phase 2C.3 - GitHub Issue #18)
+**Status:** TECHNICALLY INTEGRATED — REAL BENCHMARK BLOCKED BY CURRENT PROVIDER/MODEL AVAILABILITY (Phase 2C.3 - GitHub Issue #18)
+**Provider Selection Decision:** **NOT SELECTED AS CURRENT PROVIDER CANDIDATE**
 **Provider Classification:** **FREE WITH LIMITED MONTHLY CREDITS**
-**Default Model:** `black-forest-labs/FLUX.1-schnell`
-**Default Provider Routing:** `auto` (optional explicit provider override via `HF_PROVIDER`, e.g. `together`, `replicate`, `fal-ai`)
+**Target Model:** `black-forest-labs/FLUX.1-schnell`
 **Official SDK:** `@huggingface/inference` (`InferenceClient.textToImage`)
+**Default Provider Routing:** `auto` (optional explicit provider override via `HF_PROVIDER`, e.g. `together`, `replicate`, `fal-ai`)
 
 ---
 
@@ -12,7 +13,16 @@
 
 This document evaluates the Hugging Face Inference Providers API for seamless 2D game tile generation in Tiler under Phase 2C.3.
 
-### Critical Classification & Free Allowance Notice
+The adapter was successfully integrated behind Tiler's provider abstraction (`ImageGenerationProvider`) using the official `@huggingface/inference` SDK. Unit test suites pass completely (13/13 test cases).
+
+However, execution of the real 6-material benchmark against Hugging Face Inference Providers consistently failed across all requests with:
+> **HTTP 400:** `"Model not supported by provider fal-ai"`
+
+Because 0 out of 6 generations succeeded, no visual tileability scores or quality metrics could be evaluated. **Hugging Face is NOT selected as a current provider candidate for Tiler.**
+
+---
+
+## 2. Critical Classification & Free Allowance Notice
 
 > **IMPORTANT:** Hugging Face is **NOT** unlimited free.
 >
@@ -28,7 +38,7 @@ This document evaluates the Hugging Face Inference Providers API for seamless 2D
 
 ---
 
-## 2. Official Documentation & Specifications
+## 3. Official Documentation & Specifications
 
 The integration was implemented adhering strictly to current official Hugging Face documentation:
 
@@ -40,44 +50,41 @@ The integration was implemented adhering strictly to current official Hugging Fa
 
 ---
 
-## 3. Technical Integration Details
+## 4. Technical Integration Details
 
-### Authentication Requirements
+### Test Configuration & Authentication
 
-Hugging Face requires a fine-grained User Access Token with:
-- Permission: **"Make calls to Inference Providers"** (`inference.serverless.write`)
-- Generated from: [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-
-Provider-specific credentials (e.g. fal keys) or classic read/write tokens without the Inference Providers permission are not accepted.
+- **Authentication Token:** Fine-grained Hugging Face User Access Token configured via `HF_TOKEN`.
+- **Verified Permission Scope:** **"Make calls to Inference Providers"** (`inference.serverless.write`).
+- **Authentication Verification:** Successful. Token authentication and scope validation succeeded; requests reached partner routing without HTTP 401 Unauthorized errors.
 
 ### Architecture & SDK Integration
 
 - **Provider Abstraction:** Implements `ImageGenerationProvider` in `server/services/providers/huggingFaceProvider.ts` behind `id: "huggingface"`.
 - **Target Model:** `black-forest-labs/FLUX.1-schnell`
-- **Provider Routing:** `provider: "auto"` (default) or explicit provider override via `HF_PROVIDER` (e.g. `together`, `replicate`, `fal-ai`)
+- **Provider Routing:** `provider: "auto"` (default)
 - **Official Client SDK:** Uses `@huggingface/inference` `InferenceClient` to invoke:
   ```ts
   const client = new InferenceClient(HF_TOKEN);
   const imageBlob = await client.textToImage({
     model: "black-forest-labs/FLUX.1-schnell",
     inputs: builtPrompt,
-    provider: "auto", // or process.env.HF_PROVIDER
+    provider: "auto",
     parameters: { width: 512, height: 512, seed: 42 }
   });
   ```
-- **Authentication:** `Authorization: Bearer ${HF_TOKEN}`
 - **Resolution:** `512x512`
-- **Parameters Supported:** `inputs` (prompt), `parameters.width`, `parameters.height`, `parameters.seed` (seed: 42 preserved)
+- **Canonical Benchmark Prompts:** Prompts, seeds (`seed: 42`), and seam analysis thresholds were preserved unchanged according to benchmark methodology.
 - **Metadata Captured:**
-  - `model`: Model identifier (`black-forest-labs/FLUX.1-schnell`)
-  - `underlyingInferenceProvider`: Provider identifier or `"auto"`
-  - `routingMode`: `"auto"` (default) or `"explicit-provider"`
+  - `model`: `black-forest-labs/FLUX.1-schnell`
+  - `providerRouting`: `auto`
+  - `routingMode`: `auto`
   - `pricingClassification`: `FREE WITH LIMITED MONTHLY CREDITS`
-- **Response Handling:** Converts the SDK `Blob` output or data URL string to base64 Data URLs (`data:image/png;base64,...`).
+- **Response Normalization:** Converts SDK `Blob` output or data URLs to base64 Data URLs (`data:image/png;base64,...`).
 
 ---
 
-## 4. Error Handling & Secret Redaction
+## 5. Error Handling & Secret Redaction
 
 The provider adapter handles all error states cleanly without throwing unhandled exceptions or leaking sensitive API tokens:
 
@@ -93,7 +100,7 @@ The provider adapter handles all error states cleanly without throwing unhandled
 
 ---
 
-## 5. Real Benchmark Execution & Status
+## 6. Real Benchmark Execution Results
 
 ### Execution Command
 
@@ -101,33 +108,33 @@ The provider adapter handles all error states cleanly without throwing unhandled
 npm run benchmark:huggingface
 ```
 
-### Real Benchmark Execution Status
+### Benchmark Summary & Error Findings
 
-When `HF_TOKEN` is unconfigured in the execution environment, `npm run benchmark:huggingface` cleanly outputs a notice and token setup instructions without faking results or making billing commitments.
+The real 6-material benchmark (cobblestone, grass, sand, water, wood, lava) was executed using a valid fine-grained token with `provider="auto"` against `black-forest-labs/FLUX.1-schnell`.
 
-When `HF_TOKEN` with "Make calls to Inference Providers" permission is present, the SDK routes requests dynamically (`provider: "auto"`).
+- **Total Materials Attempted:** 6
+- **Successful Generations:** 0
+- **Failed Generations:** 6
+- **Real Benchmark Error:**
+  `HTTP 400: "Model not supported by provider fal-ai"`
+- **Quality Score:** **NONE** (no images were produced)
 
-No benchmark results are fabricated. Offline mock integration and error normalization are 100% verified via unit tests (`npm run test:huggingface`).
+### Interpretation Notice
 
----
-
-## 6. Verification & Automated Testing
-
-All automated unit tests pass completely offline without network calls or API keys:
-
-```bash
-npm run test:huggingface  # Runs provider-specific unit test suite (13/13 passed)
-npm test                 # Runs full project test suite (123/123 passed)
-npm run lint             # Runs TypeScript type check
-npm run build            # Runs Vite & Esbuild bundle builds
-```
+> **IMPORTANT:** This result must **NOT** be interpreted as a model-quality failure for FLUX.1-schnell.
+>
+> Because 0 images were generated due to an upstream provider routing error (`fal-ai` rejecting the model request via HF Inference Providers API), no image output was produced to evaluate for tileability, seams, or visual fidelity.
 
 ---
 
-## 7. Comparison with Phase 2C Providers
+## 7. Final Recommendation & Conclusion
 
-| Provider | Model | Pricing Classification | Real Benchmark Executed? | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **Pixazo** (Phase 2C.1) | SDXL Base 1.0 | Free API Gateway / Open Beta | Yes | Complete |
-| **Pollinations** (Phase 2C.2) | FLUX.1 Schnell | Paid Pollen Credits ($0.0000 free) | Blocked (HTTP 402) | Complete (Blocked) |
-| **Hugging Face** (Phase 2C.3) | FLUX.1 Schnell | **FREE WITH LIMITED MONTHLY CREDITS** ($0.10/mo) | Safely unexecuted / mock verified | **PoC Complete** |
+1. **Provider Selection:** **Hugging Face is NOT selected** for Tiler's active generation route.
+2. **Current Feasibility:** While the adapter code and test suite are technically complete and verified, real-world usage is currently blocked by Hugging Face's server-side provider routing for FLUX.1-schnell.
+3. **Verification:**
+   ```bash
+   npm run test:huggingface  # Passes 13/13 unit tests offline
+   npm test                 # Passes 123/123 project unit tests
+   npm run lint             # Clean TypeScript check
+   npm run build            # Builds Vite & Esbuild bundles successfully
+   ```
