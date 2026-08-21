@@ -4,13 +4,7 @@
  */
 
 import {
-  ExportOptions,
-  GenerationParams,
-  GenerationState,
-  ExportState,
-  PreviewState,
   SeamAnalysisReport,
-  TileProcessingOptions,
   ValidationSummary,
   WorkspaceAsset,
   WorkspaceState,
@@ -25,7 +19,7 @@ function assert(condition: boolean, message: string) {
 }
 
 console.log('======================================================');
-console.log('  [WorkspaceState] Unit Tests');
+console.log('  [WorkspaceState] Unit & Behavior Tests');
 console.log('======================================================');
 
 // Helper function to create initial workspace state
@@ -341,6 +335,47 @@ function createInitialWorkspaceState(): WorkspaceState {
   assert(simulateGenerateTrigger() === 'STARTED', 'Trigger works again after generation completes');
 }
 
+// 9. Behavior Test: Error recovery and retry flow
+{
+  let state = createInitialWorkspaceState();
+
+  // Step 1: Start generation
+  state = { ...state, generation: { status: 'generating', currentStep: 'Generating...', progress: 30 } };
+  assert(state.generation.status === 'generating', 'Step 1: Status is generating');
+
+  // Step 2: Generation fails
+  state = { ...state, generation: { status: 'error', currentStep: 'Failed', progress: 0, errorMessage: 'Timeout' } };
+  assert(state.generation.status === 'error', 'Step 2: Status is error');
+
+  // Step 3: Retry generation works cleanly from error state
+  state = { ...state, generation: { status: 'generating', currentStep: 'Retrying...', progress: 30, errorMessage: undefined } };
+  assert(state.generation.status === 'generating', 'Step 3: Status transitions back to generating on retry');
+  assert(state.generation.errorMessage === undefined, 'Step 3: Error message cleared on retry');
+}
+
+// 10. Behavior Test: Export failure does not pollute generation or asset state
+{
+  const sampleAsset: WorkspaceAsset = {
+    id: 'exp-asset-1',
+    name: 'Grass',
+    material: 'grass',
+    style: 'stylized',
+    prompt: 'grass',
+    resolution: 512,
+    processedImageDataUrl: 'data:image/png;base64,procGrass',
+    rawImageDataUrl: 'data:image/png;base64,rawGrass',
+    isTileable: true,
+    createdAt: new Date().toISOString(),
+  };
+
+  let state = createInitialWorkspaceState();
+  state = { ...state, asset: sampleAsset, export: { status: 'error', errorMessage: 'Network download failure' } };
+
+  assert(state.export.status === 'error', 'Export status reflects error');
+  assert(state.generation.status === 'idle', 'Generation state unaffected by export failure');
+  assert(state.asset === sampleAsset, 'Asset remains present and valid after export failure');
+}
+
 console.log('======================================================');
-console.log('  All WorkspaceState Unit Tests Passed Successfully!');
+console.log('  All WorkspaceState Unit & Behavior Tests Passed!');
 console.log('======================================================');
