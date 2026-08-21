@@ -22,10 +22,9 @@ The deterministic processing and validation pipeline remains the authority for w
 | **1** | Core tile engine & deterministic pipeline | Foundation | Reliable processing, seam analysis, and validation |
 | **2A** | Provider abstraction | Complete / historical | Stable provider interface and configuration model |
 | **2B** | Benchmark framework | Complete / historical | Repeatable provider benchmarking and comparable reports |
-| **2C** | Provider research PoCs | In progress / closing | Determine which external image-generation providers are technically viable |
-| **2C.3** | Provider PoC closure | Current research closure | Record real-world provider results without forcing unsuitable providers into production |
-| **2D** | Pixazo productionization | Next | Turn the selected provider path into a reliable end-to-end application path |
-| **3** | Functional product / vertical slice | Planned | Make the application genuinely usable from prompt to exported tile |
+| **2C** | Provider research PoCs | Complete | Provider candidates tested and production decision recorded |
+| **2D** | Pixazo productionization | In progress | Establish one reliable end-to-end generation vertical slice |
+| **3** | Functional product / vertical slice | Planned | Expand the working slice into a genuinely usable Tiler application |
 | **4** | UX, quality & hardening | Planned | Make the working product pleasant, robust, observable, and safe to operate |
 | **5** | Release / ecosystem | Future | Packaging, deployment, documentation, and additional providers/features |
 
@@ -33,98 +32,108 @@ The deterministic processing and validation pipeline remains the authority for w
 
 # Phase 2C — Provider research
 
-The purpose of Phase 2C is **research, not production integration**.
+The purpose of Phase 2C was **research, not production integration**.
 
-Each candidate provider should be tested through the same benchmark framework where possible. A failed provider call is still a useful result when the reason is clearly recorded.
+Each candidate provider was tested through the benchmark framework where practical. A failed provider call remains useful evidence when the reason is clearly recorded.
 
-### Current findings
+### Final findings
 
 - Pollinations PoC: technically callable, but the tested account had insufficient pollen balance for the real benchmark.
 - Hugging Face PoC: authentication and official SDK integration were verified, but the real FLUX.1-schnell benchmark was blocked by current provider/model availability (`Model not supported by provider fal-ai`).
-- Pixazo: selected as the current production candidate for the next phase.
+- Pixazo: selected as the current production candidate.
 
 ### Exit criterion
 
-Phase 2C is complete when provider candidates have been tested sufficiently to make an explicit production-selection decision and the unsuccessful candidates are documented rather than repeatedly worked around.
+Phase 2C is **complete**. Provider candidates have been tested sufficiently to make an explicit production-selection decision, and unsuccessful candidates are documented rather than repeatedly worked around.
 
 ---
 
 # Phase 2D — Pixazo productionization
 
-**This is the next engineering phase.** It is not merely another benchmark.
+Phase 2D is the engineering phase that turns the selected Pixazo integration into a reliable, testable vertical generation path inside Tiler.
 
-The goal is to take the selected Pixazo integration and establish a **working vertical generation path** inside Tiler.
-
-## 2D workstreams
-
-### 2D.1 Provider integration hardening
-
-- Verify credentials and environment handling.
-- Verify request/response handling against the real Pixazo API.
-- Normalize provider errors and timeouts.
-- Keep provider-specific details behind the provider abstraction.
-- Ensure generated image data enters the existing processing pipeline correctly.
-
-### 2D.2 End-to-end generation path
-
-The application must be able to perform the real sequence:
-
-1. User enters a prompt.
-2. Tiler submits the generation request.
-3. Pixazo returns an image.
-4. Tiler receives and stores the source image safely.
-5. Tile processing runs on the generated image.
-6. Seam analysis validates the result.
-7. The UI displays the source and processed tile.
-8. The user can export a valid result.
-
-This is the first point at which the application should be considered **functionally alive** rather than merely architecturally complete.
-
-### 2D.3 Failure and state handling
-
-The UI and backend must handle at least:
-
-- missing credentials
-- provider rejection
-- network/API failure
-- invalid image response
-- processing failure
-- validation failure
-- successful generation with a non-tileable result
-- successful generation and validation
-
-A generated image that fails tile validation is **not an application failure**; it is a valid generation result that needs further processing or regeneration.
-
-### 2D.4 Minimal usable UI
-
-Phase 2D should include enough UI functionality to exercise the complete path:
-
-- prompt input
-- generate action
-- loading state
-- error state
-- source image preview
-- processed tile preview
-- validation/seam result
-- export/download action
-
-This is deliberately a **minimal functional UI**, not the final UX.
-
-### 2D exit criteria
-
-Phase 2D is complete when a clean local setup can reliably demonstrate:
+The goal is not to build the entire final application yet. The goal is to prove and harden one complete path:
 
 `prompt → Pixazo → image → TileProcessor → validation → preview → export`
 
-with explicit success and failure states and automated tests covering the provider integration and critical pipeline boundaries.
+## 2D.1 — Functional Baseline — Complete
+
+The real Pixazo provider path has been connected to the application and verified through the UI and backend.
+
+Exit condition:
+
+- Real generation request reaches Pixazo.
+- Real provider image is returned to Tiler.
+- The generated image enters the normal processing pipeline.
+- The UI can display the generated result.
+
+## 2D.2 — Processing & Validation — Complete
+
+The raw provider result and processed result are handled as distinct stages.
+
+Completed capabilities include:
+
+- raw seam analysis
+- processed seam analysis
+- validation summary
+- deterministic final-status handling
+- independent raw/processed pass information
+- UI reporting of improvement, worsening, or unchanged processing results
+
+The backend `validationSummary.finalStatus` is the authoritative source for the user-facing final validation status.
+
+## 2D.3 — Export & Output — Complete
+
+The generated and processed results can be taken through the output/export path.
+
+The phase established the minimum output contract needed for the vertical slice and separated source, processed, validation, and export concerns.
+
+## 2D.4 — Reliability & Failure Handling — Next
+
+This phase hardens the real application path rather than adding another provider or another benchmark.
+
+The implementation should explicitly handle and test:
+
+- missing or invalid Pixazo credentials
+- provider rejection
+- network/API failure
+- timeout or stalled request
+- invalid or empty image response
+- image processing failure
+- validation failure
+- successful generation that is not tileable
+- successful generation and validation
+- repeated generation requests
+- regenerate/retry behaviour
+- export attempted without a valid output
+- loading, success, and error state transitions
+- prevention of silent fallback to mock output when the real provider is selected
+
+A generated image that fails tile validation is **not an application failure**. It is a valid generation result that needs further processing, review, or regeneration.
+
+## 2D.5 — Vertical Slice Acceptance — Planned
+
+After reliability work, perform a deliberate end-to-end acceptance pass against the real local application.
+
+The acceptance path is:
+
+`prompt → Pixazo → real image → TileProcessor → validation → preview → export`
+
+Acceptance should verify both successful and expected failure paths and confirm that the UI state, backend state, validation result, and exported output remain consistent.
+
+### Phase 2D exit criteria
+
+Phase 2D is complete when a clean local setup can reliably demonstrate the complete vertical slice with explicit success and failure states and automated tests covering the provider integration and critical pipeline boundaries.
+
+At that point Tiler has a **working technical product slice** and Phase 3 can focus on product completeness rather than proving whether the underlying generation path works.
 
 ---
 
 # Phase 3 — Functional product / vertical slice
 
-Phase 3 starts **after the Pixazo path works end-to-end**.
+Phase 3 starts **after the Pixazo path passes the Phase 2D acceptance criteria**.
 
-The goal is to turn the technical vertical slice into the actual Tiler application.
+The goal is to turn the working technical slice into the actual Tiler application.
 
 Likely areas include:
 
@@ -137,9 +146,9 @@ Likely areas include:
 - asset naming and metadata
 - export formats and dimensions
 - persistence where appropriate
-- clearer separation between source, candidate, and validated asset
+- clearer separation between source, candidate, processed, and validated asset
 
-The important distinction is that Phase 3 is about **product completeness**, whereas Phase 2D is about proving and hardening the real production path.
+Phase 3 should be driven by real user workflows discovered while using the working application. It should not prematurely become a collection of speculative features.
 
 ---
 
@@ -196,10 +205,17 @@ When implementation reveals a genuinely new constraint, the issue/ADR can refine
 
 ## Current position
 
-The project is transitioning from **provider research into productionization**.
+The project has transitioned from **provider research into Pixazo productionization**.
 
-The immediate target is therefore **Phase 2D: Pixazo productionization**, with one important principle:
+Completed work:
+
+- Phase 2C provider research and production selection.
+- Phase 2D.1 functional Pixazo generation baseline.
+- Phase 2D.2 processing and validation integration.
+- Phase 2D.3 export and output path.
+
+The immediate target is therefore **Phase 2D.4 — Reliability & Failure Handling**, followed by **Phase 2D.5 — Vertical Slice Acceptance**.
+
+Only after those exit criteria are met should Phase 3 begin.
 
 > We do not need to finish the entire application before making it functional. We need one complete, reliable vertical slice first.
-
-Once that slice works, Phase 3 can expand it into the full application without guessing whether the underlying generation pipeline actually works.
