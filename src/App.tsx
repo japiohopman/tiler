@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { DeveloperTestPanel } from './components/DeveloperTestPanel';
 import { GeneratorPanel } from './components/GeneratorPanel';
@@ -50,6 +50,7 @@ export default function App() {
     progress: 0,
   });
 
+  const isGeneratingRef = useRef<boolean>(false);
   const [currentTile, setCurrentTile] = useState<Tile | null>(null);
   const [seamReport, setSeamReport] = useState<SeamAnalysisReport | undefined>(undefined);
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -113,6 +114,12 @@ export default function App() {
 
   // Trigger AI Image Generation & Seamless Tile Pipeline
   const handleGenerate = async () => {
+    if (isGeneratingRef.current) {
+      console.warn('Generation already in progress. Duplicate request ignored.');
+      return;
+    }
+    isGeneratingRef.current = true;
+
     try {
       setGenerationState({
         status: 'generating',
@@ -197,6 +204,8 @@ export default function App() {
         message: `Generation error: ${err.message || 'Failed to generate texture'}`,
         type: 'warn',
       });
+    } finally {
+      isGeneratingRef.current = false;
     }
   };
 

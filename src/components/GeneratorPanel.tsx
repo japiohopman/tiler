@@ -143,6 +143,21 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
         </div>
       </div>
 
+      {/* Unconfigured Provider Notice */}
+      {!providerConfigured && activeProvider !== 'mock' && (
+        <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/50 text-amber-200 text-xs space-y-1.5">
+          <div className="flex items-center space-x-2 font-semibold text-amber-300">
+            <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+            <span>{getProviderBadgeLabel()} Key Missing</span>
+          </div>
+          <p className="text-[11px] text-amber-200/90 leading-relaxed">
+            {activeProvider === 'pixazo'
+              ? 'Pixazo subscription key is not configured in environment. Set PIXAZO_API_KEY or PIXAZO_SUBSCRIPTION_KEY in .env or .env.local to generate live AI images.'
+              : `Provider API key is not configured for ${activeProvider}. Set the required environment variable.`}
+          </p>
+        </div>
+      )}
+
       {/* Error Banner when API Fails */}
       {generationState.status === 'error' && generationState.errorMessage && (
         <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-200 text-xs space-y-1.5 animate-in fade-in duration-200">
