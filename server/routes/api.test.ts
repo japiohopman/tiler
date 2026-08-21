@@ -347,6 +347,28 @@ async function runTests() {
       'Export sets sanitized filename in Content-Disposition'
     );
 
+    // 7b. Texture Export JPEG filename mapping (.jpg)
+    const exportJpegRes = await originalFetch(`${baseUrl}/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tile: {
+          material: 'Grass',
+          processedImageDataUrl: dummyDataUrl,
+        },
+        options: { format: 'jpeg', resolution: 512 },
+      }),
+    });
+
+    assert(exportJpegRes.status === 200, 'JPEG export endpoint returns HTTP 200 OK');
+    const jpegContentType = exportJpegRes.headers.get('content-type');
+    const jpegContentDisposition = exportJpegRes.headers.get('content-disposition');
+    assert(jpegContentType === 'image/jpeg', 'JPEG export returns image/jpeg Content-Type');
+    assert(
+      jpegContentDisposition !== null && jpegContentDisposition.includes('filename="grass-processed.jpg"'),
+      'JPEG export produces filename ending in .jpg (not .jpeg)'
+    );
+
     console.log('\n======================================================');
     console.log(`  API Integration Test Suite Results: ${passed}/${total} Tests Passed`);
     console.log('======================================================\n');

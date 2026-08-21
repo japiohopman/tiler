@@ -100,8 +100,8 @@ async function runExportTestSuite() {
     assert(sourceInfo.imageDataUrl === mockTile.rawImageDataUrl, 'Must use raw data URL');
   });
 
-  // Test 5: Filenames building
-  test('Builds safe filenames for PNG and JSON companion metadata', () => {
+  // Test 5: Format extension mapping (PNG -> .png, WebP -> .webp, JPEG/JPG -> .jpg)
+  test('Maps format extensions correctly (PNG->.png, WebP->.webp, JPEG/JPG->.jpg)', () => {
     const mockTile: Tile = {
       id: 'tile-3',
       name: 'Water / River: Blue',
@@ -114,13 +114,21 @@ async function runExportTestSuite() {
       createdAt: new Date().toISOString(),
     };
 
-    const { imageFilename, metadataFilename } = buildExportFilenames(mockTile, { format: 'png' }, 'processed');
-    assert(imageFilename === 'water-processed.png', `Image filename incorrect: ${imageFilename}`);
-    assert(metadataFilename === 'water-processed.json', `Metadata filename incorrect: ${metadataFilename}`);
+    const pngFn = buildExportFilenames(mockTile, { format: 'png' }, 'processed');
+    assert(pngFn.imageFilename === 'water-processed.png', `PNG filename incorrect: ${pngFn.imageFilename}`);
+    assert(pngFn.metadataFilename === 'water-processed.json', `PNG metadata filename incorrect: ${pngFn.metadataFilename}`);
+
+    const webpFn = buildExportFilenames(mockTile, { format: 'webp' }, 'processed');
+    assert(webpFn.imageFilename === 'water-processed.webp', `WebP filename incorrect: ${webpFn.imageFilename}`);
+    assert(webpFn.metadataFilename === 'water-processed.json', `WebP metadata filename incorrect: ${webpFn.metadataFilename}`);
+
+    const jpegFn = buildExportFilenames(mockTile, { format: 'jpeg' }, 'processed');
+    assert(jpegFn.imageFilename === 'water-processed.jpg', `JPEG filename incorrect: ${jpegFn.imageFilename}`);
+    assert(jpegFn.metadataFilename === 'water-processed.json', `JPEG metadata filename incorrect: ${jpegFn.metadataFilename}`);
   });
 
-  // Test 6: Companion metadata includes required fields and excludes secrets
-  test('Metadata package includes reproducibility fields and contains no secrets', () => {
+  // Test 6: Companion metadata includes provider, model, seed and excludes secrets
+  test('Metadata package includes provider/model/seed reproducibility fields and contains no secrets', () => {
     const mockTile: Tile = {
       id: 'tile-4',
       name: 'Wood Planks',
@@ -135,7 +143,9 @@ async function runExportTestSuite() {
       seamScore: 0.008,
       createdAt: new Date().toISOString(),
       generationMetadata: {
+        provider: 'pixazo',
         model: 'sdxl-base-1.0',
+        seed: 4242,
         builtPrompt: 'top down wooden floor planks hand-painted style',
         material: 'wood',
         style: 'hand-painted',
@@ -161,8 +171,10 @@ async function runExportTestSuite() {
 
     const metadata = buildExportMetadata(mockTile, 'processed');
 
-    assert(metadata.material === 'wood', 'Material must match');
+    assert(metadata.provider === 'pixazo', 'Provider must match');
     assert(metadata.model === 'sdxl-base-1.0', 'Model must match');
+    assert(metadata.seed === 4242, 'Seed must match');
+    assert(metadata.material === 'wood', 'Material must match');
     assert(metadata.prompt === 'top down wooden floor planks hand-painted style', 'Prompt must match');
     assert(metadata.rawSeamScore === 0.125, 'Raw seam score must match');
     assert(metadata.processedSeamScore === 0.008, 'Processed seam score must match');
@@ -178,6 +190,34 @@ async function runExportTestSuite() {
     assert(!jsonString.includes('secret'), 'Metadata must not contain secret');
     assert(!jsonString.includes('bearer'), 'Metadata must not contain bearer');
     assert(!jsonString.includes('authorization'), 'Metadata must not contain authorization');
+  });
+
+  // Test 7: Missing provider and seed fields are omitted rather than invented
+  test('Missing provider or seed values are omitted rather than invented', () => {
+    const mockTileWithoutProviderSeed: Tile = {
+      id: 'tile-4b',
+      name: 'Cobblestone',
+      material: 'cobblestone',
+      style: 'stylized',
+      prompt: 'cobblestone',
+      resolution: 512,
+      processedImageDataUrl: 'data:image/png;base64,PROC',
+      isTileable: true,
+      createdAt: new Date().toISOString(),
+      generationMetadata: {
+        model: 'sdxl-base-1.0',
+        builtPrompt: 'cobblestone',
+        material: 'cobblestone',
+        style: 'stylized',
+        resolution: 512,
+        generatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    };
+
+    const metadata = buildExportMetadata(mockTileWithoutProviderSeed, 'processed');
+    assert(!('provider' in metadata), 'Provider key must be omitted when unavailable');
+    assert(!('seed' in metadata), 'Seed key must be omitted when unavailable');
+    assert(metadata.model === 'sdxl-base-1.0', 'Model should be preserved');
   });
 
   // Test 7: Failed validation state preservation

@@ -154,12 +154,14 @@ apiRouter.post('/generate', async (req, res) => {
 
     // Step 6: Generation metadata package
     const generationMetadata = {
+      provider: selectedProvider.id,
       model: rawResult.model,
       builtPrompt: rawResult.builtPrompt,
       material,
       style,
       detail,
       resolution,
+      seed: req.body.seed ?? (rawResult.metadata as any)?.seed,
       generatedAt: new Date().toISOString(),
       processingAlgorithm: processResult.metadata.algorithm,
       processingTimeMs: processResult.metadata.processingTimeMs,

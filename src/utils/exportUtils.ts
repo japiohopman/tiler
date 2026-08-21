@@ -29,6 +29,18 @@ export function sanitizeFilename(name: string): string {
   return sanitized.length > 0 ? sanitized : 'tile';
 }
 
+/**
+ * Normalizes export format to extension string.
+ * Enforces mapping: PNG -> 'png', WebP -> 'webp', JPEG/JPG -> 'jpg'.
+ */
+export function getFileExtension(format?: string): 'png' | 'webp' | 'jpg' {
+  if (!format) return 'png';
+  const fmt = format.toLowerCase().trim();
+  if (fmt === 'jpeg' || fmt === 'jpg') return 'jpg';
+  if (fmt === 'webp') return 'webp';
+  return 'png';
+}
+
 export type ExportSourceType = 'processed' | 'raw';
 
 export interface ExportSourceInfo {
@@ -84,11 +96,11 @@ export function buildExportFilenames(
   source: ExportSourceType
 ): { imageFilename: string; metadataFilename: string } {
   const sanitizedName = sanitizeFilename(tile.material || tile.name || 'tile');
-  const format = (options.format || 'png').toLowerCase();
+  const ext = getFileExtension(options.format);
 
   const baseFilename = `${sanitizedName}-${source}`;
   return {
-    imageFilename: `${baseFilename}.${format}`,
+    imageFilename: `${baseFilename}.${ext}`,
     metadataFilename: `${baseFilename}.json`,
   };
 }
@@ -132,9 +144,11 @@ export function buildExportMetadata(tile: Tile, source: ExportSourceType): Expor
   const processedTileable = valSummary?.processedTileable ?? tile.isTileable ?? seamRep?.pass;
 
   const rawMetadata: ExportMetadataPackage = {
+    provider: genMeta?.provider || tile.metadata?.provider,
+    model: genMeta?.model || tile.metadata?.model,
+    seed: typeof genMeta?.seed === 'number' ? genMeta.seed : typeof tile.metadata?.seed === 'number' ? tile.metadata.seed : undefined,
     material: tile.material || 'unknown',
     prompt: genMeta?.builtPrompt || tile.prompt,
-    model: genMeta?.model || tile.metadata?.model,
     generatedAt: genMeta?.generatedAt || tile.createdAt,
     resolution: tile.resolution || 512,
     rawSeamScore: typeof rawScore === 'number' ? rawScore : undefined,

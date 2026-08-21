@@ -4,7 +4,7 @@
  */
 
 import sharp from 'sharp';
-import { sanitizeFilename } from '../../src/utils/exportUtils';
+import { getFileExtension, sanitizeFilename } from '../../src/utils/exportUtils';
 
 export interface ExportConfig {
   format?: 'png' | 'webp' | 'jpeg';
@@ -65,12 +65,12 @@ export class ExportService {
     }
 
     let mimeType = 'image/png';
-    let ext = format === 'jpeg' ? 'jpg' : format;
+    const ext = getFileExtension(format);
 
-    if (format === 'webp') {
+    if (ext === 'webp') {
       pipeline = pipeline.webp({ quality: 90, lossless: true });
       mimeType = 'image/webp';
-    } else if (format === 'jpeg') {
+    } else if (ext === 'jpg') {
       pipeline = pipeline.jpeg({ quality: 90 });
       mimeType = 'image/jpeg';
     } else {
