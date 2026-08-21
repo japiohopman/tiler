@@ -61,6 +61,7 @@ export function useWorkspaceState() {
     activeProvider,
     params,
     processingOptions,
+    Boolean(asset),
     setAsset,
     setSelectedSource,
     handleNotify
@@ -82,11 +83,10 @@ export function useWorkspaceState() {
         setBackendStatus('offline');
       }
 
-      initDefaultSample();
     }
 
     verifyBackendAndInit();
-  }, [initDefaultSample]);
+  }, []);
 
   const handleReanalyze = useCallback(
     async (threshold: number, edgeRegion: EdgeRegionDepth) => {

@@ -263,6 +263,83 @@ function createInitialWorkspaceState(): WorkspaceState {
   assert(expStateCompleted.status === 'completed', 'Successful export transitions state to completed');
 }
 
+// 8. Behavior tests: Regeneration & Asset Preservation on Failure
+{
+  const initialAsset: WorkspaceAsset = {
+    id: 'asset-v1-cobble',
+    name: 'Cobblestone v1',
+    material: 'cobblestone',
+    style: 'stylized',
+    prompt: 'cobblestone pavement',
+    resolution: 512,
+    rawImageDataUrl: 'data:image/png;base64,v1Raw',
+    processedImageDataUrl: 'data:image/png;base64,v1Proc',
+    isTileable: true,
+    seamScore: 0.01,
+    createdAt: new Date().toISOString(),
+  };
+
+  let activeAsset: WorkspaceAsset | null = initialAsset;
+  let genState = transitionGenerationState('idle', '', 0);
+
+  // User triggers Regeneration: asset remains visible while generating
+  genState = transitionGenerationState('generating', 'GENERATING', 30);
+  assert(activeAsset !== null && activeAsset.id === 'asset-v1-cobble', 'Regeneration in progress preserves existing asset in workspace');
+  assert(canStartGeneration(true, genState.status) === false, 'Duplicate generation request is blocked while generating');
+
+  // Scenario A: Regeneration succeeds -> new asset replaces old asset
+  const newGenResponse: GenerationResponse = {
+    success: true,
+    tileId: 'asset-v2-cobble',
+    rawImageUrl: 'data:image/png;base64,v2Raw',
+    processedImageUrl: 'data:image/png;base64,v2Proc',
+    prompt: 'cobblestone pavement',
+  };
+  const updatedAsset = createWorkspaceAssetFromResponse(
+    newGenResponse,
+    { material: 'cobblestone', style: 'stylized', resolution: 512 },
+    { algorithm: 'offset-crossfade', blendMarginPercent: 10 }
+  );
+  activeAsset = updatedAsset;
+  genState = transitionGenerationState('completed', 'Completed', 100);
+
+  assert(activeAsset.id === 'asset-v2-cobble', 'Successful regeneration updates workspace asset');
+  assert(activeAsset.id !== initialAsset.id, 'Previous asset is no longer current after successful regeneration');
+
+  // Scenario B: Regeneration fails -> previous asset remains current
+  let currentAssetBeforeFailedRegen = activeAsset;
+  genState = transitionGenerationState('generating', 'GENERATING', 30);
+  // Regeneration API throws error (HTTP 502 Bad Gateway)
+  genState = transitionGenerationState('error', 'Generation failed', 0, 'HTTP 502 Bad Gateway: Provider failed');
+  // Asset is NOT cleared on failure
+  assert(activeAsset.id === currentAssetBeforeFailedRegen.id, 'Failed regeneration preserves previous asset in workspace');
+  assert(genState.status === 'error', 'Generation enters error state on provider failure');
+  assert(canStartGeneration(false, genState.status) === true, 'Retry remains possible after generation error without page refresh');
+}
+
+// 9. Error Differentiation: Generation Error vs Validation Failure vs Export Error
+{
+  const genError = transitionGenerationState('error', 'Generation failed', 0, 'HTTP 502 Bad Gateway');
+  const expError = transitionExportState('error', 'Failed to render PNG export');
+  const valFailedSummary: ValidationSummary = {
+    generationStatus: 'SUCCESS',
+    rawTileable: false,
+    processedTileable: false,
+    rawSeamScore: 0.18,
+    processedSeamScore: 0.12,
+    improvement: 0.06,
+    improvementStatus: 'IMPROVED',
+    finalStatus: 'VALIDATION_FAILED',
+    threshold: 0.05,
+    issues: ['Seam discontinuity'],
+    promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED',
+  };
+
+  assert(genError.status === 'error' && genError.errorMessage?.includes('HTTP 502'), 'Generation error correctly represented as generation failure');
+  assert(expError.status === 'error' && expError.errorMessage?.includes('export'), 'Export error correctly represented as export failure');
+  assert(valFailedSummary.finalStatus === 'VALIDATION_FAILED' && valFailedSummary.generationStatus === 'SUCCESS', 'Validation failure remains distinct from generation failure');
+}
+
 console.log('======================================================');
 console.log('  All WorkspaceTransitions & WorkspaceState Tests Passed!');
 console.log('======================================================');

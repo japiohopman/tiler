@@ -21,6 +21,7 @@ export function useGeneration(
   activeProvider: string,
   params: GenerationParams,
   processingOptions: TileProcessingOptions,
+  hasExistingAsset: boolean,
   setAsset: (asset: WorkspaceAsset) => void,
   setSelectedSource: (source: 'processed' | 'raw') => void,
   onNotify?: (message: string, type: 'info' | 'success' | 'warn') => void
@@ -39,12 +40,18 @@ export function useGeneration(
       return;
     }
     isGeneratingRef.current = true;
+    const isRegeneration = hasExistingAsset;
+
+    onNotify?.(
+      isRegeneration ? 'Regeneration started' : 'Generation started',
+      'info'
+    );
 
     try {
       setGenerationState(
         transitionGenerationState(
           'generating',
-          `Generating texture via ${activeProvider} provider...`,
+          'GENERATING',
           30
         )
       );
@@ -62,7 +69,7 @@ export function useGeneration(
       setGenerationState(
         transitionGenerationState(
           'processing',
-          'Transforming with Sharp offset-crossfade...',
+          'PROCESSING',
           70
         )
       );
@@ -70,18 +77,18 @@ export function useGeneration(
       const newTile = createWorkspaceAssetFromResponse(genResponse, params, processingOptions);
 
       setGenerationState(
-        transitionGenerationState('analyzing', 'Validating seam continuity...', 90)
+        transitionGenerationState('analyzing', 'ANALYZING', 90)
       );
 
       setSelectedSource('processed');
       setAsset(newTile);
 
       setGenerationState(
-        transitionGenerationState('completed', 'Tile generated & verified!', 100)
+        transitionGenerationState('completed', 'Completed', 100)
       );
 
       onNotify?.(
-        `Successfully generated ${params.material} seamless tile (512×512) via ${genResponse.generationMetadata?.model || activeProvider}!`,
+        isRegeneration ? 'Regeneration completed' : 'Generation completed',
         'success'
       );
 
@@ -90,22 +97,23 @@ export function useGeneration(
       }, 2500);
     } catch (err: any) {
       console.error('Generation pipeline error:', err);
+      const errorMessage = err.message || 'Failed to generate texture. Please check server provider configuration.';
       setGenerationState(
         transitionGenerationState(
           'error',
           'Generation failed',
           0,
-          err.message || 'Failed to generate texture. Please check server provider configuration.'
+          errorMessage
         )
       );
       onNotify?.(
-        `Generation error: ${err.message || 'Failed to generate texture'}`,
+        isRegeneration ? 'Regeneration failed' : 'Generation failed',
         'warn'
       );
     } finally {
       isGeneratingRef.current = false;
     }
-  }, [activeProvider, params, processingOptions, generationState.status, setAsset, setSelectedSource, onNotify]);
+  }, [activeProvider, params, processingOptions, hasExistingAsset, generationState.status, setAsset, setSelectedSource, onNotify]);
 
   return {
     generationState,

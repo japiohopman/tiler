@@ -188,7 +188,8 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
                 key={mat.id}
                 id={`material-select-${mat.id}`}
                 onClick={() => handleMaterialSelect(mat.id)}
-                className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                disabled={isGenerating}
+                className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isSelected
                     ? 'bg-sky-950/40 border-sky-500/80 shadow-md shadow-sky-500/10 ring-1 ring-sky-500/30'
                     : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
@@ -220,7 +221,8 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
                 key={style.id}
                 id={`style-select-${style.id}`}
                 onClick={() => handleStyleSelect(style.id)}
-                className={`px-2.5 py-2 rounded-lg border text-left text-xs font-medium transition-all truncate cursor-pointer ${
+                disabled={isGenerating}
+                className={`px-2.5 py-2 rounded-lg border text-left text-xs font-medium transition-all truncate cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isSelected
                     ? 'bg-indigo-950/60 border-indigo-500/80 text-indigo-200 shadow-sm'
                     : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -245,7 +247,8 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
                 key={item.id}
                 id={`detail-select-${item.id}`}
                 onClick={() => handleDetailSelect(item.id)}
-                className={`px-2 py-1.5 rounded-lg border text-center text-xs font-medium transition-all cursor-pointer ${
+                disabled={isGenerating}
+                className={`px-2 py-1.5 rounded-lg border text-center text-xs font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isSelected
                     ? 'bg-sky-950/50 border-sky-500 text-sky-200'
                     : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -276,6 +279,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
           id="input-additional-prompt"
           rows={2}
           value={params.additionalPrompt ?? params.customPrompt ?? ''}
+          disabled={isGenerating}
           onChange={(e) =>
             onParamsChange({
               ...params,
@@ -283,7 +287,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
               customPrompt: e.target.value,
             })
           }
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors resize-none font-mono"
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors resize-none font-mono disabled:opacity-50 disabled:cursor-not-allowed"
           placeholder="e.g., mossy patches, weathered cracks, subtle gravel..."
         />
 
@@ -331,13 +335,14 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
             <select
               id="select-algorithm"
               value={processingOptions.algorithm}
+              disabled={isGenerating}
               onChange={(e) =>
                 onProcessingOptionsChange({
                   ...processingOptions,
                   algorithm: e.target.value as any,
                 })
               }
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="offset-crossfade">Offset + Alpha Crossfade</option>
               <option value="none">Direct Passthrough (Raw AI)</option>
@@ -355,57 +360,44 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
               max={20}
               step={5}
               value={processingOptions.blendMarginPercent ?? 10}
+              disabled={isGenerating}
               onChange={(e) =>
                 onProcessingOptionsChange({
                   ...processingOptions,
                   blendMarginPercent: Number(e.target.value) as any,
                 })
               }
-              className="w-full accent-emerald-500 cursor-pointer"
+              className="w-full accent-emerald-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
         </div>
       </div>
 
-      {/* Generation Action Buttons (Generate & Regenerate) */}
+      {/* Primary Action Button (Generate vs Regenerate) */}
       <div className="space-y-2 pt-1">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {/* Primary Generate Button */}
-          <button
-            id="btn-generate-tile"
-            onClick={onGenerate}
-            disabled={isGenerating}
-            className={`py-3 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 active:from-sky-700 active:to-indigo-700 text-white text-xs font-bold tracking-wide uppercase flex items-center justify-center space-x-2 shadow-lg shadow-sky-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
-              currentTile ? 'sm:col-span-1' : 'sm:col-span-2'
-            }`}
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin text-sky-200" />
-                <span>{generationState.currentStep || 'Generating...'}</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                <span>Generate 512×512 Tile</span>
-              </>
-            )}
-          </button>
-
-          {/* Regenerate Button */}
-          {currentTile && (
-            <button
-              id="btn-regenerate-tile"
-              onClick={onGenerate}
-              disabled={isGenerating}
-              className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 text-slate-200 hover:text-white text-xs font-semibold tracking-wide uppercase flex items-center justify-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              title="Regenerate another variation with the current prompt"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-              <span>Regenerate</span>
-            </button>
+        <button
+          id={currentTile ? 'btn-regenerate-tile' : 'btn-generate-tile'}
+          onClick={onGenerate}
+          disabled={isGenerating}
+          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 active:from-sky-700 active:to-indigo-700 text-white text-xs font-bold tracking-wide uppercase flex items-center justify-center space-x-2 shadow-lg shadow-sky-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          {isGenerating ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin text-sky-200" />
+              <span>{generationState.currentStep || 'GENERATING'}</span>
+            </>
+          ) : currentTile ? (
+            <>
+              <RefreshCw className="w-4 h-4" />
+              <span>REGENERATE TILE</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4" />
+              <span>GENERATE TILE</span>
+            </>
           )}
-        </div>
+        </button>
 
         {/* Pipeline Architecture Note */}
         <div className="text-[11px] text-slate-500 flex items-center justify-between px-1">
