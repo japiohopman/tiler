@@ -31,11 +31,16 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
     onExport(options);
   };
 
-  const isPass = currentTile
-    ? (currentTile.validationSummary
-        ? currentTile.validationSummary.finalStatus !== 'VALIDATION_FAILED'
-        : (currentTile.seamReport ? currentTile.seamReport.pass : currentTile.isTileable))
-    : true;
+  let isPass: boolean | null = null;
+  if (currentTile) {
+    if (currentTile.validationSummary) {
+      isPass = currentTile.validationSummary.finalStatus !== 'VALIDATION_FAILED';
+    } else if (currentTile.seamReport) {
+      isPass = currentTile.seamReport.pass;
+    } else {
+      isPass = currentTile.isTileable;
+    }
+  }
 
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
@@ -47,7 +52,11 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             3. Export Game Texture
           </h2>
         </div>
-        {currentTile && !isPass ? (
+        {!currentTile ? (
+          <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+            NO TILE GENERATED
+          </span>
+        ) : isPass === false ? (
           <span className="text-[11px] font-mono text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40 flex items-center space-x-1">
             <AlertTriangle className="w-3 h-3 text-amber-400 inline shrink-0" />
             <span>UNVALIDATED / NON-TILEABLE</span>
@@ -61,7 +70,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       </div>
 
       {/* Validation Status Notice if Unvalidated / Failed Validation */}
-      {currentTile && !isPass && (
+      {currentTile && isPass === false && (
         <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/50 text-amber-200 text-xs space-y-1">
           <div className="flex items-center space-x-2 font-semibold text-amber-300">
             <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
