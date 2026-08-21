@@ -60,6 +60,8 @@ export interface GenerationMetadata {
   generationDurationMs?: number;
   geminiDurationMs?: number; // Legacy compatibility
   blendMarginPercent?: number;
+  rawSeamScore?: number;
+  processedSeamScore?: number;
 }
 
 export interface GenerationState {
@@ -171,7 +173,9 @@ export interface Tile {
   processedImageDataUrl?: string;
   isTileable: boolean;
   seamScore?: number;
+  rawSeamScore?: number;
   seamReport?: SeamAnalysisReport;
+  rawSeamReport?: SeamAnalysisReport;
   createdAt: string;
   generationMetadata?: GenerationMetadata;
   metadata?: {

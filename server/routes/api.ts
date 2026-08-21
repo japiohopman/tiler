@@ -81,7 +81,15 @@ apiRouter.post('/generate', async (req, res) => {
 
     const tileId = `tile-${Date.now()}`;
 
-    // Step 2: Deterministic Sharp tile processing (preserving raw image intact)
+    // Step 2: Seam Continuity Analysis on Raw Image
+    const rawBuffer = tileProcessor.toBuffer(rawResult.imageDataUrl);
+    const rawSeamReport = await seamAnalysisService.analyzeSeams(rawBuffer, {
+      threshold: 0.05,
+      edgeRegion: 4,
+      diagnosticMode: false,
+    });
+
+    // Step 3: Deterministic Sharp tile processing (preserving raw image intact)
     const procOpts = processingOptions || {
       algorithm: 'offset-crossfade',
       blendMarginPercent: 10,
@@ -94,7 +102,7 @@ apiRouter.post('/generate', async (req, res) => {
       targetHeight: resolution,
     });
 
-    // Step 3: Seam Continuity Analysis
+    // Step 4: Seam Continuity Analysis on Processed Tile
     const processedBuffer = tileProcessor.toBuffer(processResult.processedImageDataUrl);
     const seamReport = await seamAnalysisService.analyzeSeams(processedBuffer, {
       threshold: 0.05,
@@ -104,7 +112,7 @@ apiRouter.post('/generate', async (req, res) => {
 
     console.log('[Generation] validation completed');
 
-    // Step 4: Generation metadata package
+    // Step 5: Generation metadata package
     const generationMetadata = {
       model: rawResult.model,
       builtPrompt: rawResult.builtPrompt,
@@ -117,6 +125,8 @@ apiRouter.post('/generate', async (req, res) => {
       processingTimeMs: processResult.metadata.processingTimeMs,
       generationDurationMs: rawResult.generationTimeMs,
       blendMarginPercent: processResult.metadata.blendMarginPercent,
+      rawSeamScore: rawSeamReport.overallScore,
+      processedSeamScore: seamReport.overallScore,
       providerMetadata: rawResult.metadata,
     };
 
@@ -131,6 +141,7 @@ apiRouter.post('/generate', async (req, res) => {
       offsetPreviewUrl: processResult.offsetPreviewDataUrl,
       generationMetadata,
       seamReport,
+      rawSeamReport,
       processingMetadata: processResult.metadata,
       message: 'Generated texture via ImageProvider and executed full seamless tile pipeline.',
     });

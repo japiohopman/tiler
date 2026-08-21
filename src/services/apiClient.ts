@@ -24,6 +24,7 @@ export interface GenerateApiResponse {
   prompt: string;
   generationMetadata?: GenerationMetadata;
   seamReport?: SeamAnalysisResult;
+  rawSeamReport?: SeamAnalysisResult;
   processingMetadata?: any;
   message?: string;
   error?: string;

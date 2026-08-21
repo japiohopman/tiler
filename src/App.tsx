@@ -11,6 +11,7 @@ import { TilePreview } from './components/TilePreview';
 import { SeamAnalysisPanel } from './components/SeamAnalysisPanel';
 import { ExportPanel } from './components/ExportPanel';
 import {
+  EdgeRegionDepth,
   ExportOptions,
   GenerationParams,
   GenerationState,
@@ -157,7 +158,9 @@ export default function App() {
         processedImageDataUrl: genResponse.processedImageUrl, // Processed seamless tile
         isTileable: genResponse.seamReport?.pass ?? true,
         seamScore: genResponse.seamReport?.overallScore ?? 0.0,
+        rawSeamScore: genResponse.rawSeamReport?.overallScore,
         seamReport: genResponse.seamReport,
+        rawSeamReport: genResponse.rawSeamReport,
         createdAt: new Date().toISOString(),
         generationMetadata: genResponse.generationMetadata,
         metadata: {
@@ -206,6 +209,78 @@ export default function App() {
       });
     } finally {
       isGeneratingRef.current = false;
+    }
+  };
+
+  // Re-analysis handler triggered when user adjusts seam options (edgeRegion, threshold)
+  const handleReanalyze = async (threshold: number, edgeRegion: EdgeRegionDepth) => {
+    const activeImage = currentTile?.processedImageDataUrl || currentTile?.rawImageDataUrl;
+    if (!activeImage) return;
+
+    try {
+      const res = await tileApiClient.analyzeSeams(activeImage, {
+        threshold,
+        edgeRegion,
+        diagnosticMode: true,
+      });
+      if (res.success && res.report) {
+        setSeamReport(res.report);
+        if (currentTile) {
+          setCurrentTile({
+            ...currentTile,
+            seamScore: res.report.overallScore,
+            isTileable: res.report.pass,
+            seamReport: res.report,
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error('Re-analysis error:', err);
+    }
+  };
+
+  // Re-processing handler triggered when processing options change on an existing tile
+  const handleProcessingOptionsChange = async (newOpts: TileProcessingOptions) => {
+    setProcessingOptions(newOpts);
+
+    if (currentTile && currentTile.rawImageDataUrl) {
+      try {
+        const procRes = await tileApiClient.processTile(currentTile.rawImageDataUrl, newOpts);
+        if (procRes.success) {
+          const analysisRes = await tileApiClient.analyzeSeams(procRes.processedImageUrl, {
+            threshold: seamReport?.threshold ?? 0.05,
+            edgeRegion: (seamReport?.edgeRegion as EdgeRegionDepth) ?? 4,
+            diagnosticMode: true,
+          });
+
+          const updatedReport = analysisRes.report;
+          setSeamReport(updatedReport);
+
+          setCurrentTile((prevTile) =>
+            prevTile
+              ? {
+                  ...prevTile,
+                  processedImageDataUrl: procRes.processedImageUrl,
+                  isTileable: updatedReport.pass,
+                  seamScore: updatedReport.overallScore,
+                  seamReport: updatedReport,
+                  metadata: {
+                    ...prevTile.metadata,
+                    processingAlgorithm: newOpts.algorithm,
+                    processingTimeMs: procRes.metadata.processingTimeMs,
+                  },
+                }
+              : null
+          );
+
+          setNotification({
+            message: `Updated processing pipeline (${newOpts.algorithm || 'offset-crossfade'}, ${newOpts.blendMarginPercent ?? 10}% blend margin). Tile re-processed & validated!`,
+            type: 'info',
+          });
+        }
+      } catch (err: any) {
+        console.error('Re-processing error:', err);
+      }
     }
   };
 
@@ -380,7 +455,7 @@ export default function App() {
                 params={params}
                 onParamsChange={setParams}
                 processingOptions={processingOptions}
-                onProcessingOptionsChange={setProcessingOptions}
+                onProcessingOptionsChange={handleProcessingOptionsChange}
                 generationState={generationState}
                 onGenerate={handleGenerate}
                 currentTile={currentTile}
@@ -391,7 +466,11 @@ export default function App() {
 
             {/* Right Column: Seam Diagnostics & Export */}
             <div className="lg:col-span-6 flex flex-col gap-6">
-              <SeamAnalysisPanel report={seamReport} isLoading={generationState.status === 'analyzing'} />
+              <SeamAnalysisPanel
+                report={seamReport}
+                isLoading={generationState.status === 'analyzing'}
+                onReanalyze={handleReanalyze}
+              />
 
               <ExportPanel
                 currentTile={currentTile}

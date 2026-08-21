@@ -86,6 +86,9 @@ async function runTests() {
     assert(typeof genData.rawImageUrl === 'string' && genData.rawImageUrl.startsWith('data:image/'), 'Returns rawImageUrl as Base64 Data URL');
     assert(typeof genData.processedImageUrl === 'string' && genData.processedImageUrl.startsWith('data:image/'), 'Returns processedImageUrl as Base64 Data URL');
     assert(genData.seamReport && genData.seamReport.pass !== undefined, 'Returns seamReport with pass status');
+    assert(genData.rawSeamReport && typeof genData.rawSeamReport.overallScore === 'number', 'Returns rawSeamReport with raw seam score');
+    assert(typeof genData.generationMetadata?.rawSeamScore === 'number', 'Metadata captures rawSeamScore');
+    assert(typeof genData.generationMetadata?.processedSeamScore === 'number', 'Metadata captures processedSeamScore');
     assert(genData.generationMetadata?.material === 'cobblestone', 'Metadata captures material cobblestone');
 
     // 3. Validation Failure on Missing Material
@@ -176,6 +179,19 @@ async function runTests() {
     assert(procData.processedImageUrl.startsWith('data:image/'), 'Returns processedImageUrl');
     assert(procData.metadata.blendMarginPercent === 10, 'Metadata records blendMarginPercent 10');
 
+    // 5b. Re-processing with Blend Margin Variation (15%)
+    const procRes15 = await originalFetch(`${baseUrl}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: dummyDataUrl,
+        options: { blendMarginPercent: 15, algorithm: 'offset-crossfade' },
+      }),
+    });
+    assert(procRes15.status === 200, 'Process endpoint supports custom 15% blend margin');
+    const procData15 = await procRes15.json();
+    assert(procData15.metadata.blendMarginPercent === 15, 'Metadata records updated blendMarginPercent 15');
+
     // 6. Seam Analysis Endpoint (/api/analyze)
     console.log('\n--- Seam Analysis Endpoint ---');
     const analyzeRes = await originalFetch(`${baseUrl}/analyze`, {
@@ -190,6 +206,21 @@ async function runTests() {
     const analyzeData = await analyzeRes.json();
     assert(analyzeData.success === true, 'Analyze response indicates success: true');
     assert(typeof analyzeData.report.overallScore === 'number', 'Report contains numerical overallScore');
+
+    // 6b. Seam Analysis with Custom Options (threshold 0.01, edgeRegion 8px)
+    const customAnalyzeRes = await originalFetch(`${baseUrl}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: dummyDataUrl,
+        options: { threshold: 0.01, edgeRegion: 8, diagnosticMode: true },
+      }),
+    });
+    assert(customAnalyzeRes.status === 200, 'Analyze endpoint supports custom threshold and edgeRegion');
+    const customAnalyzeData = await customAnalyzeRes.json();
+    assert(customAnalyzeData.report.threshold === 0.01, 'Report records custom threshold 0.01');
+    assert(customAnalyzeData.report.edgeRegion === 8, 'Report records custom edgeRegion depth 8px');
+    assert(typeof customAnalyzeData.report.diagnosticMapDataUrl === 'string', 'Report generates diagnostic heatmap Data URL');
 
     console.log('\n======================================================');
     console.log(`  API Integration Test Suite Results: ${passed}/${total} Tests Passed`);
