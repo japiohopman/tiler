@@ -1,6 +1,6 @@
 # Tiler Benchmark Report — Pixazo AI Provider (SDXL Base 1.0)
 
-**Date & Time:** `2026-08-20T23:48:36.483Z`
+**Date & Time:** `2026-08-21T04:03:34.302Z`
 **Benchmark Version:** `1.0.0`
 **Provider:** `pixazo` (Pixazo AI Provider (SDXL Base 1.0))
 **Model:** `sdxl-base-1.0`
@@ -12,25 +12,143 @@
 | Metric | Value |
 | :--- | :--- |
 | **Total Materials Tested** | 6 |
-| **Successful Generations** | 6 / 6 (100%) |
-| **Failed Generations** | 0 |
-| **Avg Raw Generation Time** | 6603.8 ms |
-| **Avg End-to-End Latency** | 7586 ms |
-| **Avg Raw Seam Delta (Primary)** | 0.2557 (Lower is better, ≤0.05 passes) |
+| **Successful Generations** | 5 / 6 (83%) |
+| **Failed Generations** | 1 |
+| **Avg Raw Generation Time** | 10253.7 ms |
+| **Avg End-to-End Latency** | 10887.3 ms |
+| **Avg Raw Seam Delta (Primary)** | 0.2227 (Lower is better, ≤0.05 passes) |
 | **Raw Provider Pass Rate** | 0% |
-| **Avg Processed Seam Delta (Pipeline)** | 0.1357 (Lower is better, ≤0.05 passes) |
-| **Processed Pipeline Pass Rate** | 17% |
+| **Avg Processed Seam Delta (Pipeline)** | 0.0996 (Lower is better, ≤0.05 passes) |
+| **Processed Pipeline Pass Rate** | 0% |
 
 ## Material Results
 
 | Material | Raw Status | Raw Seam Delta | Raw Tile % | Processed Seam | Processed Tile % | Gen / Total Latency | Objective Score | Errors |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **cobblestone** | ⚠️ Discontinuous | `0.3995` | 60% | `0.2686` | 73% | 6329ms / 6614ms | `18.0 / 40%` | None |
-| **grass** | ⚠️ Discontinuous | `0.1097` | 89% | `0.0684` | 93% | 5755ms / 6729ms | `26.7 / 40%` | None |
-| **sand** | ⚠️ Discontinuous | `0.1667` | 83% | `0.1088` | 89% | 8324ms / 9604ms | `24.9 / 40%` | None |
-| **water** | ⚠️ Discontinuous | `0.5095` | 49% | `0.2106` | 79% | 5606ms / 7100ms | `14.7 / 40%` | None |
-| **wood** | ⚠️ Discontinuous | `0.1949` | 81% | `0.0219` | 98% | 6601ms / 7479ms | `24.3 / 40%` | None |
-| **lava** | ⚠️ Discontinuous | `0.1536` | 85% | `0.1357` | 86% | 7008ms / 7990ms | `25.5 / 40%` | None |
+| **cobblestone** | ⚠️ Discontinuous | `0.0797` | 92% | `0.0340` | 97% | 7030ms / 7366ms | `27.6 / 40%` | None |
+| **grass** | ⚠️ Discontinuous | `0.3580` | 64% | `0.0557` | 94% | 6119ms / 7178ms | `19.2 / 40%` | None |
+| **sand** | ❌ Fail | `N/A` | N/A | `N/A` | N/A | N/A / 10019ms | `N/A` | [Provider:pixazo] Pixazo API HTTP error 502: Bad Gateway. [URL: POST https://gateway.pixazo.ai/getImage/v1/getSDXLImage | Status: 502 Bad Gateway | Body: <!DOCTYPE html>
+<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+<head>
+
+<title>pixazo.ai | 502: Bad gateway</title>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/main.css" />
+</head>
+<body>
+<div id="cf-wrapper">
+    <div id="cf-error-details" class="p-0">
+        <header class="mx-auto pt-10 lg:pt-6 lg:px-8 w-240 lg:w-full mb-8">
+            <h1 class="inline-block sm:block sm:mb-2 font-light text-60 lg:text-4xl text-black-dark leading-tight mr-2">
+                <span class="inline-block">Bad gateway</span>
+                <span class="code-label">Error code 502</span>
+            </h1>
+            <div>
+                Visit <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&utm_campaign=gateway.pixazo.ai" target="_blank" rel="noopener noreferrer">cloudflare.com</a> for more information.
+            </div>
+            <div class="mt-3">2026-08-21 04:03:58 UTC</div>
+        </header>
+        <div class="my-8 bg-gradient-gray">
+            <div class="w-240 lg:w-full mx-auto">
+                <div class="clearfix md:px-8">
+                    <div id="cf-browser-status" class=" relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center">
+  <div class="relative mb-10 md:m-0">
+
+    <span class="cf-icon-browser block md:hidden h-20 bg-center bg-no-repeat"></span>
+    <span class="cf-icon-ok w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4"></span>
+
+  </div>
+  <span class="md:block w-full truncate">You</span>
+  <h3 class="md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3">
+
+    Browser
+
+  </h3>
+
+  <span class="leading-1.3 text-2xl text-green-success">Working</span>
+
+</div>
+                    <div id="cf-cloudflare-status" class=" relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center">
+  <div class="relative mb-10 md:m-0">
+    <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&#38;utm_campaign=gateway.pixazo.ai" target="_blank" rel="noopener noreferrer">
+    <span class="cf-icon-cloud block md:hidden h-20 bg-center bg-no-repeat"></span>
+    <span class="cf-icon-ok w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4"></span>
+    </a>
+  </div>
+  <span class="md:block w-full truncate">Chicago</span>
+  <h3 class="md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3">
+  <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&utm_campaign=gateway.pixazo.ai" target="_blank" rel="noopener noreferrer">
+    Cloudflare
+  </a>
+  </h3>
+
+  <span class="leading-1.3 text-2xl text-green-success">Working</span>
+
+</div>
+                    <div id="cf-host-status" class="cf-error-source relative w-1/3 md:w-full py-15 md:p-0 md:py-8 md:text-left md:border-solid md:border-0 md:border-b md:border-gray-400 overflow-hidden float-left md:float-none text-center">
+  <div class="relative mb-10 md:m-0">
+
+    <span class="cf-icon-server block md:hidden h-20 bg-center bg-no-repeat"></span>
+    <span class="cf-icon-error w-12 h-12 absolute left-1/2 md:left-auto md:right-0 md:top-0 -ml-6 -bottom-4"></span>
+
+  </div>
+  <span class="md:block w-full truncate">gateway.pixazo.ai</span>
+  <h3 class="md:inline-block mt-3 md:mt-0 text-2xl text-gray-600 font-light leading-1.3">
+
+    Host
+
+  </h3>
+
+  <span class="leading-1.3 text-2xl text-red-error">Error</span>
+
+</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-240 lg:w-full mx-auto mb-8 lg:px-8">
+            <div class="clearfix">
+                <div class="w-1/2 md:w-full float-left pr-6 md:pb-10 md:pr-0 leading-relaxed">
+                    <h2 class="text-3xl font-normal leading-1.3 mb-4">What happened?</h2>
+                    <p>The web server reported a bad gateway error.</p>
+                </div>
+                <div class="w-1/2 md:w-full float-left leading-relaxed">
+                    <h2 class="text-3xl font-normal leading-1.3 mb-4">What can I do?</h2>
+                    <p class="mb-6">Please try again in a few minutes.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+    <p class="text-13">
+      <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">a2e6c006fe179a31</strong></span>
+      <span class="cf-footer-separator sm:hidden">&bull;</span>
+      <span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1">
+        Your IP:
+        <button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn">Click to reveal</button>
+        <span class="hidden" id="cf-footer-ip">34.29.198.103</span>
+        <span class="cf-footer-separator sm:hidden">&bull;</span>
+      </span>
+      <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing?utm_source=errorcode_502&#38;utm_campaign=gateway.pixazo.ai" id="brand_link" target="_blank">Cloudflare</a></span>
+
+    </p>
+    <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
+  </div><!-- /.error-footer -->
+
+    </div>
+</div>
+</body>
+</html>] |
+| **water** | ⚠️ Discontinuous | `0.3122` | 69% | `0.1732` | 83% | 11222ms / 12372ms | `20.7 / 40%` | None |
+| **wood** | ⚠️ Discontinuous | `0.2535` | 75% | `0.1876` | 81% | 10769ms / 11790ms | `22.5 / 40%` | None |
+| **lava** | ⚠️ Discontinuous | `0.1102` | 89% | `0.0473` | 95% | 16129ms / 16600ms | `26.7 / 40%` | None |
 
 ## Quality Score Methodology & Weightings
 

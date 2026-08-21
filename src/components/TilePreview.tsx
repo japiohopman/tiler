@@ -261,24 +261,24 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
               <button
                 id="btn-view-processed"
                 onClick={() => setSelectedSource('processed')}
-                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all ${
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide ${
                   selectedSource === 'processed'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Seamless Tile
+                PROCESSED TILE
               </button>
               <button
                 id="btn-view-raw"
                 onClick={() => setSelectedSource('raw')}
-                className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all ${
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide ${
                   selectedSource === 'raw'
                     ? 'bg-sky-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Raw AI Image
+                RAW AI OUTPUT
               </button>
             </div>
           )}

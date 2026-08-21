@@ -112,7 +112,47 @@ apiRouter.post('/generate', async (req, res) => {
 
     console.log('[Generation] validation completed');
 
-    // Step 5: Generation metadata package
+    // Step 5: Validation summary computation
+    const rawSeamScore = rawSeamReport.overallScore;
+    const processedSeamScore = seamReport.overallScore;
+    const improvement = Number((rawSeamScore - processedSeamScore).toFixed(4));
+    let improvementStatus: 'IMPROVED' | 'WORSENED' | 'UNCHANGED' = 'UNCHANGED';
+    if (improvement > 0.0001) {
+      improvementStatus = 'IMPROVED';
+    } else if (improvement < -0.0001) {
+      improvementStatus = 'WORSENED';
+    }
+
+    const rawTileable = rawSeamReport.pass;
+    const processedTileable = seamReport.pass;
+
+    let finalStatus: 'PASS_RAW' | 'PASS_AFTER_PROCESSING' | 'VALIDATION_FAILED' = 'VALIDATION_FAILED';
+    if (rawTileable) {
+      finalStatus = 'PASS_RAW';
+    } else if (processedTileable) {
+      finalStatus = 'PASS_AFTER_PROCESSING';
+    }
+
+    const issues = [...(seamReport.issues || [])];
+    if (!processedTileable && issues.length === 0) {
+      issues.push(`Opposing boundary edges exceed tolerance (${processedSeamScore.toFixed(4)} > 0.05).`);
+    }
+
+    const validationSummary = {
+      generationStatus: 'SUCCESS' as const,
+      rawTileable,
+      processedTileable,
+      rawSeamScore,
+      processedSeamScore,
+      improvement,
+      improvementStatus,
+      finalStatus,
+      threshold: 0.05,
+      issues,
+      promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED' as const,
+    };
+
+    // Step 6: Generation metadata package
     const generationMetadata = {
       model: rawResult.model,
       builtPrompt: rawResult.builtPrompt,
@@ -142,6 +182,7 @@ apiRouter.post('/generate', async (req, res) => {
       generationMetadata,
       seamReport,
       rawSeamReport,
+      validationSummary,
       processingMetadata: processResult.metadata,
       message: 'Generated texture via ImageProvider and executed full seamless tile pipeline.',
     });

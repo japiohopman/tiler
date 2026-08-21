@@ -91,6 +91,32 @@ async function runTests() {
     assert(typeof genData.generationMetadata?.processedSeamScore === 'number', 'Metadata captures processedSeamScore');
     assert(genData.generationMetadata?.material === 'cobblestone', 'Metadata captures material cobblestone');
 
+    // 2b. Validation Summary API Contract Verification
+    console.log('\n--- Validation Summary & Improvement API Contract ---');
+    assert(genData.validationSummary !== undefined, 'Returns validationSummary object');
+    assert(genData.validationSummary.generationStatus === 'SUCCESS', 'ValidationSummary reports generationStatus SUCCESS');
+    assert(typeof genData.validationSummary.rawTileable === 'boolean', 'ValidationSummary reports rawTileable boolean');
+    assert(typeof genData.validationSummary.processedTileable === 'boolean', 'ValidationSummary reports processedTileable boolean');
+    assert(typeof genData.validationSummary.improvement === 'number', 'ValidationSummary reports numerical improvement');
+    assert(['IMPROVED', 'WORSENED', 'UNCHANGED'].includes(genData.validationSummary.improvementStatus), 'ValidationSummary reports valid improvementStatus');
+    assert(['PASS_RAW', 'PASS_AFTER_PROCESSING', 'VALIDATION_FAILED'].includes(genData.validationSummary.finalStatus), 'ValidationSummary reports valid finalStatus');
+    assert(genData.validationSummary.threshold === 0.05, 'ValidationSummary maintains strict threshold 0.05');
+    assert(genData.validationSummary.promptAdherenceStatus === 'NOT_AUTOMATICALLY_VALIDATED', 'ValidationSummary explicitly reports promptAdherenceStatus NOT_AUTOMATICALLY_VALIDATED');
+
+    // 2c. Improvement / Worsening Metric Mechanics Test
+    const rawScoreTest = genData.rawSeamReport.overallScore;
+    const procScoreTest = genData.seamReport.overallScore;
+    const expectedImp = Number((rawScoreTest - procScoreTest).toFixed(4));
+    assert(Math.abs(genData.validationSummary.improvement - expectedImp) < 0.001, 'Calculates correct improvement delta (raw - processed)');
+
+    if (rawScoreTest > procScoreTest) {
+      assert(genData.validationSummary.improvementStatus === 'IMPROVED', 'Correctly identifies IMPROVED when rawScore > processedScore');
+    } else if (procScoreTest > rawScoreTest) {
+      assert(genData.validationSummary.improvementStatus === 'WORSENED', 'Correctly identifies WORSENED when processedScore > rawScore');
+    } else {
+      assert(genData.validationSummary.improvementStatus === 'UNCHANGED', 'Correctly identifies UNCHANGED when scores are identical');
+    }
+
     // 3. Validation Failure on Missing Material
     console.log('\n--- Input Validation Failure Handling ---');
     const invalidRes = await originalFetch(`${baseUrl}/generate`, {

@@ -161,6 +161,7 @@ export default function App() {
         rawSeamScore: genResponse.rawSeamReport?.overallScore,
         seamReport: genResponse.seamReport,
         rawSeamReport: genResponse.rawSeamReport,
+        validationSummary: genResponse.validationSummary,
         createdAt: new Date().toISOString(),
         generationMetadata: genResponse.generationMetadata,
         metadata: {
@@ -468,6 +469,8 @@ export default function App() {
             <div className="lg:col-span-6 flex flex-col gap-6">
               <SeamAnalysisPanel
                 report={seamReport}
+                rawReport={currentTile?.rawSeamReport}
+                validationSummary={currentTile?.validationSummary}
                 isLoading={generationState.status === 'analyzing'}
                 onReanalyze={handleReanalyze}
               />

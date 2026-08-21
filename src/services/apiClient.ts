@@ -13,6 +13,7 @@ import {
   SeamAnalysisResult,
   Tile,
   TileProcessingOptions,
+  ValidationSummary,
 } from '../types';
 
 export interface GenerateApiResponse {
@@ -25,6 +26,7 @@ export interface GenerateApiResponse {
   generationMetadata?: GenerationMetadata;
   seamReport?: SeamAnalysisResult;
   rawSeamReport?: SeamAnalysisResult;
+  validationSummary?: ValidationSummary;
   processingMetadata?: any;
   message?: string;
   error?: string;

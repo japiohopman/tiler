@@ -13,16 +13,20 @@ import {
   Sliders,
   Sparkles,
 } from 'lucide-react';
-import { EdgeRegionDepth, SeamAnalysisResult } from '../types';
+import { EdgeRegionDepth, SeamAnalysisResult, ValidationSummary } from '../types';
 
 interface SeamAnalysisPanelProps {
   report?: SeamAnalysisResult;
+  rawReport?: SeamAnalysisResult;
+  validationSummary?: ValidationSummary;
   isLoading?: boolean;
   onReanalyze?: (threshold: number, edgeRegion: EdgeRegionDepth) => void;
 }
 
 export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
   report,
+  rawReport,
+  validationSummary,
   isLoading,
   onReanalyze,
 }) => {
@@ -269,7 +273,106 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
         </div>
       )}
 
-      {/* Status messages / Discontinuities */}
+      {/* Validation Summary Breakdown */}
+      <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 space-y-2 text-xs">
+        <div className="flex items-center justify-between font-semibold text-slate-200 border-b border-slate-800/80 pb-2">
+          <span className="flex items-center space-x-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Validation & Improvement Summary</span>
+          </span>
+          <span className="text-[10px] font-mono text-slate-400">
+            Threshold: ≤ {currentThreshold}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[11px]">
+          {/* 1. Generation */}
+          <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 font-sans">GENERATION</div>
+            <div className="text-emerald-400 font-bold mt-0.5">✓ SUCCESS</div>
+          </div>
+
+          {/* 2. Raw Tileability */}
+          <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 font-sans">RAW TILEABILITY</div>
+            <div className={rawReport?.pass || validationSummary?.rawTileable ? "text-emerald-400 font-bold mt-0.5" : "text-rose-400 font-bold mt-0.5"}>
+              {(rawReport?.pass ?? validationSummary?.rawTileable) ? '✓ PASS' : '✗ FAIL'}
+            </div>
+            {rawReport?.overallScore !== undefined && (
+              <div className="text-[9px] text-slate-500 font-mono mt-0.5">({rawReport.overallScore.toFixed(4)})</div>
+            )}
+          </div>
+
+          {/* 3. Processed Tileability */}
+          <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 font-sans">PROCESSED TILEABILITY</div>
+            <div className={isPass ? "text-emerald-400 font-bold mt-0.5" : "text-rose-400 font-bold mt-0.5"}>
+              {isPass ? '✓ PASS' : '✗ FAIL'}
+            </div>
+            <div className="text-[9px] text-slate-500 font-mono mt-0.5">({overallScore.toFixed(4)})</div>
+          </div>
+
+          {/* 4. Final Status */}
+          <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 font-sans">FINAL STATUS</div>
+            <div className={isPass ? "text-emerald-400 font-bold mt-0.5 text-[10px]" : "text-rose-400 font-bold mt-0.5 text-[10px]"}>
+              {isPass ? 'PASS AFTER PROCESSING' : 'VALIDATION FAILED'}
+            </div>
+          </div>
+        </div>
+
+        {/* Improvement / Worsening Metrics */}
+        {rawReport?.overallScore !== undefined && (
+          <div className="bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between font-mono text-[11px]">
+            <span className="text-slate-400 font-sans">Seam Delta Improvement:</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-slate-400">{rawReport.overallScore.toFixed(4)} → {overallScore.toFixed(4)}</span>
+              {rawReport.overallScore - overallScore > 0.0001 ? (
+                <span className="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                  +{(rawReport.overallScore - overallScore).toFixed(4)} (IMPROVED)
+                </span>
+              ) : rawReport.overallScore - overallScore < -0.0001 ? (
+                <span className="px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
+                  {(rawReport.overallScore - overallScore).toFixed(4)} (WORSENED)
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">
+                  UNCHANGED
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Prompt Adherence Status Line */}
+        <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between text-[11px]">
+          <span className="text-slate-400 font-sans">Prompt Adherence:</span>
+          <span className="text-amber-400 font-mono font-semibold text-[10px] bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/30">
+            NOT AUTOMATICALLY VALIDATED
+          </span>
+        </div>
+      </div>
+
+      {/* Diagnostic details if validation failed */}
+      {!isPass && (
+        <div className="bg-rose-950/30 border border-rose-500/40 rounded-xl p-3 text-xs space-y-1.5 text-rose-200">
+          <div className="font-bold text-rose-300 flex items-center space-x-1.5">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>Validation Failure Details</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-rose-300/90 pt-1">
+            <div>Overall Score: {overallScore.toFixed(4)}</div>
+            <div>Threshold: {currentThreshold.toFixed(4)}</div>
+            <div>Horizontal Delta: {hScore.toFixed(4)}</div>
+            <div>Vertical Delta: {vScore.toFixed(4)}</div>
+          </div>
+          <div className="text-[11px] text-rose-300/80 pt-1 border-t border-rose-500/20">
+            <strong>Reason:</strong> Opposing boundary edges exceed tolerance limit ({overallScore.toFixed(4)} &gt; {currentThreshold}).
+          </div>
+        </div>
+      )}
+
+      {/* Status messages / Technical Seam Assessment */}
       <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-800/80 text-xs space-y-1">
         <div className="text-slate-300 font-medium flex items-center space-x-1.5">
           <Info className="w-3.5 h-3.5 text-amber-400" />
