@@ -32,6 +32,8 @@ import { SAMPLE_TEXTURES, SampleTextureDefinition } from '../utils/sampleTexture
 export interface TilePreviewProps {
   imageDataUrl?: string;
   rawImageDataUrl?: string;
+  selectedSource?: 'processed' | 'raw';
+  onSelectedSourceChange?: (source: 'processed' | 'raw') => void;
   materialName?: string;
   seamReport?: SeamAnalysisResult;
   generationMetadata?: GenerationMetadata;
@@ -42,6 +44,8 @@ export interface TilePreviewProps {
 export const TilePreview: React.FC<TilePreviewProps> = ({
   imageDataUrl,
   rawImageDataUrl,
+  selectedSource: externalSelectedSource,
+  onSelectedSourceChange,
   materialName = 'Texture',
   seamReport,
   generationMetadata,
@@ -51,8 +55,16 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Active texture source: 'processed' vs 'raw' (when both are available)
-  const [selectedSource, setSelectedSource] = useState<'processed' | 'raw'>('processed');
+  // Active texture source: controlled externally or default internally
+  const [internalSelectedSource, setInternalSelectedSource] = useState<'processed' | 'raw'>('processed');
+  const selectedSource = externalSelectedSource !== undefined ? externalSelectedSource : internalSelectedSource;
+
+  const handleSourceToggle = (source: 'processed' | 'raw') => {
+    setInternalSelectedSource(source);
+    if (onSelectedSourceChange) {
+      onSelectedSourceChange(source);
+    }
+  };
 
   // 3 Primary Preview Modes: 'single' (1x1), '3x3', 'infinite'
   const [previewMode, setPreviewMode] = useState<TilePreviewMode>('3x3');
@@ -260,7 +272,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
               <span className="text-slate-400 font-semibold px-1.5 hidden md:inline">View:</span>
               <button
                 id="btn-view-processed"
-                onClick={() => setSelectedSource('processed')}
+                onClick={() => handleSourceToggle('processed')}
                 className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide ${
                   selectedSource === 'processed'
                     ? 'bg-emerald-600 text-white shadow-sm'
@@ -271,7 +283,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
               </button>
               <button
                 id="btn-view-raw"
-                onClick={() => setSelectedSource('raw')}
+                onClick={() => handleSourceToggle('raw')}
                 className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide ${
                   selectedSource === 'raw'
                     ? 'bg-sky-600 text-white shadow-sm'

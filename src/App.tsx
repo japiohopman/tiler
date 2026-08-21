@@ -54,6 +54,8 @@ export default function App() {
   const isGeneratingRef = useRef<boolean>(false);
   const [currentTile, setCurrentTile] = useState<Tile | null>(null);
   const [seamReport, setSeamReport] = useState<SeamAnalysisReport | undefined>(undefined);
+  const [rawSeamReport, setRawSeamReport] = useState<SeamAnalysisReport | undefined>(undefined);
+  const [selectedSource, setSelectedSource] = useState<'processed' | 'raw'>('processed');
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: 'info' | 'success' | 'warn' } | null>(null);
 
@@ -94,6 +96,7 @@ export default function App() {
       };
 
       setSeamReport(initialReport);
+      setRawSeamReport(initialReport);
       setCurrentTile({
         id: 'initial-sample',
         name: defaultSample.name,
@@ -106,6 +109,7 @@ export default function App() {
         isTileable: true,
         seamScore: 0.0,
         seamReport: initialReport,
+        rawSeamReport: initialReport,
         createdAt: new Date().toISOString(),
       });
     }
@@ -176,9 +180,9 @@ export default function App() {
         progress: 90,
       });
 
-      if (genResponse.seamReport) {
-        setSeamReport(genResponse.seamReport);
-      }
+      setSeamReport(genResponse.seamReport);
+      setRawSeamReport(genResponse.rawSeamReport);
+      setSelectedSource('processed');
 
       setCurrentTile(newTile);
 
@@ -215,7 +219,8 @@ export default function App() {
 
   // Re-analysis handler triggered when user adjusts seam options (edgeRegion, threshold)
   const handleReanalyze = async (threshold: number, edgeRegion: EdgeRegionDepth) => {
-    const activeImage = currentTile?.processedImageDataUrl || currentTile?.rawImageDataUrl;
+    const targetImage = selectedSource === 'raw' ? currentTile?.rawImageDataUrl : currentTile?.processedImageDataUrl;
+    const activeImage = targetImage || currentTile?.processedImageDataUrl || currentTile?.rawImageDataUrl;
     if (!activeImage) return;
 
     try {
@@ -224,14 +229,58 @@ export default function App() {
         edgeRegion,
         diagnosticMode: true,
       });
+
       if (res.success && res.report) {
-        setSeamReport(res.report);
+        const updatedReport = res.report;
+
+        let newProcessedReport = seamReport;
+        let newRawReport = rawSeamReport;
+
+        if (selectedSource === 'raw') {
+          newRawReport = updatedReport;
+          setRawSeamReport(updatedReport);
+        } else {
+          newProcessedReport = updatedReport;
+          setSeamReport(updatedReport);
+        }
+
+        // Recompute validation summary metrics without overwriting the inactive report
+        const rawScore = newRawReport?.overallScore ?? currentTile?.rawSeamScore ?? currentTile?.seamScore ?? 0;
+        const procScore = newProcessedReport?.overallScore ?? currentTile?.seamScore ?? 0;
+        const rawPass = newRawReport ? newRawReport.pass : rawScore <= threshold;
+        const procPass = newProcessedReport ? newProcessedReport.pass : procScore <= threshold;
+        const imp = Number((rawScore - procScore).toFixed(4));
+        const impStatus = imp > 0.0001 ? 'IMPROVED' : imp < -0.0001 ? 'WORSENED' : 'UNCHANGED';
+
+        let finalStatus: 'PASS_RAW' | 'PASS_AFTER_PROCESSING' | 'VALIDATION_FAILED' = 'VALIDATION_FAILED';
+        if (rawPass) {
+          finalStatus = 'PASS_RAW';
+        } else if (procPass) {
+          finalStatus = 'PASS_AFTER_PROCESSING';
+        }
+
+        const updatedSummary = {
+          generationStatus: currentTile?.validationSummary?.generationStatus || ('SUCCESS' as const),
+          rawTileable: rawPass,
+          processedTileable: procPass,
+          rawSeamScore: rawScore,
+          processedSeamScore: procScore,
+          improvement: imp,
+          improvementStatus: impStatus as 'IMPROVED' | 'WORSENED' | 'UNCHANGED',
+          finalStatus,
+          threshold,
+          promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED' as const,
+        };
+
         if (currentTile) {
           setCurrentTile({
             ...currentTile,
-            seamScore: res.report.overallScore,
-            isTileable: res.report.pass,
-            seamReport: res.report,
+            seamScore: newProcessedReport?.overallScore ?? currentTile.seamScore,
+            rawSeamScore: newRawReport?.overallScore ?? currentTile.rawSeamScore,
+            isTileable: newProcessedReport ? newProcessedReport.pass : currentTile.isTileable,
+            seamReport: newProcessedReport,
+            rawSeamReport: newRawReport,
+            validationSummary: updatedSummary,
           });
         }
       }
@@ -442,8 +491,10 @@ export default function App() {
           <TilePreview
             imageDataUrl={currentTile?.processedImageDataUrl}
             rawImageDataUrl={currentTile?.rawImageDataUrl}
+            selectedSource={selectedSource}
+            onSelectedSourceChange={setSelectedSource}
             materialName={currentMaterialDef?.name || params.material}
-            seamReport={seamReport}
+            seamReport={selectedSource === 'raw' ? (rawSeamReport || seamReport) : seamReport}
             generationMetadata={currentTile?.generationMetadata}
             onTextureSelect={handleTextureSelect}
           />
@@ -468,8 +519,8 @@ export default function App() {
             {/* Right Column: Seam Diagnostics & Export */}
             <div className="lg:col-span-6 flex flex-col gap-6">
               <SeamAnalysisPanel
-                report={seamReport}
-                rawReport={currentTile?.rawSeamReport}
+                report={selectedSource === 'raw' ? (rawSeamReport || seamReport) : seamReport}
+                rawReport={rawSeamReport || currentTile?.rawSeamReport}
                 validationSummary={currentTile?.validationSummary}
                 isLoading={generationState.status === 'analyzing'}
                 onReanalyze={handleReanalyze}

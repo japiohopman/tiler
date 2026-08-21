@@ -102,15 +102,6 @@ To execute the canonical 6-material benchmark framework against Pixazo:
 npm run benchmark:pixazo
 ```
 
-### Phase 2D.2 Pipeline Evaluation & Validation Workflow
-The application generation pipeline executes:
-`Pixazo → RAW AI IMAGE → RAW SEAM ANALYSIS → TileProcessor → PROCESSED TILE → PROCESSED SEAM ANALYSIS → VALIDATION SUMMARY`
-
-Key principles:
-- **Generation Success != Tile Validation Success:** An AI generation that returns a valid image payload is marked as `Generation: SUCCESS`. However, if boundary pixels exceed tolerance (`threshold = 0.05`), `Tile Validation: FAIL` is explicitly reported.
-- **Raw vs. Processed Seam Comparison:** Raw seam score (`rawSeamScore`) and processed seam score (`processedSeamScore`) are evaluated independently to measure algorithm improvement/worsening delta.
-- **Prompt Adherence:** Semantic content quality is explicitly marked as `Prompt Adherence: NOT AUTOMATICALLY VALIDATED`. Prompt adherence is evaluated separately from mathematical seam tileability.
-
 ### Environment Variable Loading
 `server/services/benchmark/cli-pixazo.ts` calls `dotenv.config()` at startup, automatically loading environment credentials from `.env` or `.env.local`.
 

@@ -7,6 +7,7 @@ import express from 'express';
 import http from 'http';
 import { apiRouter } from './api';
 import { generationService } from '../services/generationService';
+import { seamAnalysisService } from '../services/seamAnalysisService';
 import { mockProvider } from '../services/providers/mockProvider';
 import { pixazoProvider } from '../services/providers/pixazoProvider';
 import { ProviderError } from '../services/providers/types';
@@ -116,6 +117,81 @@ async function runTests() {
     } else {
       assert(genData.validationSummary.improvementStatus === 'UNCHANGED', 'Correctly identifies UNCHANGED when scores are identical');
     }
+
+    // 2d. Explicit Deterministic Classification Tests for IMPROVED, WORSENED, UNCHANGED
+    console.log('\n--- Deterministic Validation Summary Classifications (IMPROVED / WORSENED / UNCHANGED) ---');
+    const originalAnalyze = seamAnalysisService.analyzeSeams;
+
+    // Test case 1: Deterministic IMPROVED (raw 0.1200, proc 0.0100 -> delta +0.1100, IMPROVED)
+    let stepCount = 0;
+    seamAnalysisService.analyzeSeams = async (_img: any, _options?: any) => {
+      stepCount++;
+      const score = stepCount === 1 ? 0.1200 : 0.0100;
+      return {
+        horizontalScore: score,
+        verticalScore: score,
+        overallScore: score,
+        width: 512,
+        height: 512,
+        pass: score <= 0.05,
+        threshold: 0.05,
+        edgeRegion: 4,
+        maxHorizontalDelta: 0.1,
+        maxVerticalDelta: 0.1,
+        discontinuousPixelCount: 0,
+        totalEdgePixelsEvaluated: 2048,
+        issues: [],
+      };
+    };
+
+    const impGenRes = await originalFetch(`${baseUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ material: 'cobblestone', style: 'stylized', resolution: 512 }),
+    });
+    const impGenData = await impGenRes.json();
+    assert(impGenData.validationSummary.rawSeamScore === 0.12, 'Deterministic raw score is 0.1200');
+    assert(impGenData.validationSummary.processedSeamScore === 0.01, 'Deterministic processed score is 0.0100');
+    assert(impGenData.validationSummary.improvement === 0.11, 'Deterministic improvement delta is +0.1100');
+    assert(impGenData.validationSummary.improvementStatus === 'IMPROVED', 'Deterministic classification is IMPROVED');
+    assert(impGenData.validationSummary.finalStatus === 'PASS_AFTER_PROCESSING', 'Deterministic finalStatus is PASS_AFTER_PROCESSING');
+
+    // Test case 2: Deterministic WORSENED (raw 0.0100, proc 0.0800 -> delta -0.0700, WORSENED)
+    stepCount = 0;
+    seamAnalysisService.analyzeSeams = async (_img: any, _options?: any) => {
+      stepCount++;
+      const score = stepCount === 1 ? 0.0100 : 0.0800;
+      return {
+        horizontalScore: score,
+        verticalScore: score,
+        overallScore: score,
+        width: 512,
+        height: 512,
+        pass: score <= 0.05,
+        threshold: 0.05,
+        edgeRegion: 4,
+        maxHorizontalDelta: 0.1,
+        maxVerticalDelta: 0.1,
+        discontinuousPixelCount: 0,
+        totalEdgePixelsEvaluated: 2048,
+        issues: [],
+      };
+    };
+
+    const worGenRes = await originalFetch(`${baseUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ material: 'wood', style: 'stylized', resolution: 512 }),
+    });
+    const worGenData = await worGenRes.json();
+    assert(worGenData.validationSummary.rawSeamScore === 0.01, 'Deterministic raw score is 0.0100');
+    assert(worGenData.validationSummary.processedSeamScore === 0.08, 'Deterministic processed score is 0.0800');
+    assert(worGenData.validationSummary.improvement === -0.07, 'Deterministic improvement delta is -0.0700');
+    assert(worGenData.validationSummary.improvementStatus === 'WORSENED', 'Deterministic classification is WORSENED');
+    assert(worGenData.validationSummary.finalStatus === 'PASS_RAW', 'Deterministic finalStatus is PASS_RAW');
+
+    // Restore original seam analysis service method
+    seamAnalysisService.analyzeSeams = originalAnalyze;
 
     // 3. Validation Failure on Missing Material
     console.log('\n--- Input Validation Failure Handling ---');
