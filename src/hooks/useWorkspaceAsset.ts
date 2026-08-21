@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { tileApiClient } from '../services/apiClient';
 import { SAMPLE_TEXTURES, SampleTextureDefinition } from '../utils/sampleTextures';
+import { updateSeamAnalysisSummary } from '../utils/workspaceTransitions';
 
 export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 'success' | 'warn') => void) {
   const [asset, setAsset] = useState<WorkspaceAsset | null>(null);
@@ -71,53 +72,18 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
         });
 
         if (res.success && res.report) {
-          const updatedReport = res.report;
-          let newProcessedReport = asset.seamReport;
-          let newRawReport = asset.rawSeamReport;
-
-          if (selectedSource === 'raw') {
-            newRawReport = updatedReport;
-          } else {
-            newProcessedReport = updatedReport;
-          }
-
-          const rawScore = newRawReport?.overallScore ?? asset.rawSeamScore ?? asset.seamScore ?? 0;
-          const procScore = newProcessedReport?.overallScore ?? asset.seamScore ?? 0;
-          const rawPass = newRawReport ? newRawReport.pass : rawScore <= threshold;
-          const procPass = newProcessedReport ? newProcessedReport.pass : procScore <= threshold;
-          const imp = Number((rawScore - procScore).toFixed(4));
-          const impStatus = imp > 0.0001 ? 'IMPROVED' : imp < -0.0001 ? 'WORSENED' : 'UNCHANGED';
-
-          let finalStatus: 'PASS_RAW' | 'PASS_AFTER_PROCESSING' | 'VALIDATION_FAILED' = 'VALIDATION_FAILED';
-          if (rawPass) {
-            finalStatus = 'PASS_RAW';
-          } else if (procPass) {
-            finalStatus = 'PASS_AFTER_PROCESSING';
-          }
-
-          const updatedSummary = {
-            generationStatus: asset.validationSummary?.generationStatus || ('SUCCESS' as const),
-            rawTileable: rawPass,
-            processedTileable: procPass,
-            rawSeamScore: rawScore,
-            processedSeamScore: procScore,
-            improvement: imp,
-            improvementStatus: impStatus as 'IMPROVED' | 'WORSENED' | 'UNCHANGED',
-            finalStatus,
-            threshold,
-            promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED' as const,
-          };
+          const updatedResult = updateSeamAnalysisSummary(asset, selectedSource, res.report, threshold);
 
           setAsset((prev) =>
             prev
               ? {
                   ...prev,
-                  seamScore: newProcessedReport?.overallScore ?? prev.seamScore,
-                  rawSeamScore: newRawReport?.overallScore ?? prev.rawSeamScore,
-                  isTileable: newProcessedReport ? newProcessedReport.pass : prev.isTileable,
-                  seamReport: newProcessedReport,
-                  rawSeamReport: newRawReport,
-                  validationSummary: updatedSummary,
+                  seamScore: updatedResult.seamScore,
+                  rawSeamScore: updatedResult.rawSeamScore,
+                  isTileable: updatedResult.isTileable,
+                  seamReport: updatedResult.newSeamReport,
+                  rawSeamReport: updatedResult.newRawSeamReport,
+                  validationSummary: updatedResult.validationSummary,
                 }
               : null
           );

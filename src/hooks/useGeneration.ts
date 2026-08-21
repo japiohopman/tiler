@@ -11,6 +11,11 @@ import {
   WorkspaceAsset,
 } from '../types';
 import { tileApiClient } from '../services/apiClient';
+import {
+  canStartGeneration,
+  createWorkspaceAssetFromResponse,
+  transitionGenerationState,
+} from '../utils/workspaceTransitions';
 
 export function useGeneration(
   activeProvider: string,
@@ -29,19 +34,20 @@ export function useGeneration(
   const isGeneratingRef = useRef<boolean>(false);
 
   const handleGenerate = useCallback(async () => {
-    if (isGeneratingRef.current || generationState.status === 'generating' || generationState.status === 'processing') {
+    if (!canStartGeneration(isGeneratingRef.current, generationState.status)) {
       console.warn('Generation already in progress. Duplicate request ignored.');
       return;
     }
     isGeneratingRef.current = true;
 
     try {
-      setGenerationState({
-        status: 'generating',
-        currentStep: `Generating texture via ${activeProvider} provider...`,
-        progress: 30,
-        errorMessage: undefined,
-      });
+      setGenerationState(
+        transitionGenerationState(
+          'generating',
+          `Generating texture via ${activeProvider} provider...`,
+          30
+        )
+      );
 
       const genResponse = await tileApiClient.generateTile({
         material: params.material,
@@ -53,49 +59,26 @@ export function useGeneration(
         processingOptions,
       });
 
-      setGenerationState({
-        status: 'processing',
-        currentStep: 'Transforming with Sharp offset-crossfade...',
-        progress: 70,
-      });
+      setGenerationState(
+        transitionGenerationState(
+          'processing',
+          'Transforming with Sharp offset-crossfade...',
+          70
+        )
+      );
 
-      const newTile: WorkspaceAsset = {
-        id: genResponse.tileId || `tile-${Date.now()}`,
-        name: `${params.material} (${params.style})`,
-        material: params.material,
-        style: params.style,
-        prompt: genResponse.prompt || params.customPrompt || `${params.material} ${params.style}`,
-        resolution: 512,
-        rawImageDataUrl: genResponse.rawImageUrl,
-        processedImageDataUrl: genResponse.processedImageUrl,
-        isTileable: genResponse.seamReport?.pass ?? true,
-        seamScore: genResponse.seamReport?.overallScore ?? 0.0,
-        rawSeamScore: genResponse.rawSeamReport?.overallScore,
-        seamReport: genResponse.seamReport,
-        rawSeamReport: genResponse.rawSeamReport,
-        validationSummary: genResponse.validationSummary,
-        createdAt: new Date().toISOString(),
-        generationMetadata: genResponse.generationMetadata,
-        metadata: {
-          processingAlgorithm: processingOptions.algorithm,
-          model: genResponse.generationMetadata?.model || 'sdxl-base-1.0',
-        },
-      };
+      const newTile = createWorkspaceAssetFromResponse(genResponse, params, processingOptions);
 
-      setGenerationState({
-        status: 'analyzing',
-        currentStep: 'Validating seam continuity...',
-        progress: 90,
-      });
+      setGenerationState(
+        transitionGenerationState('analyzing', 'Validating seam continuity...', 90)
+      );
 
       setSelectedSource('processed');
       setAsset(newTile);
 
-      setGenerationState({
-        status: 'completed',
-        currentStep: 'Tile generated & verified!',
-        progress: 100,
-      });
+      setGenerationState(
+        transitionGenerationState('completed', 'Tile generated & verified!', 100)
+      );
 
       onNotify?.(
         `Successfully generated ${params.material} seamless tile (512×512) via ${genResponse.generationMetadata?.model || activeProvider}!`,
@@ -103,16 +86,18 @@ export function useGeneration(
       );
 
       setTimeout(() => {
-        setGenerationState((prev) => ({ ...prev, status: 'idle', currentStep: '' }));
+        setGenerationState(transitionGenerationState('idle', '', 0));
       }, 2500);
     } catch (err: any) {
       console.error('Generation pipeline error:', err);
-      setGenerationState({
-        status: 'error',
-        currentStep: 'Generation failed',
-        progress: 0,
-        errorMessage: err.message || 'Failed to generate texture. Please check server provider configuration.',
-      });
+      setGenerationState(
+        transitionGenerationState(
+          'error',
+          'Generation failed',
+          0,
+          err.message || 'Failed to generate texture. Please check server provider configuration.'
+        )
+      );
       onNotify?.(
         `Generation error: ${err.message || 'Failed to generate texture'}`,
         'warn'

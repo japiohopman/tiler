@@ -73,6 +73,22 @@ export interface GenerationState {
   errorMessage?: string;
 }
 
+export interface GenerationResponse {
+  success: boolean;
+  tileId: string;
+  rawImageUrl?: string;
+  processedImageUrl?: string;
+  offsetPreviewUrl?: string;
+  prompt: string;
+  generationMetadata?: GenerationMetadata;
+  seamReport?: SeamAnalysisResult;
+  rawSeamReport?: SeamAnalysisResult;
+  validationSummary?: ValidationSummary;
+  processingMetadata?: any;
+  message?: string;
+  error?: string;
+}
+
 export type ExportLifecycleStatus = 'idle' | 'exporting' | 'completed' | 'error';
 
 export interface ExportState {

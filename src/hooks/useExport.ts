@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import { ExportOptions, ExportState, WorkspaceAsset } from '../types';
 import { tileApiClient } from '../services/apiClient';
+import { transitionExportState } from '../utils/workspaceTransitions';
 
 export function useExport(onNotify?: (message: string, type: 'info' | 'success' | 'warn') => void) {
   const [exportState, setExportState] = useState<ExportState>({
@@ -19,7 +20,7 @@ export function useExport(onNotify?: (message: string, type: 'info' | 'success' 
         return;
       }
 
-      setExportState({ status: 'exporting' });
+      setExportState(transitionExportState('exporting'));
       try {
         const blob = await tileApiClient.exportTile(asset, options);
         const url = URL.createObjectURL(blob);
@@ -31,14 +32,14 @@ export function useExport(onNotify?: (message: string, type: 'info' | 'success' 
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        setExportState({ status: 'completed' });
+        setExportState(transitionExportState('completed'));
         onNotify?.(`Exported ${asset.material} texture as ${options.resolution}×${options.resolution} ${options.format.toUpperCase()}`, 'success');
       } catch (err: any) {
-        setExportState({ status: 'error', errorMessage: err.message || 'Export failed' });
+        setExportState(transitionExportState('error', err.message || 'Export failed'));
         onNotify?.(`Export notice: ${err.message || 'Export handler ready'}`, 'warn');
       } finally {
         setTimeout(() => {
-          setExportState((prev) => (prev.status === 'completed' ? { status: 'idle' } : prev));
+          setExportState((prev) => (prev.status === 'completed' ? transitionExportState('idle') : prev));
         }, 1500);
       }
     },
