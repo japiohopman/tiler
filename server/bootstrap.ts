@@ -3,12 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import dotenv from 'dotenv';
 import { generationService } from './services/generationService';
 import { geminiProvider } from './services/providers/geminiProvider';
 import { mockProvider } from './services/providers/mockProvider';
 import { huggingFaceProvider } from './services/providers/huggingFaceProvider';
 import { pixazoProvider } from './services/providers/pixazoProvider';
 import { pollinationsProvider } from './services/providers/pollinationsProvider';
+
+// Ensure environment variables from .env / .env.local are loaded prior to provider configuration
+dotenv.config();
 
 /**
  * Application Composition & Provider Bootstrap Layer

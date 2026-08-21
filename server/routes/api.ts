@@ -38,6 +38,8 @@ apiRouter.get('/health', (req, res) => {
  * Preserves both original raw image and processed tile.
  */
 apiRouter.post('/generate', async (req, res) => {
+  console.log('[Generation] request received');
+  let requestedProviderId: string | undefined;
   try {
     const {
       material,
@@ -50,9 +52,16 @@ apiRouter.post('/generate', async (req, res) => {
       providerId,
     } = req.body;
 
+    requestedProviderId = providerId;
+
     if (!material) {
+      console.error('[Generation] request failed: Material parameter is required.');
       return res.status(400).json({ error: 'Material parameter is required.' });
     }
+
+    const selectedProvider = generationService.getProvider(providerId);
+    console.log(`[Generation] selected provider: ${selectedProvider.id}`);
+    console.log(`[Generation] starting provider request: ${selectedProvider.id}`);
 
     // Step 1: Call server-side provider generation service
     const rawResult = await generationService.generate(
@@ -66,6 +75,9 @@ apiRouter.post('/generate', async (req, res) => {
       },
       providerId
     );
+
+    console.log(`[Generation] provider completed: ${selectedProvider.id}`);
+    console.log('[Generation] processing image');
 
     const tileId = `tile-${Date.now()}`;
 
@@ -90,6 +102,8 @@ apiRouter.post('/generate', async (req, res) => {
       diagnosticMode: true,
     });
 
+    console.log('[Generation] validation completed');
+
     // Step 4: Generation metadata package
     const generationMetadata = {
       model: rawResult.model,
@@ -106,6 +120,8 @@ apiRouter.post('/generate', async (req, res) => {
       providerMetadata: rawResult.metadata,
     };
 
+    console.log('[Generation] request completed');
+
     res.json({
       success: true,
       tileId,
@@ -119,7 +135,11 @@ apiRouter.post('/generate', async (req, res) => {
       message: 'Generated texture via ImageProvider and executed full seamless tile pipeline.',
     });
   } catch (error: any) {
-    console.error('Error in /api/generate:', error);
+    const activeId = requestedProviderId || generationService.getDefaultProviderId() || 'unknown';
+    const sanitizedMsg = (error.message || 'Generation failed')
+      .replace(/([a-f0-9]{32,})/gi, '[REDACTED_TOKEN]')
+      .slice(0, 200);
+    console.error(`[Generation] provider failed: ${activeId} — ${sanitizedMsg}`);
     res.status(500).json({ error: error.message || 'Generation failed' });
   }
 });
