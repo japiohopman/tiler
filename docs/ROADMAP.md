@@ -23,9 +23,9 @@ The deterministic processing and validation pipeline remains the authority for w
 | **2A** | Provider abstraction | Complete / historical | Stable provider interface and configuration model |
 | **2B** | Benchmark framework | Complete / historical | Repeatable provider benchmarking and comparable reports |
 | **2C** | Provider research PoCs | In progress / closing | Determine which external image-generation providers are technically viable |
-| **2C.3** | Provider PoC closure | Current research closure | Record real-world provider results without forcing unsuitable providers into production |
-| **2D** | Pixazo productionization | Next | Turn the selected provider path into a reliable end-to-end application path |
-| **3** | Functional product / vertical slice | Planned | Make the application genuinely usable from prompt to exported tile |
+| **2C.3** | Provider PoC closure | Complete / historical | Record real-world provider results without forcing unsuitable providers into production |
+| **2D** | Pixazo productionization | Complete | Turn the selected provider path into a reliable end-to-end application path |
+| **3** | Functional product / vertical slice | Next | Make the application genuinely usable from prompt to exported tile |
 | **4** | UX, quality & hardening | Planned | Make the working product pleasant, robust, observable, and safe to operate |
 | **5** | Release / ecosystem | Future | Packaging, deployment, documentation, and additional providers/features |
 
