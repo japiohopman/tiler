@@ -22,6 +22,10 @@ The deterministic processing and validation pipeline remains the authority for w
 | **1** | Core tile engine & deterministic pipeline | Foundation | Reliable processing, seam analysis, and validation |
 | **2A** | Provider abstraction | Complete / historical | Stable provider interface and configuration model |
 | **2B** | Benchmark framework | Complete / historical | Repeatable provider benchmarking and comparable reports |
+| **2C** | Provider research PoCs | In progress / closing | Determine which external image-generation providers are technically viable |
+| **2C.3** | Provider PoC closure | Complete / historical | Record real-world provider results without forcing unsuitable providers into production |
+| **2D** | Pixazo productionization | Complete | Turn the selected provider path into a reliable end-to-end application path |
+| **3** | Functional product / vertical slice | Next | Make the application genuinely usable from prompt to exported tile |
 | **2C** | Provider research PoCs | Complete | Provider candidates tested and production decision recorded |
 | **2D** | Pixazo productionization | In progress | Establish one reliable end-to-end generation vertical slice |
 | **3** | Functional product / vertical slice | Planned | Expand the working slice into a genuinely usable Tiler application |
