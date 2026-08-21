@@ -28,8 +28,6 @@ import { Info, Sparkles, Sliders, CheckCircle2, ShieldCheck } from 'lucide-react
 export default function App() {
   const [activeView, setActiveView] = useState<'workspace' | 'processor'>('workspace');
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking');
-  const [activeProvider, setActiveProvider] = useState<string>('pixazo');
-  const [providerConfigured, setProviderConfigured] = useState<boolean>(true);
 
   // Generation & Processing States
   const [params, setParams] = useState<GenerationParams>({
@@ -62,8 +60,6 @@ export default function App() {
         const health = await tileApiClient.checkHealth();
         if (health.status === 'ok') {
           setBackendStatus('online');
-          setActiveProvider(health.activeProvider || 'pixazo');
-          setProviderConfigured(health.providerConfigured ?? true);
         } else {
           setBackendStatus('offline');
         }
@@ -111,17 +107,17 @@ export default function App() {
     verifyBackendAndInit();
   }, []);
 
-  // Trigger AI Image Generation & Seamless Tile Pipeline
+  // Trigger Full Gemini Image Generation & Seamless Tile Pipeline
   const handleGenerate = async () => {
     try {
       setGenerationState({
         status: 'generating',
-        currentStep: `Generating texture via ${activeProvider} provider...`,
+        currentStep: 'Generating texture via AI model...',
         progress: 30,
         errorMessage: undefined,
       });
 
-      // Step 1 & 2: Call server-side pipeline (AI Generation → Sharp Offset Transform → Seam Analyzer)
+      // Step 1 & 2: Call server-side pipeline (Gemini Generation → Sharp Offset Transform → Seam Analyzer)
       const genResponse = await tileApiClient.generateTile({
         material: params.material,
         style: params.style,
@@ -155,7 +151,7 @@ export default function App() {
         generationMetadata: genResponse.generationMetadata,
         metadata: {
           processingAlgorithm: processingOptions.algorithm,
-          model: genResponse.generationMetadata?.model || 'sdxl-base-1.0',
+          model: genResponse.generationMetadata?.model || 'gemini-3.1-flash-image',
         },
       };
 
@@ -178,7 +174,7 @@ export default function App() {
       });
 
       setNotification({
-        message: `Successfully generated ${params.material} seamless tile (512×512) via ${genResponse.generationMetadata?.model || activeProvider}!`,
+        message: `Successfully generated ${params.material} seamless tile (512×512) via ${genResponse.generationMetadata?.model || 'Gemini'}!`,
         type: 'success',
       });
 
@@ -191,7 +187,7 @@ export default function App() {
         status: 'error',
         currentStep: 'Generation failed',
         progress: 0,
-        errorMessage: err.message || 'Failed to generate texture. Please check server provider configuration.',
+        errorMessage: err.message || 'Failed to generate texture. Please check provider API configuration.',
       });
       setNotification({
         message: `Generation error: ${err.message || 'Failed to generate texture'}`,
@@ -375,8 +371,6 @@ export default function App() {
                 generationState={generationState}
                 onGenerate={handleGenerate}
                 currentTile={currentTile}
-                activeProvider={activeProvider}
-                providerConfigured={providerConfigured}
               />
             </div>
 

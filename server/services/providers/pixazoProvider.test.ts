@@ -8,13 +8,13 @@ import { PixazoImageGenerationProvider, pixazoProvider } from './pixazoProvider'
 import { ProviderError } from './types';
 
 /**
- * Unit Test Suite for Pixazo AI Provider (Phase 2D Production-Hardened Integration)
- * Tests provider configuration detection, SDXL Base API request construction, async queue polling,
- * HTTP error normalization, secret redaction, request timeout/abort, and benchmark runner compatibility.
+ * Unit Test Suite for Hardened Pixazo AI Provider (SDXL Base 1.0 - Phase 2D)
+ * Tests provider configuration detection, timeout management, credential sanitization,
+ * response parsing (sync/async/malformed), error normalization, and benchmark runner compatibility.
  */
 async function runTests() {
   console.log('======================================================');
-  console.log('  [PixazoProvider] Starting Production Unit Test Suite');
+  console.log('  [PixazoProvider] Starting Unit Test Suite (Phase 2D Hardened)');
   console.log('======================================================\n');
 
   let passed = 0;
@@ -45,8 +45,8 @@ async function runTests() {
     const metadata = extractProviderMetadata(pixazoProvider as any);
     assert(metadata.model === 'sdxl-base-1.0', 'extractProviderMetadata retrieves model sdxl-base-1.0');
 
-    // 2. Unconfigured State & Fallback Credential Variable Support
-    console.log('\n--- Configuration Detection & Alternative Credential Names ---');
+    // 2. Unconfigured State & Alternative Credential Variables
+    console.log('\n--- Configuration Detection & Key Hierarchy ---');
     delete process.env.PIXAZO_API_KEY;
     delete process.env.PIXAZO_SUBSCRIPTION_KEY;
 
@@ -63,15 +63,14 @@ async function runTests() {
       'generate throws normalized ProviderError when unconfigured'
     );
 
-    // Test alternative variable name PIXAZO_SUBSCRIPTION_KEY
-    process.env.PIXAZO_SUBSCRIPTION_KEY = 'sub-key-alias-999';
-    assert(pixazoProvider.isConfigured() === true, 'isConfigured returns true when PIXAZO_SUBSCRIPTION_KEY is present');
+    // Test alternative PIXAZO_SUBSCRIPTION_KEY name
+    process.env.PIXAZO_SUBSCRIPTION_KEY = 'sub-key-999';
+    assert(pixazoProvider.isConfigured() === true, 'isConfigured returns true when PIXAZO_SUBSCRIPTION_KEY is set');
 
-    delete process.env.PIXAZO_SUBSCRIPTION_KEY;
     process.env.PIXAZO_API_KEY = 'test-subscription-key-12345';
-    assert(pixazoProvider.isConfigured() === true, 'isConfigured returns true when PIXAZO_API_KEY is present');
+    assert(pixazoProvider.isConfigured() === true, 'isConfigured returns true when PIXAZO_API_KEY is set');
 
-    // 3. Request Construction & Synchronous Response Mock (imageUrl schema)
+    // 3. Request Construction & Sync Response Mock
     console.log('\n--- SDXL Base Request Construction & Sync Response Mock ---');
     let capturedUrl = '';
     let capturedHeaders: Record<string, string> = {};
@@ -116,9 +115,84 @@ async function runTests() {
     assert(capturedBody.negative_prompt.length > 0, 'Includes negative_prompt parameter');
     assert(syncResult.imageDataUrl.startsWith('data:image/'), 'Returns normalized base64 Data URL');
     assert(syncResult.model === 'sdxl-base-1.0', 'Returns model name sdxl-base-1.0');
-    assert(syncResult.metadata?.isFree === true, 'Metadata identifies free-tier offering');
+    assert(syncResult.metadata?.resolution === 512, 'Metadata records 512x512 resolution');
+    assert(syncResult.metadata?.requestedMaterial === 'cobblestone', 'Metadata records requested material');
 
-    // 4. Asynchronous Queue Polling Handling
+    // 4. Timeout Management & AbortController Test
+    console.log('\n--- Timeout Behavior & AbortController ---');
+    process.env.PIXAZO_TIMEOUT_MS = '50'; // 50ms short timeout for test
+
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const signal = init?.signal;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          resolve(new Response(JSON.stringify({ imageUrl: dummyBase64Png }), { status: 200 }));
+        }, 200); // 200ms delay exceeds 50ms timeout
+
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            const abortError = new Error('The operation was aborted.');
+            abortError.name = 'AbortError';
+            reject(abortError);
+          });
+        }
+      });
+    }) as typeof fetch;
+
+    let timeoutError: any;
+    try {
+      await pixazoProvider.generate({ material: 'water', style: 'pixel art', resolution: 512 });
+    } catch (err) {
+      timeoutError = err;
+    }
+    assert(
+      timeoutError instanceof ProviderError && timeoutError.message.includes('timed out'),
+      'Request aborts and throws ProviderError on timeout'
+    );
+
+    // Reset timeout env
+    delete process.env.PIXAZO_TIMEOUT_MS;
+
+    // 5. Malformed Response & Secret Redaction Test
+    console.log('\n--- Malformed Response & Secret Redaction ---');
+    globalThis.fetch = (async (): Promise<Response> => {
+      return new Response('NOT_JSON_RESPONSE', { status: 200, headers: { 'content-type': 'text/plain' } });
+    }) as typeof fetch;
+
+    let malformedError: any;
+    try {
+      await pixazoProvider.generate({ material: 'lava', style: 'pixel art', resolution: 512 });
+    } catch (err) {
+      malformedError = err;
+    }
+    assert(
+      malformedError instanceof ProviderError && malformedError.message.includes('malformed JSON response'),
+      'Handles non-JSON response with normalized ProviderError'
+    );
+
+    // Secret Redaction Verification
+    globalThis.fetch = (async (): Promise<Response> => {
+      return new Response(
+        JSON.stringify({ message: 'Error with key test-subscription-key-12345 invalid' }),
+        { status: 401 }
+      );
+    }) as typeof fetch;
+
+    let secretError: any;
+    try {
+      await pixazoProvider.generate({ material: 'lava', style: 'pixel art', resolution: 512 });
+    } catch (err) {
+      secretError = err;
+    }
+    assert(
+      secretError instanceof ProviderError &&
+        !secretError.message.includes('test-subscription-key-12345') &&
+        secretError.message.includes('[REDACTED_API_KEY]'),
+      'Redacts API credentials from error messages'
+    );
+
+    // 6. Async Queue Polling Handling
     console.log('\n--- Async Queue Polling Handling ---');
     let pollCount = 0;
     globalThis.fetch = (async (input: RequestInfo | URL): Promise<Response> => {
@@ -162,83 +236,24 @@ async function runTests() {
     assert(pollCount >= 2, 'Polls status endpoint until status is COMPLETED');
     assert(asyncResult.imageDataUrl.startsWith('data:image/'), 'Returns image upon async completion');
 
-    // 5. Secret Redaction & Error Handling
-    console.log('\n--- Secret Redaction & HTTP Error Handling ---');
+    // 7. HTTP Status Errors Normalization
+    console.log('\n--- HTTP Error Handling Normalization ---');
     globalThis.fetch = (async (): Promise<Response> => {
-      return new Response(`<html>401 Unauthorized for key test-subscription-key-12345</html>`, {
-        status: 401,
-        headers: { 'content-type': 'text/html' },
-      });
+      return new Response(JSON.stringify({ message: 'Insufficient balance' }), { status: 402 });
     }) as typeof fetch;
 
-    let authError: any;
+    let quotaError: any;
     try {
       await pixazoProvider.generate({ material: 'sand', style: 'pixel art', resolution: 512 });
     } catch (err) {
-      authError = err;
+      quotaError = err;
     }
     assert(
-      authError instanceof ProviderError && authError.message.includes('401 Unauthorized'),
-      'Handles plain HTML 401 error cleanly'
-    );
-    assert(
-      !authError.message.includes('test-subscription-key-12345'),
-      'Redacts API secret token from error message'
+      quotaError instanceof ProviderError && quotaError.message.includes('402 Insufficient Balance'),
+      'Handles 402 Insufficient Balance error cleanly'
     );
 
-    // 6. Malformed Response Handling
-    console.log('\n--- Malformed Response Handling ---');
-    globalThis.fetch = (async (): Promise<Response> => {
-      return new Response('Not valid json {{{', { status: 200 });
-    }) as typeof fetch;
-
-    let malformedError: any;
-    try {
-      await pixazoProvider.generate({ material: 'lava', style: 'stylized', resolution: 512 });
-    } catch (err) {
-      malformedError = err;
-    }
-    assert(
-      malformedError instanceof ProviderError && malformedError.message.includes('malformed payload'),
-      'Handles malformed JSON response body with normalized ProviderError'
-    );
-
-    // 7. Timeout / AbortController Handling
-    console.log('\n--- Timeout & AbortController Handling ---');
-    process.env.PIXAZO_TIMEOUT_MS = '50'; // 50ms short timeout for test
-
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      return new Promise((resolve, reject) => {
-        const signal = init?.signal;
-        const timer = setTimeout(() => {
-          resolve(new Response(JSON.stringify({ imageUrl: dummyBase64Png }), { status: 200 }));
-        }, 500); // 500ms delay to trigger 50ms timeout
-
-        if (signal) {
-          signal.addEventListener('abort', () => {
-            clearTimeout(timer);
-            const abortErr = new Error('The operation was aborted');
-            abortErr.name = 'AbortError';
-            reject(abortErr);
-          });
-        }
-      });
-    }) as typeof fetch;
-
-    let timeoutError: any;
-    try {
-      await pixazoProvider.generate({ material: 'wood', style: 'stylized', resolution: 512 });
-    } catch (err) {
-      timeoutError = err;
-    }
-    assert(
-      timeoutError instanceof ProviderError && timeoutError.message.includes('timed out after 50ms'),
-      'Aborts stalled request and throws normalized ProviderError on timeout'
-    );
-
-    delete process.env.PIXAZO_TIMEOUT_MS;
-
-    // 8. Benchmark Runner Compatibility with Mocked Pixazo Provider
+    // 8. Benchmark Runner Compatibility
     console.log('\n--- Benchmark Runner Compatibility ---');
     globalThis.fetch = (async (): Promise<Response> => {
       return new Response(

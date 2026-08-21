@@ -5,7 +5,7 @@
 
 export interface PromptBuildOptions {
   material: string;
-  style?: string;
+  style: string;
   detail?: string;
   additionalPrompt?: string;
   customPrompt?: string;
@@ -56,11 +56,11 @@ export class PromptBuilder {
    * Constructs an optimized game texture generation prompt
    */
   static buildPrompt(options: PromptBuildOptions): string {
-    const { material, style = 'stylized', detail = 'high', additionalPrompt, customPrompt } = options;
+    const { material, style, detail = 'high', additionalPrompt, customPrompt } = options;
 
-    const normalizedMat = (material || 'cobblestone').toLowerCase().trim();
-    const normalizedStyle = (style || 'stylized').toLowerCase().trim();
-    const normalizedDetail = (detail || 'high').toLowerCase().trim();
+    const normalizedMat = material.toLowerCase().trim();
+    const normalizedStyle = style.toLowerCase().trim();
+    const normalizedDetail = detail.toLowerCase().trim();
 
     const matDescription = MATERIAL_DESCRIPTORS[normalizedMat] || `${normalizedMat} surface`;
     const styleDescription = STYLE_DESCRIPTORS[normalizedStyle] || `${normalizedStyle} game art style`;
