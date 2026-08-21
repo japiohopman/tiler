@@ -154,12 +154,14 @@ apiRouter.post('/generate', async (req, res) => {
 
     // Step 6: Generation metadata package
     const generationMetadata = {
+      provider: selectedProvider.id,
       model: rawResult.model,
       builtPrompt: rawResult.builtPrompt,
       material,
       style,
       detail,
       resolution,
+      seed: req.body.seed ?? (rawResult.metadata as any)?.seed,
       generatedAt: new Date().toISOString(),
       processingAlgorithm: processResult.metadata.algorithm,
       processingTimeMs: processResult.metadata.processingTimeMs,
@@ -329,7 +331,8 @@ apiRouter.post('/export', async (req, res) => {
     }
 
     const inputBuffer = tileProcessor.toBuffer(imageData);
-    const { buffer, mimeType, filename } = await exportService.exportTexture(inputBuffer, options);
+    const materialName = tile?.material || tile?.name || 'tile';
+    const { buffer, mimeType, filename } = await exportService.exportTexture(inputBuffer, options, materialName);
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
