@@ -13,16 +13,20 @@ import {
   Sliders,
   Sparkles,
 } from 'lucide-react';
-import { EdgeRegionDepth, SeamAnalysisResult } from '../types';
+import { EdgeRegionDepth, SeamAnalysisResult, ValidationSummary } from '../types';
 
 interface SeamAnalysisPanelProps {
   report?: SeamAnalysisResult;
+  rawReport?: SeamAnalysisResult;
+  validationSummary?: ValidationSummary;
   isLoading?: boolean;
   onReanalyze?: (threshold: number, edgeRegion: EdgeRegionDepth) => void;
 }
 
 export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
   report,
+  rawReport,
+  validationSummary,
   isLoading,
   onReanalyze,
 }) => {
@@ -49,9 +53,38 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
   const hScore = report?.horizontalScore ?? 0.0;
   const vScore = report?.verticalScore ?? 0.0;
   const overallScore = report?.overallScore ?? 0.0;
-  const isPass = report?.pass ?? true;
   const currentThreshold = report?.threshold ?? threshold;
   const currentEdgeRegion = report?.edgeRegion ?? edgeRegion;
+
+  // RAW Tileability: prefer validationSummary.rawTileable if available, otherwise rawReport?.pass
+  const isRawPass = validationSummary ? validationSummary.rawTileable : (rawReport?.pass ?? false);
+
+  // PROCESSED Tileability: prefer validationSummary.processedTileable if available, otherwise report?.pass
+  const isProcessedPass = validationSummary ? validationSummary.processedTileable : (report?.pass ?? false);
+
+  // FINAL STATUS: single source of truth from validationSummary.finalStatus
+  let finalStatusText = 'VALIDATION FAILED';
+  let isFinalPass = false;
+
+  if (validationSummary) {
+    if (validationSummary.finalStatus === 'PASS_RAW') {
+      finalStatusText = 'PASS — RAW OUTPUT ALREADY TILEABLE';
+      isFinalPass = true;
+    } else if (validationSummary.finalStatus === 'PASS_AFTER_PROCESSING') {
+      finalStatusText = 'PASS AFTER PROCESSING';
+      isFinalPass = true;
+    } else {
+      finalStatusText = 'VALIDATION FAILED';
+      isFinalPass = false;
+    }
+  } else if (report) {
+    // Fallback when validationSummary is unavailable: handle safely without silently assuming success
+    isFinalPass = !!report.pass;
+    finalStatusText = isFinalPass ? 'PASS AFTER PROCESSING' : 'VALIDATION FAILED';
+  } else {
+    isFinalPass = false;
+    finalStatusText = 'VALIDATION FAILED';
+  }
 
   const handleSettingChange = (newThreshold: number, newRegion: EdgeRegionDepth) => {
     setThreshold(newThreshold);
@@ -73,12 +106,12 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
         </div>
         <div
           className={`flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-            isPass
+            isFinalPass
               ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
               : 'bg-rose-950/60 text-rose-300 border-rose-500/40'
           }`}
         >
-          {isPass ? (
+          {isFinalPass ? (
             <>
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               <span>PASSED (≤ {currentThreshold})</span>
@@ -269,7 +302,130 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
         </div>
       )}
 
-      {/* Status messages / Discontinuities */}
+      {/* Validation Summary Breakdown */}
+      <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 space-y-2 text-xs">
+        <div className="flex items-center justify-between font-semibold text-slate-200 border-b border-slate-800/80 pb-2">
+          <span className="flex items-center space-x-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Validation & Improvement Summary</span>
+          </span>
+          <span className="text-[10px] font-mono text-slate-400">
+            Threshold: ≤ {currentThreshold}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[11px]">
+          {/* 1. Generation */}
+          <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 font-sans">GENERATION</div>
+            <div className="text-emerald-400 font-bold mt-0.5">✓ SUCCESS</div>
+          </div>
+
+          {/* 2. Raw Tileability */}
+          <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 font-sans">RAW TILEABILITY</div>
+            <div className={isRawPass ? "text-emerald-400 font-bold mt-0.5" : "text-rose-400 font-bold mt-0.5"}>
+              {isRawPass ? '✓ PASS' : '✗ FAIL'}
+            </div>
+            {rawReport?.overallScore !== undefined && (
+              <div className="text-[9px] text-slate-500 font-mono mt-0.5">({rawReport.overallScore.toFixed(4)})</div>
+            )}
+          </div>
+
+          {/* 3. Processed Tileability */}
+          <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 font-sans">PROCESSED TILEABILITY</div>
+            <div className={isProcessedPass ? "text-emerald-400 font-bold mt-0.5" : "text-rose-400 font-bold mt-0.5"}>
+              {isProcessedPass ? '✓ PASS' : '✗ FAIL'}
+            </div>
+            <div className="text-[9px] text-slate-500 font-mono mt-0.5">({overallScore.toFixed(4)})</div>
+          </div>
+
+          {/* 4. Final Status */}
+          <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 font-sans">FINAL STATUS</div>
+            <div className={isFinalPass ? "text-emerald-400 font-bold mt-0.5 text-[10px]" : "text-rose-400 font-bold mt-0.5 text-[10px]"}>
+              {finalStatusText}
+            </div>
+          </div>
+        </div>
+
+        {/* Improvement / Worsening Metrics */}
+        {(rawReport?.overallScore !== undefined || validationSummary) && (
+          <div className="bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between font-mono text-[11px]">
+            <span className="text-slate-400 font-sans">Seam Delta Improvement:</span>
+            <div className="flex items-center space-x-2">
+              {rawReport?.overallScore !== undefined && (
+                <span className="text-slate-400">{rawReport.overallScore.toFixed(4)} → {overallScore.toFixed(4)}</span>
+              )}
+              {(() => {
+                const status = validationSummary
+                  ? validationSummary.improvementStatus
+                  : (rawReport?.overallScore !== undefined
+                      ? (rawReport.overallScore - overallScore > 0.0001
+                          ? 'IMPROVED'
+                          : rawReport.overallScore - overallScore < -0.0001
+                          ? 'WORSENED'
+                          : 'UNCHANGED')
+                      : 'UNCHANGED');
+
+                const delta = validationSummary
+                  ? validationSummary.improvement
+                  : (rawReport?.overallScore !== undefined ? rawReport.overallScore - overallScore : 0);
+
+                if (status === 'IMPROVED') {
+                  return (
+                    <span className="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                      +{delta.toFixed(4)} (IMPROVED)
+                    </span>
+                  );
+                }
+                if (status === 'WORSENED') {
+                  return (
+                    <span className="px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
+                      {delta.toFixed(4)} (WORSENED)
+                    </span>
+                  );
+                }
+                return (
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">
+                    UNCHANGED
+                  </span>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* Prompt Adherence Status Line */}
+        <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between text-[11px]">
+          <span className="text-slate-400 font-sans">Prompt Adherence:</span>
+          <span className="text-amber-400 font-mono font-semibold text-[10px] bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/30">
+            NOT AUTOMATICALLY VALIDATED
+          </span>
+        </div>
+      </div>
+
+      {/* Diagnostic details if validation failed */}
+      {!isFinalPass && (
+        <div className="bg-rose-950/30 border border-rose-500/40 rounded-xl p-3 text-xs space-y-1.5 text-rose-200">
+          <div className="font-bold text-rose-300 flex items-center space-x-1.5">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>Validation Failure Details</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-rose-300/90 pt-1">
+            <div>Overall Score: {overallScore.toFixed(4)}</div>
+            <div>Threshold: {currentThreshold.toFixed(4)}</div>
+            <div>Horizontal Delta: {hScore.toFixed(4)}</div>
+            <div>Vertical Delta: {vScore.toFixed(4)}</div>
+          </div>
+          <div className="text-[11px] text-rose-300/80 pt-1 border-t border-rose-500/20">
+            <strong>Reason:</strong> Opposing boundary edges exceed tolerance limit ({overallScore.toFixed(4)} &gt; {currentThreshold}).
+          </div>
+        </div>
+      )}
+
+      {/* Status messages / Technical Seam Assessment */}
       <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-800/80 text-xs space-y-1">
         <div className="text-slate-300 font-medium flex items-center space-x-1.5">
           <Info className="w-3.5 h-3.5 text-amber-400" />

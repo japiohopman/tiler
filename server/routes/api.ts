@@ -81,7 +81,15 @@ apiRouter.post('/generate', async (req, res) => {
 
     const tileId = `tile-${Date.now()}`;
 
-    // Step 2: Deterministic Sharp tile processing (preserving raw image intact)
+    // Step 2: Seam Continuity Analysis on Raw Image
+    const rawBuffer = tileProcessor.toBuffer(rawResult.imageDataUrl);
+    const rawSeamReport = await seamAnalysisService.analyzeSeams(rawBuffer, {
+      threshold: 0.05,
+      edgeRegion: 4,
+      diagnosticMode: false,
+    });
+
+    // Step 3: Deterministic Sharp tile processing (preserving raw image intact)
     const procOpts = processingOptions || {
       algorithm: 'offset-crossfade',
       blendMarginPercent: 10,
@@ -94,7 +102,7 @@ apiRouter.post('/generate', async (req, res) => {
       targetHeight: resolution,
     });
 
-    // Step 3: Seam Continuity Analysis
+    // Step 4: Seam Continuity Analysis on Processed Tile
     const processedBuffer = tileProcessor.toBuffer(processResult.processedImageDataUrl);
     const seamReport = await seamAnalysisService.analyzeSeams(processedBuffer, {
       threshold: 0.05,
@@ -104,7 +112,47 @@ apiRouter.post('/generate', async (req, res) => {
 
     console.log('[Generation] validation completed');
 
-    // Step 4: Generation metadata package
+    // Step 5: Validation summary computation
+    const rawSeamScore = rawSeamReport.overallScore;
+    const processedSeamScore = seamReport.overallScore;
+    const improvement = Number((rawSeamScore - processedSeamScore).toFixed(4));
+    let improvementStatus: 'IMPROVED' | 'WORSENED' | 'UNCHANGED' = 'UNCHANGED';
+    if (improvement > 0.0001) {
+      improvementStatus = 'IMPROVED';
+    } else if (improvement < -0.0001) {
+      improvementStatus = 'WORSENED';
+    }
+
+    const rawTileable = rawSeamReport.pass;
+    const processedTileable = seamReport.pass;
+
+    let finalStatus: 'PASS_RAW' | 'PASS_AFTER_PROCESSING' | 'VALIDATION_FAILED' = 'VALIDATION_FAILED';
+    if (rawTileable) {
+      finalStatus = 'PASS_RAW';
+    } else if (processedTileable) {
+      finalStatus = 'PASS_AFTER_PROCESSING';
+    }
+
+    const issues = [...(seamReport.issues || [])];
+    if (!processedTileable && issues.length === 0) {
+      issues.push(`Opposing boundary edges exceed tolerance (${processedSeamScore.toFixed(4)} > 0.05).`);
+    }
+
+    const validationSummary = {
+      generationStatus: 'SUCCESS' as const,
+      rawTileable,
+      processedTileable,
+      rawSeamScore,
+      processedSeamScore,
+      improvement,
+      improvementStatus,
+      finalStatus,
+      threshold: 0.05,
+      issues,
+      promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED' as const,
+    };
+
+    // Step 6: Generation metadata package
     const generationMetadata = {
       model: rawResult.model,
       builtPrompt: rawResult.builtPrompt,
@@ -117,6 +165,8 @@ apiRouter.post('/generate', async (req, res) => {
       processingTimeMs: processResult.metadata.processingTimeMs,
       generationDurationMs: rawResult.generationTimeMs,
       blendMarginPercent: processResult.metadata.blendMarginPercent,
+      rawSeamScore: rawSeamReport.overallScore,
+      processedSeamScore: seamReport.overallScore,
       providerMetadata: rawResult.metadata,
     };
 
@@ -131,6 +181,8 @@ apiRouter.post('/generate', async (req, res) => {
       offsetPreviewUrl: processResult.offsetPreviewDataUrl,
       generationMetadata,
       seamReport,
+      rawSeamReport,
+      validationSummary,
       processingMetadata: processResult.metadata,
       message: 'Generated texture via ImageProvider and executed full seamless tile pipeline.',
     });

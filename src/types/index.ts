@@ -60,6 +60,8 @@ export interface GenerationMetadata {
   generationDurationMs?: number;
   geminiDurationMs?: number; // Legacy compatibility
   blendMarginPercent?: number;
+  rawSeamScore?: number;
+  processedSeamScore?: number;
 }
 
 export interface GenerationState {
@@ -160,6 +162,20 @@ export interface ExportOptions {
   includeMetadata: boolean;
 }
 
+export interface ValidationSummary {
+  generationStatus: 'SUCCESS' | 'ERROR';
+  rawTileable: boolean;
+  processedTileable: boolean;
+  rawSeamScore: number;
+  processedSeamScore: number;
+  improvement: number;
+  improvementStatus: 'IMPROVED' | 'WORSENED' | 'UNCHANGED';
+  finalStatus: 'PASS_RAW' | 'PASS_AFTER_PROCESSING' | 'VALIDATION_FAILED';
+  threshold: number;
+  issues: string[];
+  promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED';
+}
+
 export interface Tile {
   id: string;
   name: string;
@@ -171,7 +187,10 @@ export interface Tile {
   processedImageDataUrl?: string;
   isTileable: boolean;
   seamScore?: number;
+  rawSeamScore?: number;
   seamReport?: SeamAnalysisReport;
+  rawSeamReport?: SeamAnalysisReport;
+  validationSummary?: ValidationSummary;
   createdAt: string;
   generationMetadata?: GenerationMetadata;
   metadata?: {

@@ -7,6 +7,7 @@ import express from 'express';
 import http from 'http';
 import { apiRouter } from './api';
 import { generationService } from '../services/generationService';
+import { seamAnalysisService } from '../services/seamAnalysisService';
 import { mockProvider } from '../services/providers/mockProvider';
 import { pixazoProvider } from '../services/providers/pixazoProvider';
 import { ProviderError } from '../services/providers/types';
@@ -86,7 +87,111 @@ async function runTests() {
     assert(typeof genData.rawImageUrl === 'string' && genData.rawImageUrl.startsWith('data:image/'), 'Returns rawImageUrl as Base64 Data URL');
     assert(typeof genData.processedImageUrl === 'string' && genData.processedImageUrl.startsWith('data:image/'), 'Returns processedImageUrl as Base64 Data URL');
     assert(genData.seamReport && genData.seamReport.pass !== undefined, 'Returns seamReport with pass status');
+    assert(genData.rawSeamReport && typeof genData.rawSeamReport.overallScore === 'number', 'Returns rawSeamReport with raw seam score');
+    assert(typeof genData.generationMetadata?.rawSeamScore === 'number', 'Metadata captures rawSeamScore');
+    assert(typeof genData.generationMetadata?.processedSeamScore === 'number', 'Metadata captures processedSeamScore');
     assert(genData.generationMetadata?.material === 'cobblestone', 'Metadata captures material cobblestone');
+
+    // 2b. Validation Summary API Contract Verification
+    console.log('\n--- Validation Summary & Improvement API Contract ---');
+    assert(genData.validationSummary !== undefined, 'Returns validationSummary object');
+    assert(genData.validationSummary.generationStatus === 'SUCCESS', 'ValidationSummary reports generationStatus SUCCESS');
+    assert(typeof genData.validationSummary.rawTileable === 'boolean', 'ValidationSummary reports rawTileable boolean');
+    assert(typeof genData.validationSummary.processedTileable === 'boolean', 'ValidationSummary reports processedTileable boolean');
+    assert(typeof genData.validationSummary.improvement === 'number', 'ValidationSummary reports numerical improvement');
+    assert(['IMPROVED', 'WORSENED', 'UNCHANGED'].includes(genData.validationSummary.improvementStatus), 'ValidationSummary reports valid improvementStatus');
+    assert(['PASS_RAW', 'PASS_AFTER_PROCESSING', 'VALIDATION_FAILED'].includes(genData.validationSummary.finalStatus), 'ValidationSummary reports valid finalStatus');
+    assert(genData.validationSummary.threshold === 0.05, 'ValidationSummary maintains strict threshold 0.05');
+    assert(genData.validationSummary.promptAdherenceStatus === 'NOT_AUTOMATICALLY_VALIDATED', 'ValidationSummary explicitly reports promptAdherenceStatus NOT_AUTOMATICALLY_VALIDATED');
+
+    // 2c. Improvement / Worsening Metric Mechanics Test
+    const rawScoreTest = genData.rawSeamReport.overallScore;
+    const procScoreTest = genData.seamReport.overallScore;
+    const expectedImp = Number((rawScoreTest - procScoreTest).toFixed(4));
+    assert(Math.abs(genData.validationSummary.improvement - expectedImp) < 0.001, 'Calculates correct improvement delta (raw - processed)');
+
+    if (rawScoreTest > procScoreTest) {
+      assert(genData.validationSummary.improvementStatus === 'IMPROVED', 'Correctly identifies IMPROVED when rawScore > processedScore');
+    } else if (procScoreTest > rawScoreTest) {
+      assert(genData.validationSummary.improvementStatus === 'WORSENED', 'Correctly identifies WORSENED when processedScore > rawScore');
+    } else {
+      assert(genData.validationSummary.improvementStatus === 'UNCHANGED', 'Correctly identifies UNCHANGED when scores are identical');
+    }
+
+    // 2d. Explicit Deterministic Classification Tests for IMPROVED, WORSENED, UNCHANGED
+    console.log('\n--- Deterministic Validation Summary Classifications (IMPROVED / WORSENED / UNCHANGED) ---');
+    const originalAnalyze = seamAnalysisService.analyzeSeams;
+
+    // Test case 1: Deterministic IMPROVED (raw 0.1200, proc 0.0100 -> delta +0.1100, IMPROVED)
+    let stepCount = 0;
+    seamAnalysisService.analyzeSeams = async (_img: any, _options?: any) => {
+      stepCount++;
+      const score = stepCount === 1 ? 0.1200 : 0.0100;
+      return {
+        horizontalScore: score,
+        verticalScore: score,
+        overallScore: score,
+        width: 512,
+        height: 512,
+        pass: score <= 0.05,
+        threshold: 0.05,
+        edgeRegion: 4,
+        maxHorizontalDelta: 0.1,
+        maxVerticalDelta: 0.1,
+        discontinuousPixelCount: 0,
+        totalEdgePixelsEvaluated: 2048,
+        issues: [],
+      };
+    };
+
+    const impGenRes = await originalFetch(`${baseUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ material: 'cobblestone', style: 'stylized', resolution: 512 }),
+    });
+    const impGenData = await impGenRes.json();
+    assert(impGenData.validationSummary.rawSeamScore === 0.12, 'Deterministic raw score is 0.1200');
+    assert(impGenData.validationSummary.processedSeamScore === 0.01, 'Deterministic processed score is 0.0100');
+    assert(impGenData.validationSummary.improvement === 0.11, 'Deterministic improvement delta is +0.1100');
+    assert(impGenData.validationSummary.improvementStatus === 'IMPROVED', 'Deterministic classification is IMPROVED');
+    assert(impGenData.validationSummary.finalStatus === 'PASS_AFTER_PROCESSING', 'Deterministic finalStatus is PASS_AFTER_PROCESSING');
+
+    // Test case 2: Deterministic WORSENED (raw 0.0100, proc 0.0800 -> delta -0.0700, WORSENED)
+    stepCount = 0;
+    seamAnalysisService.analyzeSeams = async (_img: any, _options?: any) => {
+      stepCount++;
+      const score = stepCount === 1 ? 0.0100 : 0.0800;
+      return {
+        horizontalScore: score,
+        verticalScore: score,
+        overallScore: score,
+        width: 512,
+        height: 512,
+        pass: score <= 0.05,
+        threshold: 0.05,
+        edgeRegion: 4,
+        maxHorizontalDelta: 0.1,
+        maxVerticalDelta: 0.1,
+        discontinuousPixelCount: 0,
+        totalEdgePixelsEvaluated: 2048,
+        issues: [],
+      };
+    };
+
+    const worGenRes = await originalFetch(`${baseUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ material: 'wood', style: 'stylized', resolution: 512 }),
+    });
+    const worGenData = await worGenRes.json();
+    assert(worGenData.validationSummary.rawSeamScore === 0.01, 'Deterministic raw score is 0.0100');
+    assert(worGenData.validationSummary.processedSeamScore === 0.08, 'Deterministic processed score is 0.0800');
+    assert(worGenData.validationSummary.improvement === -0.07, 'Deterministic improvement delta is -0.0700');
+    assert(worGenData.validationSummary.improvementStatus === 'WORSENED', 'Deterministic classification is WORSENED');
+    assert(worGenData.validationSummary.finalStatus === 'PASS_RAW', 'Deterministic finalStatus is PASS_RAW');
+
+    // Restore original seam analysis service method
+    seamAnalysisService.analyzeSeams = originalAnalyze;
 
     // 3. Validation Failure on Missing Material
     console.log('\n--- Input Validation Failure Handling ---');
@@ -176,6 +281,19 @@ async function runTests() {
     assert(procData.processedImageUrl.startsWith('data:image/'), 'Returns processedImageUrl');
     assert(procData.metadata.blendMarginPercent === 10, 'Metadata records blendMarginPercent 10');
 
+    // 5b. Re-processing with Blend Margin Variation (15%)
+    const procRes15 = await originalFetch(`${baseUrl}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: dummyDataUrl,
+        options: { blendMarginPercent: 15, algorithm: 'offset-crossfade' },
+      }),
+    });
+    assert(procRes15.status === 200, 'Process endpoint supports custom 15% blend margin');
+    const procData15 = await procRes15.json();
+    assert(procData15.metadata.blendMarginPercent === 15, 'Metadata records updated blendMarginPercent 15');
+
     // 6. Seam Analysis Endpoint (/api/analyze)
     console.log('\n--- Seam Analysis Endpoint ---');
     const analyzeRes = await originalFetch(`${baseUrl}/analyze`, {
@@ -190,6 +308,21 @@ async function runTests() {
     const analyzeData = await analyzeRes.json();
     assert(analyzeData.success === true, 'Analyze response indicates success: true');
     assert(typeof analyzeData.report.overallScore === 'number', 'Report contains numerical overallScore');
+
+    // 6b. Seam Analysis with Custom Options (threshold 0.01, edgeRegion 8px)
+    const customAnalyzeRes = await originalFetch(`${baseUrl}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: dummyDataUrl,
+        options: { threshold: 0.01, edgeRegion: 8, diagnosticMode: true },
+      }),
+    });
+    assert(customAnalyzeRes.status === 200, 'Analyze endpoint supports custom threshold and edgeRegion');
+    const customAnalyzeData = await customAnalyzeRes.json();
+    assert(customAnalyzeData.report.threshold === 0.01, 'Report records custom threshold 0.01');
+    assert(customAnalyzeData.report.edgeRegion === 8, 'Report records custom edgeRegion depth 8px');
+    assert(typeof customAnalyzeData.report.diagnosticMapDataUrl === 'string', 'Report generates diagnostic heatmap Data URL');
 
     console.log('\n======================================================');
     console.log(`  API Integration Test Suite Results: ${passed}/${total} Tests Passed`);
