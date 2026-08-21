@@ -56,6 +56,13 @@ export interface AnalyzeApiResponse {
   error?: string;
 }
 
+export interface HealthCheckResponse {
+  status: string;
+  activeProvider: string;
+  providerConfigured: boolean;
+  sharpReady: boolean;
+}
+
 /**
  * Client service abstraction for communicating with backend tile services.
  * All image generation, Sharp processing, and seam analysis are executed server-side
@@ -67,7 +74,7 @@ class TileApiClient {
   /**
    * Health check to ensure server-side pipeline is active
    */
-  async checkHealth(): Promise<{ status: string; geminiConfigured: boolean; sharpReady: boolean }> {
+  async checkHealth(): Promise<HealthCheckResponse> {
     try {
       const response = await fetch(`${this.baseUrl}/health`);
       if (!response.ok) {
@@ -76,12 +83,12 @@ class TileApiClient {
       return await response.json();
     } catch (error) {
       console.warn('Backend health check failed:', error);
-      return { status: 'offline', geminiConfigured: false, sharpReady: false };
+      return { status: 'offline', activeProvider: 'mock', providerConfigured: false, sharpReady: false };
     }
   }
 
   /**
-   * Triggers server-side AI visual texture generation via Gemini Image Generation service
+   * Triggers server-side AI visual texture generation via configured provider (e.g., Pixazo, Mock, Gemini)
    * and executes full Sharp seamless pipeline + Seam continuity analyzer.
    */
   async generateTile(params: GenerateTileRequest | GenerationParams): Promise<GenerateApiResponse> {
@@ -103,7 +110,6 @@ class TileApiClient {
 
   /**
    * Triggers local server-side Sharp seamless tile processing pipeline
-   * TODO [Phase 2]: Connect to server Sharp offset and blending pipeline
    */
   async processTile(
     tileImageData: string,
@@ -175,7 +181,6 @@ class TileApiClient {
 
   /**
    * Requests texture export in selected format and grid layout
-   * TODO [Phase 2]: Connect to server Sharp export pipeline
    */
   async exportTile(tile: Tile, options: ExportOptions): Promise<Blob> {
     const response = await fetch(`${this.baseUrl}/export`, {
