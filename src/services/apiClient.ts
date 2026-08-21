@@ -105,7 +105,11 @@ class TileApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Network response error' }));
-      throw new Error(errorData.error || `Generation failed with status ${response.status}`);
+      const errorMsg = errorData.error || `Generation failed with status ${response.status}`;
+      const err = new Error(errorMsg) as any;
+      if (errorData.providerId) err.providerId = errorData.providerId;
+      if (errorData.stage) err.stage = errorData.stage;
+      throw err;
     }
 
     return await response.json();
@@ -131,7 +135,10 @@ class TileApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Processing error' }));
-      throw new Error(errorData.error || `Processing failed with status ${response.status}`);
+      const errorMsg = errorData.error || `Processing failed with status ${response.status}`;
+      const err = new Error(errorMsg) as any;
+      if (errorData.stage) err.stage = errorData.stage;
+      throw err;
     }
 
     return await response.json();
@@ -154,7 +161,10 @@ class TileApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Analysis error' }));
-      throw new Error(errorData.error || `Analysis failed with status ${response.status}`);
+      const errorMsg = errorData.error || `Analysis failed with status ${response.status}`;
+      const err = new Error(errorMsg) as any;
+      if (errorData.stage) err.stage = errorData.stage;
+      throw err;
     }
 
     return await response.json();

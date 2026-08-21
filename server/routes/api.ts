@@ -63,52 +63,83 @@ apiRouter.post('/generate', async (req, res) => {
     console.log(`[Generation] selected provider: ${selectedProvider.id}`);
     console.log(`[Generation] starting provider request: ${selectedProvider.id}`);
 
-    // Step 1: Call server-side provider generation service
-    const rawResult = await generationService.generate(
-      {
-        material,
-        style,
-        detail,
-        additionalPrompt,
-        customPrompt,
-        resolution,
-      },
-      providerId
-    );
+    let rawResult;
+    try {
+      rawResult = await generationService.generate(
+        {
+          material,
+          style,
+          detail,
+          additionalPrompt,
+          customPrompt,
+          resolution,
+        },
+        providerId
+      );
+      console.log(`[Generation] provider completed: ${selectedProvider.id}`);
+    } catch (providerError: any) {
+      const activeId = selectedProvider?.id || requestedProviderId || generationService.getDefaultProviderId() || 'unknown';
+      const sanitizedMsg = (providerError.message || 'Provider generation failed')
+        .replace(/([a-f0-9]{32,})/gi, '[REDACTED_TOKEN]')
+        .replace(/(Bearer\s+[A-Za-z0-9\-._~+/]+=*)/gi, 'Bearer [REDACTED_TOKEN]')
+        .slice(0, 250);
+      console.error(`[Generation] provider failed: ${activeId} — ${sanitizedMsg}`);
+      return res.status(502).json({
+        error: sanitizedMsg,
+        providerId: activeId,
+        stage: 'provider',
+      });
+    }
 
-    console.log(`[Generation] provider completed: ${selectedProvider.id}`);
     console.log('[Generation] processing image');
-
     const tileId = `tile-${Date.now()}`;
 
-    // Step 2: Seam Continuity Analysis on Raw Image
-    const rawBuffer = tileProcessor.toBuffer(rawResult.imageDataUrl);
-    const rawSeamReport = await seamAnalysisService.analyzeSeams(rawBuffer, {
-      threshold: 0.05,
-      edgeRegion: 4,
-      diagnosticMode: false,
-    });
+    let processResult;
+    let rawSeamReport;
+    let seamReport;
 
-    // Step 3: Deterministic Sharp tile processing (preserving raw image intact)
-    const procOpts = processingOptions || {
-      algorithm: 'offset-crossfade',
-      blendMarginPercent: 10,
-    };
+    try {
+      // Step 2: Seam Continuity Analysis on Raw Image
+      const rawBuffer = tileProcessor.toBuffer(rawResult.imageDataUrl);
+      rawSeamReport = await seamAnalysisService.analyzeSeams(rawBuffer, {
+        threshold: 0.05,
+        edgeRegion: 4,
+        diagnosticMode: false,
+      });
 
-    const processResult = await tileProcessor.processTile(rawResult.imageDataUrl, {
-      algorithm: procOpts.algorithm || 'offset-crossfade',
-      blendMarginPercent: procOpts.blendMarginPercent ?? 10,
-      targetWidth: resolution,
-      targetHeight: resolution,
-    });
+      // Step 3: Deterministic Sharp tile processing (preserving raw image intact)
+      const procOpts = processingOptions || {
+        algorithm: 'offset-crossfade',
+        blendMarginPercent: 10,
+      };
 
-    // Step 4: Seam Continuity Analysis on Processed Tile
-    const processedBuffer = tileProcessor.toBuffer(processResult.processedImageDataUrl);
-    const seamReport = await seamAnalysisService.analyzeSeams(processedBuffer, {
-      threshold: 0.05,
-      edgeRegion: 4,
-      diagnosticMode: true,
-    });
+      processResult = await tileProcessor.processTile(rawResult.imageDataUrl, {
+        algorithm: procOpts.algorithm || 'offset-crossfade',
+        blendMarginPercent: procOpts.blendMarginPercent ?? 10,
+        targetWidth: resolution,
+        targetHeight: resolution,
+      });
+
+      // Step 4: Seam Continuity Analysis on Processed Tile
+      const processedBuffer = tileProcessor.toBuffer(processResult.processedImageDataUrl);
+      seamReport = await seamAnalysisService.analyzeSeams(processedBuffer, {
+        threshold: 0.05,
+        edgeRegion: 4,
+        diagnosticMode: true,
+      });
+    } catch (procError: any) {
+      const activeId = selectedProvider?.id || requestedProviderId || generationService.getDefaultProviderId() || 'unknown';
+      const sanitizedMsg = (procError.message || 'TileProcessor failed')
+        .replace(/([a-f0-9]{32,})/gi, '[REDACTED_TOKEN]')
+        .slice(0, 250);
+      console.error(`[Generation] processing failed: ${activeId} — ${sanitizedMsg}`);
+      return res.status(500).json({
+        error: `Processing failed: ${sanitizedMsg}`,
+        providerId: activeId,
+        stage: 'processing',
+        rawImageUrl: rawResult.imageDataUrl,
+      });
+    }
 
     console.log('[Generation] validation completed');
 
@@ -154,14 +185,12 @@ apiRouter.post('/generate', async (req, res) => {
 
     // Step 6: Generation metadata package
     const generationMetadata = {
-      provider: selectedProvider.id,
       model: rawResult.model,
       builtPrompt: rawResult.builtPrompt,
       material,
       style,
       detail,
       resolution,
-      seed: req.body.seed ?? (rawResult.metadata as any)?.seed,
       generatedAt: new Date().toISOString(),
       processingAlgorithm: processResult.metadata.algorithm,
       processingTimeMs: processResult.metadata.processingTimeMs,
@@ -192,9 +221,14 @@ apiRouter.post('/generate', async (req, res) => {
     const activeId = requestedProviderId || generationService.getDefaultProviderId() || 'unknown';
     const sanitizedMsg = (error.message || 'Generation failed')
       .replace(/([a-f0-9]{32,})/gi, '[REDACTED_TOKEN]')
+      .replace(/(Bearer\s+[A-Za-z0-9\-._~+/]+=*)/gi, 'Bearer [REDACTED_TOKEN]')
       .slice(0, 200);
-    console.error(`[Generation] provider failed: ${activeId} — ${sanitizedMsg}`);
-    res.status(500).json({ error: error.message || 'Generation failed' });
+    console.error(`[Generation] pipeline failed: ${activeId} — ${sanitizedMsg}`);
+    res.status(500).json({
+      error: sanitizedMsg,
+      providerId: activeId,
+      stage: 'unknown',
+    });
   }
 });
 
@@ -243,7 +277,7 @@ apiRouter.post('/process', async (req, res) => {
     const { image, options } = req.body;
 
     if (!image) {
-      return res.status(400).json({ error: 'Image data URL or buffer is required.' });
+      return res.status(400).json({ error: 'Image data URL or buffer is required.', stage: 'processing' });
     }
 
     const result = await tileProcessor.processTile(image, options);
@@ -257,8 +291,11 @@ apiRouter.post('/process', async (req, res) => {
       message: 'Deterministic offset-crossfade seamless transformation complete.',
     });
   } catch (error: any) {
-    console.error('Error in /api/process:', error);
-    res.status(500).json({ error: error.message || 'Processing failed' });
+    const sanitizedMsg = (error.message || 'Processing failed')
+      .replace(/([a-f0-9]{32,})/gi, '[REDACTED_TOKEN]')
+      .slice(0, 200);
+    console.error('Error in /api/process:', sanitizedMsg);
+    res.status(500).json({ error: sanitizedMsg, stage: 'processing' });
   }
 });
 
@@ -327,18 +364,20 @@ apiRouter.post('/export', async (req, res) => {
     const imageData = tile?.processedImageDataUrl || tile?.rawImageDataUrl;
 
     if (!imageData) {
-      return res.status(400).json({ error: 'No image data to export.' });
+      return res.status(400).json({ error: 'No image data to export.', stage: 'export' });
     }
 
     const inputBuffer = tileProcessor.toBuffer(imageData);
-    const materialName = tile?.material || tile?.name || 'tile';
-    const { buffer, mimeType, filename } = await exportService.exportTexture(inputBuffer, options, materialName);
+    const { buffer, mimeType, filename } = await exportService.exportTexture(inputBuffer, options);
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
   } catch (error: any) {
-    console.error('Error in /api/export:', error);
-    res.status(500).json({ error: error.message || 'Export failed' });
+    const sanitizedMsg = (error.message || 'Export failed')
+      .replace(/([a-f0-9]{32,})/gi, '[REDACTED_TOKEN]')
+      .slice(0, 200);
+    console.error('Error in /api/export:', sanitizedMsg);
+    res.status(500).json({ error: sanitizedMsg, stage: 'export' });
   }
 });

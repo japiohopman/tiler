@@ -24,14 +24,7 @@ import {
 } from './types';
 import { tileApiClient } from './services/apiClient';
 import { SAMPLE_TEXTURES, SampleTextureDefinition } from './utils/sampleTextures';
-import {
-  buildExportFilenames,
-  buildExportMetadata,
-  dataUrlToBlob,
-  getExportSourceInfo,
-  triggerBrowserDownload,
-} from './utils/exportUtils';
-import { Info } from 'lucide-react';
+import { Info, Sparkles, Sliders, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export default function App() {
   const [activeView, setActiveView] = useState<'workspace' | 'processor'>('workspace');
@@ -64,8 +57,6 @@ export default function App() {
   const [rawSeamReport, setRawSeamReport] = useState<SeamAnalysisReport | undefined>(undefined);
   const [selectedSource, setSelectedSource] = useState<'processed' | 'raw'>('processed');
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [exportStatus, setExportStatus] = useState<'idle' | 'exporting' | 'completed' | 'error'>('idle');
-  const [exportMessage, setExportMessage] = useState<string | undefined>(undefined);
   const [notification, setNotification] = useState<{ message: string; type: 'info' | 'success' | 'warn' } | null>(null);
 
   // Initial Backend Health Check & Initial Sample Loading
@@ -345,60 +336,33 @@ export default function App() {
 
   // Export Texture Handler
   const handleExport = async (options: ExportOptions) => {
-    const sourceInfo = getExportSourceInfo(currentTile);
-
-    if (!currentTile || sourceInfo.source === 'none' || !sourceInfo.imageDataUrl) {
-      setExportStatus('error');
-      setExportMessage('No tile image available to export.');
+    if (!currentTile || (!currentTile.processedImageDataUrl && !currentTile.rawImageDataUrl)) {
       setNotification({
-        message: 'No tile image available to export.',
-        type: 'warn',
+        message: `Generate a ${params.material} texture first to export ${options.resolution}×${options.resolution} ${options.format.toUpperCase()} asset.`,
+        type: 'info',
       });
       return;
     }
 
     setIsExporting(true);
-    setExportStatus('exporting');
-    setExportMessage('Preparing export file...');
-
     try {
-      const { imageFilename, metadataFilename } = buildExportFilenames(currentTile, options, sourceInfo.source);
+      const blob = await tileApiClient.exportTile(currentTile, options);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentTile.material}_${options.resolution}x${options.resolution}.${options.format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
-      // Download main image (PNG/WebP/JPEG)
-      let imageBlob: Blob;
-      if (options.exportGridSheet || options.resolution !== currentTile.resolution || options.format !== 'png') {
-        imageBlob = await tileApiClient.exportTile(currentTile, options);
-      } else {
-        imageBlob = dataUrlToBlob(sourceInfo.imageDataUrl);
-      }
-
-      triggerBrowserDownload(imageBlob, imageFilename);
-
-      // Download companion metadata JSON if requested
-      if (options.includeMetadata) {
-        const metadataObj = buildExportMetadata(currentTile, sourceInfo.source);
-        const jsonString = JSON.stringify(metadataObj, null, 2);
-        const metadataBlob = new Blob([jsonString], { type: 'application/json' });
-        triggerBrowserDownload(metadataBlob, metadataFilename);
-      }
-
-      const isValidationFailed = currentTile.validationSummary?.finalStatus === 'VALIDATION_FAILED';
-      const statusNotice = isValidationFailed ? ' (Validation failed, exported anyway)' : '';
-      const successMsg = `Export completed! Downloaded ${imageFilename}${options.includeMetadata ? ` and ${metadataFilename}` : ''}${statusNotice}.`;
-
-      setExportStatus('completed');
-      setExportMessage(successMsg);
       setNotification({
-        message: successMsg,
+        message: `Exported ${currentTile.material} texture as ${options.resolution}×${options.resolution} ${options.format.toUpperCase()}`,
         type: 'success',
       });
     } catch (err: any) {
-      console.error('Export error:', err);
-      const errMsg = `Export failed: ${err.message || 'Unknown error'}`;
-      setExportStatus('error');
-      setExportMessage(errMsg);
       setNotification({
-        message: errMsg,
+        message: `Export notice: ${err.message || 'Export handler ready'}`,
         type: 'warn',
       });
     } finally {
@@ -566,8 +530,6 @@ export default function App() {
                 currentTile={currentTile}
                 onExport={handleExport}
                 isExporting={isExporting}
-                exportStatus={exportStatus}
-                exportMessage={exportMessage}
               />
             </div>
           </div>

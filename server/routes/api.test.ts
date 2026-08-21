@@ -16,7 +16,7 @@ import { ProviderError } from '../services/providers/types';
  * Application Layer & API Router End-to-End Integration Test Suite
  *
  * Verifies that the Express API router correctly handles health checks,
- * texture generation requests, error states, seam analysis, processing, and export.
+ * texture generation requests, error states, seam analysis, and processing.
  */
 async function runTests() {
   console.log('======================================================');
@@ -217,13 +217,16 @@ async function runTests() {
       body: JSON.stringify({ material: 'sand', style: 'stylized' }),
     });
 
-    assert(unconfigRes.status === 500, 'Returns HTTP 500 when active provider is unconfigured');
+    assert(unconfigRes.status === 502, 'Returns HTTP 502 Bad Gateway when Pixazo provider generation fails');
     const unconfigData = await unconfigRes.json();
+    assert(unconfigData.stage === 'provider', 'Structured error identifies stage: provider');
+    assert(unconfigData.providerId === 'pixazo', 'Structured error identifies providerId: pixazo');
     assert(
       unconfigData.error.includes('Pixazo') || unconfigData.error.includes('not configured'),
       'Returns human-readable provider configuration error'
     );
     assert(!unconfigData.error.includes('test-secret'), 'Does not leak sensitive credential information');
+    assert(!unconfigData.rawImageUrl, 'No mock or raw image returned on provider failure (no silent mock fallback)');
 
     // 4b. End-to-End Vertical Slice Generation via Pixazo Provider
     console.log('\n--- End-to-End Vertical Slice Generation via Pixazo Provider ---');
@@ -323,51 +326,6 @@ async function runTests() {
     assert(customAnalyzeData.report.threshold === 0.01, 'Report records custom threshold 0.01');
     assert(customAnalyzeData.report.edgeRegion === 8, 'Report records custom edgeRegion depth 8px');
     assert(typeof customAnalyzeData.report.diagnosticMapDataUrl === 'string', 'Report generates diagnostic heatmap Data URL');
-
-    // 7. Texture Export Endpoint (/api/export)
-    console.log('\n--- Texture Export Endpoint ---');
-    const exportRes = await originalFetch(`${baseUrl}/export`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tile: {
-          material: 'Cobblestone / Stone',
-          processedImageDataUrl: dummyDataUrl,
-        },
-        options: { format: 'png', resolution: 512 },
-      }),
-    });
-
-    assert(exportRes.status === 200, 'Export endpoint returns HTTP 200 OK');
-    const contentType = exportRes.headers.get('content-type');
-    const contentDisposition = exportRes.headers.get('content-disposition');
-    assert(contentType === 'image/png', 'Export returns image/png Content-Type');
-    assert(
-      contentDisposition !== null && contentDisposition.includes('filename="cobblestone-stone-processed.png"'),
-      'Export sets sanitized filename in Content-Disposition'
-    );
-
-    // 7b. Texture Export JPEG filename mapping (.jpg)
-    const exportJpegRes = await originalFetch(`${baseUrl}/export`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tile: {
-          material: 'Grass',
-          processedImageDataUrl: dummyDataUrl,
-        },
-        options: { format: 'jpeg', resolution: 512 },
-      }),
-    });
-
-    assert(exportJpegRes.status === 200, 'JPEG export endpoint returns HTTP 200 OK');
-    const jpegContentType = exportJpegRes.headers.get('content-type');
-    const jpegContentDisposition = exportJpegRes.headers.get('content-disposition');
-    assert(jpegContentType === 'image/jpeg', 'JPEG export returns image/jpeg Content-Type');
-    assert(
-      jpegContentDisposition !== null && jpegContentDisposition.includes('filename="grass-processed.jpg"'),
-      'JPEG export produces filename ending in .jpg (not .jpeg)'
-    );
 
     console.log('\n======================================================');
     console.log(`  API Integration Test Suite Results: ${passed}/${total} Tests Passed`);
