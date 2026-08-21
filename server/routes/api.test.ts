@@ -120,7 +120,41 @@ async function runTests() {
     );
     assert(!unconfigData.error.includes('test-secret'), 'Does not leak sensitive credential information');
 
-    // Re-set default provider to mock for remaining tests
+    // 4b. End-to-End Vertical Slice Generation via Pixazo Provider
+    console.log('\n--- End-to-End Vertical Slice Generation via Pixazo Provider ---');
+    process.env.PIXAZO_API_KEY = 'test-pixazo-api-key-12345';
+    const dummyBase64Png =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = input.toString();
+      if (url.includes('/getSDXLImage')) {
+        return new Response(JSON.stringify({ imageUrl: dummyBase64Png }), { status: 200 });
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+
+    const pixazoGenRes = await originalFetch(`${baseUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        material: 'grass',
+        style: 'stylized',
+        detail: 'high',
+        resolution: 512,
+        providerId: 'pixazo',
+      }),
+    });
+
+    assert(pixazoGenRes.status === 200, 'Pixazo generation via /api/generate returns HTTP 200 OK');
+    const pixazoGenData = await pixazoGenRes.json();
+    assert(pixazoGenData.success === true, 'Pixazo generation response indicates success: true');
+    assert(pixazoGenData.rawImageUrl.startsWith('data:image/'), 'Returns Pixazo raw image URL');
+    assert(pixazoGenData.processedImageUrl.startsWith('data:image/'), 'Returns processed tile URL from Pixazo input');
+    assert(pixazoGenData.generationMetadata?.model === 'sdxl-base-1.0', 'Metadata records model sdxl-base-1.0');
+
+    // Restore fetch and default provider
+    globalThis.fetch = originalFetch;
     generationService.setDefaultProvider('mock');
 
     // 5. Image Processing Endpoint (/api/process)
