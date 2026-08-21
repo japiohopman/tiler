@@ -329,7 +329,8 @@ apiRouter.post('/export', async (req, res) => {
     }
 
     const inputBuffer = tileProcessor.toBuffer(imageData);
-    const { buffer, mimeType, filename } = await exportService.exportTexture(inputBuffer, options);
+    const materialName = tile?.material || tile?.name || 'tile';
+    const { buffer, mimeType, filename } = await exportService.exportTexture(inputBuffer, options, materialName);
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

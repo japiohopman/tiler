@@ -16,7 +16,7 @@ import { ProviderError } from '../services/providers/types';
  * Application Layer & API Router End-to-End Integration Test Suite
  *
  * Verifies that the Express API router correctly handles health checks,
- * texture generation requests, error states, seam analysis, and processing.
+ * texture generation requests, error states, seam analysis, processing, and export.
  */
 async function runTests() {
   console.log('======================================================');
@@ -323,6 +323,29 @@ async function runTests() {
     assert(customAnalyzeData.report.threshold === 0.01, 'Report records custom threshold 0.01');
     assert(customAnalyzeData.report.edgeRegion === 8, 'Report records custom edgeRegion depth 8px');
     assert(typeof customAnalyzeData.report.diagnosticMapDataUrl === 'string', 'Report generates diagnostic heatmap Data URL');
+
+    // 7. Texture Export Endpoint (/api/export)
+    console.log('\n--- Texture Export Endpoint ---');
+    const exportRes = await originalFetch(`${baseUrl}/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tile: {
+          material: 'Cobblestone / Stone',
+          processedImageDataUrl: dummyDataUrl,
+        },
+        options: { format: 'png', resolution: 512 },
+      }),
+    });
+
+    assert(exportRes.status === 200, 'Export endpoint returns HTTP 200 OK');
+    const contentType = exportRes.headers.get('content-type');
+    const contentDisposition = exportRes.headers.get('content-disposition');
+    assert(contentType === 'image/png', 'Export returns image/png Content-Type');
+    assert(
+      contentDisposition !== null && contentDisposition.includes('filename="cobblestone-stone-processed.png"'),
+      'Export sets sanitized filename in Content-Disposition'
+    );
 
     console.log('\n======================================================');
     console.log(`  API Integration Test Suite Results: ${passed}/${total} Tests Passed`);
