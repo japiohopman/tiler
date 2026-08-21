@@ -64,11 +64,46 @@ export interface GenerationMetadata {
   processedSeamScore?: number;
 }
 
+export type GenerationLifecycleStatus = 'idle' | 'generating' | 'processing' | 'analyzing' | 'completed' | 'error';
+
 export interface GenerationState {
-  status: 'idle' | 'generating' | 'processing' | 'analyzing' | 'completed' | 'error';
+  status: GenerationLifecycleStatus;
   currentStep: string;
   progress: number; // 0 - 100
   errorMessage?: string;
+}
+
+export type ExportLifecycleStatus = 'idle' | 'exporting' | 'completed' | 'error';
+
+export interface ExportState {
+  status: ExportLifecycleStatus;
+  errorMessage?: string;
+}
+
+export interface PreviewState {
+  selectedSource: 'processed' | 'raw';
+  mode: TilePreviewMode;
+  showGrid: boolean;
+}
+
+export interface WorkspaceConfig {
+  params: GenerationParams;
+  processingOptions: TileProcessingOptions;
+  activeProvider: string;
+  providerConfigured: boolean;
+}
+
+export type WorkspaceAsset = Tile;
+
+export interface WorkspaceState {
+  activeView: 'workspace' | 'processor';
+  backendStatus: 'online' | 'offline' | 'checking';
+  config: WorkspaceConfig;
+  generation: GenerationState;
+  asset: WorkspaceAsset | null;
+  preview: PreviewState;
+  export: ExportState;
+  notification: { message: string; type: 'info' | 'success' | 'warn' } | null;
 }
 
 export type EdgeRegionDepth = 1 | 2 | 4 | 8;
