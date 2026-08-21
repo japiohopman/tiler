@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Download, FileImage, Layers, Check } from 'lucide-react';
+import { Download, FileImage, Layers, Check, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ExportOptions, Tile } from '../types';
 
 interface ExportPanelProps {
@@ -31,6 +31,12 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
     onExport(options);
   };
 
+  const isPass = currentTile
+    ? (currentTile.validationSummary
+        ? currentTile.validationSummary.finalStatus !== 'VALIDATION_FAILED'
+        : (currentTile.seamReport ? currentTile.seamReport.pass : currentTile.isTileable))
+    : true;
+
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
       {/* Header */}
@@ -41,10 +47,31 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
             3. Export Game Texture
           </h2>
         </div>
-        <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-          512×512 PNG
-        </span>
+        {currentTile && !isPass ? (
+          <span className="text-[11px] font-mono text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40 flex items-center space-x-1">
+            <AlertTriangle className="w-3 h-3 text-amber-400 inline shrink-0" />
+            <span>UNVALIDATED / NON-TILEABLE</span>
+          </span>
+        ) : (
+          <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30 flex items-center space-x-1">
+            <CheckCircle2 className="w-3 h-3 text-emerald-400 inline shrink-0" />
+            <span>VALIDATED SEAMLESS</span>
+          </span>
+        )}
       </div>
+
+      {/* Validation Status Notice if Unvalidated / Failed Validation */}
+      {currentTile && !isPass && (
+        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/50 text-amber-200 text-xs space-y-1">
+          <div className="flex items-center space-x-2 font-semibold text-amber-300">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+            <span>Exporting Unvalidated Texture</span>
+          </div>
+          <p className="text-[11px] text-amber-200/90 leading-relaxed">
+            This texture failed seam validation. You can export it for inspection or testing, but it is not validated as tileable.
+          </p>
+        </div>
+      )}
 
       {/* Format & Sheet Options */}
       <div className="grid grid-cols-2 gap-3 text-xs">

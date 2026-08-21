@@ -327,6 +327,42 @@ async function runTests() {
     assert(customAnalyzeData.report.edgeRegion === 8, 'Report records custom edgeRegion depth 8px');
     assert(typeof customAnalyzeData.report.diagnosticMapDataUrl === 'string', 'Report generates diagnostic heatmap Data URL');
 
+    // 7. Texture Export Endpoint (/api/export)
+    console.log('\n--- Texture Export Endpoint ---');
+    const exportResPng = await originalFetch(`${baseUrl}/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tile: { processedImageDataUrl: dummyDataUrl },
+        options: { format: 'png', resolution: 512, exportGridSheet: false },
+      }),
+    });
+    assert(exportResPng.status === 200, 'Export endpoint returns HTTP 200 OK for PNG');
+    assert(exportResPng.headers.get('content-type') === 'image/png', 'Export returns image/png Content-Type header');
+    const pngBuffer = await exportResPng.arrayBuffer();
+    assert(pngBuffer.byteLength > 0, 'Export returns non-empty PNG buffer');
+
+    // 7b. Export as 3x3 Tiled Spritesheet Grid
+    const exportResGrid = await originalFetch(`${baseUrl}/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tile: { processedImageDataUrl: dummyDataUrl },
+        options: { format: 'png', resolution: 512, exportGridSheet: true, gridSheetSize: 3 },
+      }),
+    });
+    assert(exportResGrid.status === 200, 'Export endpoint returns HTTP 200 OK for 3x3 tiled spritesheet');
+    const gridBuffer = await exportResGrid.arrayBuffer();
+    assert(gridBuffer.byteLength > pngBuffer.byteLength, '3x3 Tiled spritesheet produces larger buffer than single tile');
+
+    // 7c. Export Error Handling (Missing image data)
+    const exportResInvalid = await originalFetch(`${baseUrl}/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tile: {}, options: { format: 'png' } }),
+    });
+    assert(exportResInvalid.status === 400, 'Export endpoint returns HTTP 400 Bad Request when image data is missing');
+
     console.log('\n======================================================');
     console.log(`  API Integration Test Suite Results: ${passed}/${total} Tests Passed`);
     console.log('======================================================\n');

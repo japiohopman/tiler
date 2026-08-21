@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import sharp from 'sharp';
+import sharp, { Sharp } from 'sharp';
 
 export interface ExportConfig {
   format?: 'png' | 'webp' | 'jpeg';
@@ -32,10 +32,37 @@ export class ExportService {
       gridSheetSize = 3,
     } = config;
 
-    let pipeline = sharp(imageBuffer).resize(resolution, resolution, { fit: 'fill' });
+    const tileBuffer = await sharp(imageBuffer)
+      .resize(resolution, resolution, { fit: 'fill' })
+      .toBuffer();
+
+    let pipeline: Sharp;
 
     if (exportGridSheet) {
-      // TODO: In Phase 2, composite gridSheetSize x gridSheetSize tiles into single spritesheet
+      const count = Math.max(2, Math.min(4, gridSheetSize));
+      const sheetDimension = resolution * count;
+      const compositeInputs = [];
+
+      for (let row = 0; row < count; row++) {
+        for (let col = 0; col < count; col++) {
+          compositeInputs.push({
+            input: tileBuffer,
+            top: row * resolution,
+            left: col * resolution,
+          });
+        }
+      }
+
+      pipeline = sharp({
+        create: {
+          width: sheetDimension,
+          height: sheetDimension,
+          channels: 4,
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        },
+      }).composite(compositeInputs);
+    } else {
+      pipeline = sharp(tileBuffer);
     }
 
     let mimeType = 'image/png';
