@@ -48,14 +48,12 @@ export interface GenerationParams {
 }
 
 export interface GenerationMetadata {
-  provider?: string;
   model: string;
   builtPrompt: string;
   material: string;
   style: string;
   detail?: string;
   resolution: number;
-  seed?: number;
   generatedAt: string;
   processingAlgorithm?: string;
   processingTimeMs?: number;
@@ -196,9 +194,7 @@ export interface Tile {
   createdAt: string;
   generationMetadata?: GenerationMetadata;
   metadata?: {
-    provider?: string;
     model?: string;
-    seed?: number;
     processingAlgorithm?: string;
     processingTimeMs?: number;
   };
