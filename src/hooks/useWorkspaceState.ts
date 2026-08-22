@@ -20,7 +20,7 @@ import { useWorkspaceAsset } from './useWorkspaceAsset';
 import { useGeneration } from './useGeneration';
 
 export function useWorkspaceState() {
-  const [activeView, setActiveView] = useState<'workspace' | 'processor'>('workspace');
+  const [activeView, setActiveView] = useState<'workspace' | 'editor' | 'processor'>('workspace');
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [activeProvider, setActiveProvider] = useState<string>('pixazo');
   const [providerConfigured, setProviderConfigured] = useState<boolean>(true);
@@ -48,8 +48,14 @@ export function useWorkspaceState() {
   const { previewState, setSelectedSource, setPreviewMode, setShowGrid } = usePreviewState();
   const { exportState, handleExport: executeExport } = useExport(handleNotify);
   const {
+    assets,
+    currentAssetId,
     asset,
-    setAsset,
+    selectAsset,
+    deleteAsset,
+    addAsset,
+    handleApplyEdits,
+    handleResetEdits,
     processingState,
     initDefaultSample,
     handleReanalyze: executeReanalyze,
@@ -62,8 +68,9 @@ export function useWorkspaceState() {
     activeProvider,
     params,
     processingOptions,
+    assets,
     Boolean(asset),
-    setAsset,
+    addAsset,
     setSelectedSource,
     handleNotify
   );
@@ -124,6 +131,8 @@ export function useWorkspaceState() {
     config,
     generation: generationState,
     processing: processingState,
+    assets,
+    currentAssetId,
     asset,
     preview: previewState,
     export: exportState,
@@ -142,6 +151,10 @@ export function useWorkspaceState() {
       handleExport,
       handleTextureSelect,
       handleTileFromProcessor,
+      selectAsset,
+      deleteAsset,
+      handleApplyEdits,
+      handleResetEdits,
       setSelectedSource,
       setPreviewMode,
       setShowGrid,

@@ -10,6 +10,8 @@ import { GeneratorPanel } from './components/GeneratorPanel';
 import { TilePreview } from './components/TilePreview';
 import { SeamAnalysisPanel } from './components/SeamAnalysisPanel';
 import { ExportPanel } from './components/ExportPanel';
+import { AssetHistoryPanel } from './components/AssetHistoryPanel';
+import { ImageEditor } from './components/editor/ImageEditor';
 import { TARGET_MATERIALS } from './types';
 import { useWorkspaceState } from './hooks/useWorkspaceState';
 import { Info } from 'lucide-react';
@@ -23,6 +25,8 @@ export default function App() {
     config,
     generation,
     processing,
+    assets,
+    currentAssetId,
     asset,
     preview,
     export: exportState,
@@ -67,6 +71,27 @@ export default function App() {
         <main className="flex-1 py-6">
           <DeveloperTestPanel onTileProcessed={actions.handleTileFromProcessor} />
         </main>
+      ) : activeView === 'editor' ? (
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+          <ImageEditor
+            asset={asset}
+            onApplyEdits={(editedDataUrl) => {
+              actions.handleApplyEdits(editedDataUrl);
+              actions.setActiveView('workspace');
+            }}
+            onCancel={() => actions.setActiveView('workspace')}
+            onResetEdits={actions.handleResetEdits}
+          />
+
+          {/* Asset History Panel in Editor view so user can switch assets */}
+          <AssetHistoryPanel
+            assets={assets}
+            currentAssetId={currentAssetId}
+            onSelectAsset={actions.selectAsset}
+            onDeleteAsset={actions.deleteAsset}
+            activeProvider={config.activeProvider}
+          />
+        </main>
       ) : (
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
           {/* Primary Modular Tile Preview Component */}
@@ -79,6 +104,16 @@ export default function App() {
             seamReport={activeReport}
             generationMetadata={asset?.generationMetadata}
             onTextureSelect={actions.handleTextureSelect}
+            onOpenEditor={() => actions.setActiveView('editor')}
+          />
+
+          {/* Asset History Panel */}
+          <AssetHistoryPanel
+            assets={assets}
+            currentAssetId={currentAssetId}
+            onSelectAsset={actions.selectAsset}
+            onDeleteAsset={actions.deleteAsset}
+            activeProvider={config.activeProvider}
           />
 
           {/* Configuration & Pipeline Controls */}
