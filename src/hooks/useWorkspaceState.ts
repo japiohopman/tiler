@@ -96,12 +96,12 @@ export function useWorkspaceState() {
     [executeReanalyze, previewState.selectedSource]
   );
 
-  const handleProcessingOptionsChange = useCallback(
-    async (newOpts: TileProcessingOptions) => {
-      setProcessingOptions(newOpts);
-      await executeProcessingOptionsChange(newOpts);
+  const handleReprocess = useCallback(
+    async (overrideOpts?: TileProcessingOptions) => {
+      const activeOpts = overrideOpts || processingOptions;
+      await executeProcessingOptionsChange(activeOpts);
     },
-    [executeProcessingOptionsChange]
+    [executeProcessingOptionsChange, processingOptions]
   );
 
   const handleExport = useCallback(
@@ -136,7 +136,7 @@ export function useWorkspaceState() {
       setActiveView,
       setParams,
       setProcessingOptions,
-      handleProcessingOptionsChange,
+      handleReprocess,
       handleGenerate,
       handleReanalyze,
       handleExport,

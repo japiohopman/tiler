@@ -89,11 +89,11 @@ export default function App() {
                 params={config.params}
                 onParamsChange={actions.setParams}
                 processingOptions={config.processingOptions}
-                onProcessingOptionsChange={actions.handleProcessingOptionsChange}
+                onProcessingOptionsChange={actions.setProcessingOptions}
                 generationState={generation}
                 processingState={processing}
                 onGenerate={actions.handleGenerate}
-                onReprocess={() => actions.handleProcessingOptionsChange(config.processingOptions)}
+                onReprocess={actions.handleReprocess}
                 currentTile={asset}
                 activeProvider={config.activeProvider}
                 providerConfigured={config.providerConfigured}

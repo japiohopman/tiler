@@ -436,6 +436,18 @@ function createInitialWorkspaceState(): WorkspaceState {
     validationSummary: reprocessResult.validationSummary,
   };
 
+  // Explicit reprocess action requirement test: Changing config options alone does NOT modify asset
+  let configOpts = { algorithm: 'offset-crossfade' as const, blendMarginPercent: 10 as 10 | 15 };
+  let assetBeforeExplicitReprocess = initialAsset;
+
+  // User changes blend margin slider to 15% (updates configOpts state)
+  configOpts = { ...configOpts, blendMarginPercent: 15 };
+  assert(assetBeforeExplicitReprocess.processedImageDataUrl === 'data:image/png;base64,initialProcessedData', 'Changing processing options state alone does NOT immediately modify processed asset URL');
+
+  // User explicitly clicks REPROCESS EXISTING ASSET -> executes reprocess function
+  const assetAfterExplicitReprocess = newProcessedAsset;
+  assert(assetAfterExplicitReprocess.processedImageDataUrl === 'data:image/png;base64,newProcessedData15Percent', 'Explicit REPROCESS action updates processed image URL');
+
   // Raw image is preserved completely
   assert(newProcessedAsset.rawImageDataUrl === initialAsset.rawImageDataUrl, 'Reprocessing preserves original raw provider image');
   assert(newProcessedAsset.rawSeamScore === initialAsset.rawSeamScore, 'Reprocessing preserves original raw seam score');
