@@ -10,6 +10,7 @@ import { GeneratorPanel } from './components/GeneratorPanel';
 import { TilePreview } from './components/TilePreview';
 import { SeamAnalysisPanel } from './components/SeamAnalysisPanel';
 import { ExportPanel } from './components/ExportPanel';
+import { AssetHistoryPanel } from './components/AssetHistoryPanel';
 import { TARGET_MATERIALS } from './types';
 import { useWorkspaceState } from './hooks/useWorkspaceState';
 import { Info } from 'lucide-react';
@@ -23,6 +24,8 @@ export default function App() {
     config,
     generation,
     processing,
+    assets,
+    currentAssetId,
     asset,
     preview,
     export: exportState,
@@ -79,6 +82,15 @@ export default function App() {
             seamReport={activeReport}
             generationMetadata={asset?.generationMetadata}
             onTextureSelect={actions.handleTextureSelect}
+          />
+
+          {/* Asset History Panel */}
+          <AssetHistoryPanel
+            assets={assets}
+            currentAssetId={currentAssetId}
+            onSelectAsset={actions.selectAsset}
+            onDeleteAsset={actions.deleteAsset}
+            activeProvider={config.activeProvider}
           />
 
           {/* Configuration & Pipeline Controls */}

@@ -11,10 +11,14 @@ import {
   WorkspaceState,
 } from '../types';
 import {
+  addAssetToHistory,
   canStartGeneration,
   createWorkspaceAssetFromResponse,
+  deleteAssetFromHistory,
+  generateReadableAssetName,
   transitionExportState,
   transitionGenerationState,
+  updateAssetInHistory,
   updateSeamAnalysisSummary,
 } from '../utils/workspaceTransitions';
 
@@ -57,6 +61,8 @@ function createInitialWorkspaceState(): WorkspaceState {
       status: 'ready',
       currentStep: 'READY',
     },
+    assets: [],
+    currentAssetId: null,
     asset: null,
     preview: {
       selectedSource: 'processed',
@@ -472,6 +478,104 @@ function createInitialWorkspaceState(): WorkspaceState {
   assert(processingFailureOccurred === true, 'Processing failure captured');
   assert(activeAssetAfterFailure.processedImageDataUrl === 'data:image/png;base64,newProcessedData15Percent', 'Processing failure preserves previous valid processed asset');
   assert(activeAssetAfterFailure.rawImageDataUrl === initialAsset.rawImageDataUrl, 'Processing failure preserves raw provider image');
+}
+
+// 11. Phase 3.4 — Generation History & Asset Management Unit & Behavior Tests
+{
+  console.log('--- Phase 3.4 Asset History & Management Tests ---');
+
+  // Test A: Readable Asset Naming
+  const asset1: WorkspaceAsset = {
+    id: 'id-1',
+    name: 'Cobblestone — Stylized',
+    material: 'cobblestone',
+    style: 'stylized',
+    prompt: 'cobblestone',
+    resolution: 512,
+    createdAt: new Date().toISOString(),
+    isTileable: true,
+  };
+
+  const name1 = generateReadableAssetName('cobblestone', 'stylized', []);
+  assert(name1 === 'Cobblestone — Stylized', 'Generates readable asset name without suffix');
+
+  const name2 = generateReadableAssetName('cobblestone', 'stylized', [asset1]);
+  assert(name2 === 'Cobblestone — Stylized #2', 'Appends collision suffix #2 when name exists');
+
+  // Test B: History Append & Max Limit Enforcement (20)
+  let history: WorkspaceAsset[] = [];
+  for (let i = 1; i <= 22; i++) {
+    const dummyAsset: WorkspaceAsset = {
+      id: `asset-${i}`,
+      name: `Asset ${i}`,
+      material: 'cobblestone',
+      style: 'stylized',
+      prompt: 'cobblestone',
+      resolution: 512,
+      createdAt: new Date().toISOString(),
+      isTileable: true,
+    };
+    history = addAssetToHistory(history, dummyAsset, 20);
+  }
+
+  assert(history.length === 20, 'History limit capped at 20 assets');
+  assert(history[0].id === 'asset-3', 'Oldest entries (asset-1, asset-2) removed deterministically');
+  assert(history[19].id === 'asset-22', 'Newest asset is present at end of history');
+
+  // Test C: Updating a Specific Asset in History
+  const assetA: WorkspaceAsset = {
+    id: 'asset-A',
+    name: 'Asset A',
+    material: 'wood',
+    style: 'hand-painted',
+    prompt: 'wood',
+    resolution: 512,
+    rawImageDataUrl: 'rawA',
+    processedImageDataUrl: 'procA_v1',
+    createdAt: new Date().toISOString(),
+    isTileable: false,
+  };
+
+  const assetB: WorkspaceAsset = {
+    id: 'asset-B',
+    name: 'Asset B',
+    material: 'grass',
+    style: 'stylized',
+    prompt: 'grass',
+    resolution: 512,
+    rawImageDataUrl: 'rawB',
+    processedImageDataUrl: 'procB',
+    createdAt: new Date().toISOString(),
+    isTileable: true,
+  };
+
+  let testHistory = [assetA, assetB];
+
+  const updatedAssetA: WorkspaceAsset = {
+    ...assetA,
+    processedImageDataUrl: 'procA_v2',
+    isTileable: true,
+  };
+
+  testHistory = updateAssetInHistory(testHistory, updatedAssetA);
+  assert(testHistory[0].processedImageDataUrl === 'procA_v2', 'Reprocessing updates selected asset in history');
+  assert(testHistory[1].processedImageDataUrl === 'procB', 'Other history entries (asset B) remain completely unchanged');
+
+  // Test D: Deleting Historical Assets
+  // Scenario D1: Delete non-current asset
+  let delRes1 = deleteAssetFromHistory(testHistory, 'asset-A', 'asset-B');
+  assert(delRes1.updatedAssets.length === 1, 'Non-current asset removed safely');
+  assert(delRes1.nextCurrentAssetId === 'asset-B', 'Current asset ID remains asset-B when deleting non-current asset');
+
+  // Scenario D2: Delete current asset
+  let delRes2 = deleteAssetFromHistory(testHistory, 'asset-B', 'asset-B');
+  assert(delRes2.updatedAssets.length === 1, 'Current asset removed');
+  assert(delRes2.nextCurrentAssetId === 'asset-A', 'Deleting current asset deterministically selects another remaining asset');
+
+  // Scenario D3: Delete final asset
+  let delRes3 = deleteAssetFromHistory([assetA], 'asset-A', 'asset-A');
+  assert(delRes3.updatedAssets.length === 0, 'Final asset deleted');
+  assert(delRes3.nextCurrentAssetId === null, 'Deleting final asset returns to empty workspace state (null)');
 }
 
 console.log('======================================================');

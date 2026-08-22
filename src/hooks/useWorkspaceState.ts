@@ -48,8 +48,12 @@ export function useWorkspaceState() {
   const { previewState, setSelectedSource, setPreviewMode, setShowGrid } = usePreviewState();
   const { exportState, handleExport: executeExport } = useExport(handleNotify);
   const {
+    assets,
+    currentAssetId,
     asset,
-    setAsset,
+    selectAsset,
+    deleteAsset,
+    addAsset,
     processingState,
     initDefaultSample,
     handleReanalyze: executeReanalyze,
@@ -62,8 +66,9 @@ export function useWorkspaceState() {
     activeProvider,
     params,
     processingOptions,
+    assets,
     Boolean(asset),
-    setAsset,
+    addAsset,
     setSelectedSource,
     handleNotify
   );
@@ -124,6 +129,8 @@ export function useWorkspaceState() {
     config,
     generation: generationState,
     processing: processingState,
+    assets,
+    currentAssetId,
     asset,
     preview: previewState,
     export: exportState,
@@ -142,6 +149,8 @@ export function useWorkspaceState() {
       handleExport,
       handleTextureSelect,
       handleTileFromProcessor,
+      selectAsset,
+      deleteAsset,
       setSelectedSource,
       setPreviewMode,
       setShowGrid,

@@ -21,8 +21,9 @@ export function useGeneration(
   activeProvider: string,
   params: GenerationParams,
   processingOptions: TileProcessingOptions,
+  existingAssets: WorkspaceAsset[],
   hasExistingAsset: boolean,
-  setAsset: (asset: WorkspaceAsset) => void,
+  addAsset: (asset: WorkspaceAsset) => void,
   setSelectedSource: (source: 'processed' | 'raw') => void,
   onNotify?: (message: string, type: 'info' | 'success' | 'warn') => void
 ) {
@@ -74,14 +75,14 @@ export function useGeneration(
         )
       );
 
-      const newTile = createWorkspaceAssetFromResponse(genResponse, params, processingOptions);
+      const newTile = createWorkspaceAssetFromResponse(genResponse, params, processingOptions, existingAssets);
 
       setGenerationState(
         transitionGenerationState('analyzing', 'ANALYZING', 90)
       );
 
       setSelectedSource('processed');
-      setAsset(newTile);
+      addAsset(newTile);
 
       setGenerationState(
         transitionGenerationState('completed', 'Completed', 100)
@@ -113,7 +114,7 @@ export function useGeneration(
     } finally {
       isGeneratingRef.current = false;
     }
-  }, [activeProvider, params, processingOptions, hasExistingAsset, generationState.status, setAsset, setSelectedSource, onNotify]);
+  }, [activeProvider, params, processingOptions, existingAssets, hasExistingAsset, generationState.status, addAsset, setSelectedSource, onNotify]);
 
   return {
     generationState,

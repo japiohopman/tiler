@@ -125,6 +125,8 @@ export interface WorkspaceState {
   config: WorkspaceConfig;
   generation: GenerationState;
   processing: ProcessingState;
+  assets: WorkspaceAsset[];
+  currentAssetId: string | null;
   asset: WorkspaceAsset | null;
   preview: PreviewState;
   export: ExportState;
