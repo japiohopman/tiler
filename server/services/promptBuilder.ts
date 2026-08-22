@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { getMaterialProfile, MaterialProfile } from './materialProfiles';
+import { evaluatePromptAdherence, PromptAdherenceReport } from './promptAdherence';
+
 export interface PromptBuildOptions {
   material: string;
   style?: string;
@@ -12,17 +15,14 @@ export interface PromptBuildOptions {
   resolution?: number;
 }
 
-/**
- * Material descriptor mapping for enhanced 2D game ground texture generation
- */
-const MATERIAL_DESCRIPTORS: Record<string, string> = {
-  cobblestone: 'ancient irregular stone cobblestones with realistic mortar lines, chipped rock edges, and natural mineral wear',
-  wood: 'weathered timber wood floor planks with horizontal grain lines, soft knots, and tactile lumber grooves',
-  water: 'crystal-clear turquoise water surface with gentle caustic ripples and transparent fluid depth',
-  grass: 'lush green meadow grass turf with fine individual blades, clovers, and earthy soil undertones',
-  lava: 'cracked black basalt rock crust with glowing orange-red molten magma veins and volcanic heat fissures',
-  sand: 'fine golden desert sand grains with gentle wind-blown micro-ripples and smooth dune granule texture',
-};
+export interface StructuredPromptResult {
+  builtPrompt: string;
+  negativePrompt: string;
+  userPrompt: string;
+  materialProfileId: string;
+  canonicalName: string;
+  adherenceReport: PromptAdherenceReport;
+}
 
 /**
  * Visual style descriptor mapping for game asset rendering
@@ -46,39 +46,47 @@ const DETAIL_DESCRIPTORS: Record<string, string> = {
 };
 
 /**
- * Dedicated Prompt Builder for 2D Game Ground Textures.
+ * Dedicated Material-Aware Prompt Builder for 2D Game Ground Textures.
  *
- * Enforces all technical, orthographic, lighting, and negative constraints
+ * Enforces technical, orthographic, lighting, material identity, and negative constraints
  * specified for game engine tileable ground textures.
  */
 export class PromptBuilder {
   /**
-   * Constructs an optimized game texture generation prompt
+   * Constructs an optimized game texture generation prompt (positive prompt string)
    */
   static buildPrompt(options: PromptBuildOptions): string {
+    const res = this.buildStructuredPrompt(options);
+    return res.builtPrompt;
+  }
+
+  /**
+   * Constructs both positive prompt, negative prompt, and deterministic adherence report
+   */
+  static buildStructuredPrompt(options: PromptBuildOptions): StructuredPromptResult {
     const { material, style = 'stylized', detail = 'high', additionalPrompt, customPrompt } = options;
 
-    const normalizedMat = (material || 'cobblestone').toLowerCase().trim();
+    const profile: MaterialProfile = getMaterialProfile(material);
     const normalizedStyle = (style || 'stylized').toLowerCase().trim();
     const normalizedDetail = (detail || 'high').toLowerCase().trim();
 
-    const matDescription = MATERIAL_DESCRIPTORS[normalizedMat] || `${normalizedMat} surface`;
     const styleDescription = STYLE_DESCRIPTORS[normalizedStyle] || `${normalizedStyle} game art style`;
     const detailDescription = DETAIL_DESCRIPTORS[normalizedDetail] || DETAIL_DESCRIPTORS.high;
 
-    // Base subject
-    const subject = `Top-down orthographic 2D game ground texture of ${matDescription}.`;
+    // Preserve original user modifier intent
+    const userModifier = (additionalPrompt || customPrompt || '').trim();
 
-    // Visual style & artistic rendering
+    // 1. Base Subject prioritizing Material Identity
+    const primaryDescriptiveTerms = profile.descriptiveTerms.slice(0, 3).join(', ');
+    const subject = `Top-down orthographic 2D game ground texture of ${profile.canonicalName} (${primaryDescriptiveTerms}).`;
+
+    // 2. Visual Style & Artistic Rendering
     const styleClause = `Visual Style: ${styleDescription}. Detail Level: ${detailDescription}.`;
 
-    // User additional custom prompt guidance if provided
-    const userModifier = additionalPrompt || customPrompt;
-    const additionalClause = userModifier && userModifier.trim().length > 0
-      ? `Specific Features: ${userModifier.trim()}.`
-      : '';
+    // 3. User Additional Modifier Clause (preserves original user input verbatim)
+    const userClause = userModifier.length > 0 ? `Specific Features: ${userModifier}.` : '';
 
-    // Technical ground texture constraints
+    // 4. Technical Ground Texture & Orthographic Tile Constraints
     const technicalRequirements = [
       'Top-down 90-degree direct overhead orthographic view.',
       'Pure flat texture-only surface with 100% uniform seamless coverage filling the entire square frame from edge to edge.',
@@ -86,23 +94,66 @@ export class PromptBuilder {
       'Seamless tileable repeating pattern design suitable as a 2D game ground terrain texture.',
     ].join(' ');
 
-    // Strict negative constraints to eliminate objects, perspective, UI, borders, etc.
-    const negativeConstraints = [
+    // 5. Strict Negative Rules within prompt text
+    const negativeTextClause = [
       'Strict Negative Rules:',
       'NO perspective, NO angled isometric view, NO horizon line, NO sky, NO 3D scene depth.',
       'NO characters, NO animals, NO monsters, NO trees, NO standalone objects, NO props, NO buildings, NO items.',
       'NO borders, NO frames, NO vignetting, NO circular crop, NO rounded corners.',
       'NO text, NO letters, NO numbers, NO watermark, NO logo, NO user interface (UI) elements.',
-    ].join(' ');
-
-    return [
-      subject,
-      styleClause,
-      additionalClause,
-      technicalRequirements,
-      negativeConstraints,
+      profile.negativeConstraints.length > 0 ? `NO ${profile.negativeConstraints.join(', NO ')}.` : '',
     ]
       .filter(Boolean)
       .join(' ');
+
+    const builtPrompt = [
+      subject,
+      styleClause,
+      userClause,
+      technicalRequirements,
+      negativeTextClause,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    // Build dedicated negative prompt parameter for providers supporting negative_prompt (e.g. Pixazo SDXL)
+    const baseNegativeTerms = [
+      'blurry',
+      'distorted',
+      'low quality',
+      '3d render',
+      'perspective view',
+      'isometric',
+      'horizon',
+      'sky',
+      'character',
+      'person',
+      'face',
+      'building',
+      'house',
+      'street',
+      'vehicle',
+      'border',
+      'frame',
+      'watermark',
+      'text',
+    ];
+
+    const combinedNegatives = Array.from(
+      new Set([...baseNegativeTerms, ...profile.negativeConstraints.map((n) => n.toLowerCase())])
+    );
+    const negativePrompt = combinedNegatives.join(', ');
+
+    // Evaluate prompt adherence deterministically
+    const adherenceReport = evaluatePromptAdherence(builtPrompt, profile.id, userModifier);
+
+    return {
+      builtPrompt,
+      negativePrompt,
+      userPrompt: userModifier,
+      materialProfileId: profile.id,
+      canonicalName: profile.canonicalName,
+      adherenceReport,
+    };
   }
 }

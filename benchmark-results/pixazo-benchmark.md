@@ -1,6 +1,6 @@
 # Tiler Benchmark Report — Pixazo AI Provider (SDXL Base 1.0)
 
-**Date & Time:** `2026-08-20T23:48:36.483Z`
+**Date & Time:** `2026-08-22T14:29:37.689Z`
 **Benchmark Version:** `1.0.0`
 **Provider:** `pixazo` (Pixazo AI Provider (SDXL Base 1.0))
 **Model:** `sdxl-base-1.0`
@@ -14,23 +14,23 @@
 | **Total Materials Tested** | 6 |
 | **Successful Generations** | 6 / 6 (100%) |
 | **Failed Generations** | 0 |
-| **Avg Raw Generation Time** | 6603.8 ms |
-| **Avg End-to-End Latency** | 7586 ms |
-| **Avg Raw Seam Delta (Primary)** | 0.2557 (Lower is better, ≤0.05 passes) |
+| **Avg Raw Generation Time** | 10900.9 ms |
+| **Avg End-to-End Latency** | 11734.9 ms |
+| **Avg Raw Seam Delta (Primary)** | 0.2329 (Lower is better, ≤0.05 passes) |
 | **Raw Provider Pass Rate** | 0% |
-| **Avg Processed Seam Delta (Pipeline)** | 0.1357 (Lower is better, ≤0.05 passes) |
-| **Processed Pipeline Pass Rate** | 17% |
+| **Avg Processed Seam Delta (Pipeline)** | 0.0817 (Lower is better, ≤0.05 passes) |
+| **Processed Pipeline Pass Rate** | 33% |
 
 ## Material Results
 
 | Material | Raw Status | Raw Seam Delta | Raw Tile % | Processed Seam | Processed Tile % | Gen / Total Latency | Objective Score | Errors |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **cobblestone** | ⚠️ Discontinuous | `0.3995` | 60% | `0.2686` | 73% | 6329ms / 6614ms | `18.0 / 40%` | None |
-| **grass** | ⚠️ Discontinuous | `0.1097` | 89% | `0.0684` | 93% | 5755ms / 6729ms | `26.7 / 40%` | None |
-| **sand** | ⚠️ Discontinuous | `0.1667` | 83% | `0.1088` | 89% | 8324ms / 9604ms | `24.9 / 40%` | None |
-| **water** | ⚠️ Discontinuous | `0.5095` | 49% | `0.2106` | 79% | 5606ms / 7100ms | `14.7 / 40%` | None |
-| **wood** | ⚠️ Discontinuous | `0.1949` | 81% | `0.0219` | 98% | 6601ms / 7479ms | `24.3 / 40%` | None |
-| **lava** | ⚠️ Discontinuous | `0.1536` | 85% | `0.1357` | 86% | 7008ms / 7990ms | `25.5 / 40%` | None |
+| **cobblestone** | ⚠️ Discontinuous | `0.1754` | 82% | `0.0586` | 94% | 8926ms / 9581ms | `24.6 / 40%` | None |
+| **grass** | ⚠️ Discontinuous | `0.5428` | 46% | `0.0587` | 94% | 11704ms / 12330ms | `13.8 / 40%` | None |
+| **sand** | ⚠️ Discontinuous | `0.3487` | 65% | `0.2749` | 73% | 17055ms / 18299ms | `19.5 / 40%` | None |
+| **water** | ⚠️ Discontinuous | `0.1185` | 88% | `0.0277` | 97% | 5662ms / 6515ms | `26.4 / 40%` | None |
+| **wood** | ⚠️ Discontinuous | `0.1073` | 89% | `0.0201` | 98% | 15660ms / 16601ms | `26.7 / 40%` | None |
+| **lava** | ⚠️ Discontinuous | `0.1048` | 90% | `0.0502` | 95% | 6398ms / 7083ms | `27.0 / 40%` | None |
 
 ## Quality Score Methodology & Weightings
 

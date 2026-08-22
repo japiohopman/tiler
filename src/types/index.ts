@@ -47,6 +47,21 @@ export interface GenerationParams {
   seed?: number;
 }
 
+export interface PromptAdherenceSummary {
+  materialId: string;
+  canonicalName: string;
+  score: number;
+  pass: boolean;
+  hasMaterialIdentity: boolean;
+  hasTileConstraints: boolean;
+  hasUserIntentPreserved: boolean;
+  forbiddenTermsFound: string[];
+  matchedMaterialTerms: string[];
+  matchedTileTerms: string[];
+  issues: string[];
+  details: string;
+}
+
 export interface GenerationMetadata {
   model: string;
   builtPrompt: string;
@@ -62,6 +77,10 @@ export interface GenerationMetadata {
   blendMarginPercent?: number;
   rawSeamScore?: number;
   processedSeamScore?: number;
+  userPrompt?: string;
+  materialProfileId?: string;
+  negativePrompt?: string;
+  promptAdherence?: PromptAdherenceSummary;
 }
 
 export type GenerationLifecycleStatus = 'idle' | 'generating' | 'processing' | 'analyzing' | 'completed' | 'error';
@@ -235,7 +254,7 @@ export interface ValidationSummary {
   finalStatus: 'PASS_RAW' | 'PASS_AFTER_PROCESSING' | 'VALIDATION_FAILED';
   threshold: number;
   issues: string[];
-  promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED';
+  promptAdherenceStatus?: 'PASS' | 'WEAK_ADHERENCE' | 'NOT_AUTOMATICALLY_VALIDATED';
 }
 
 export interface Tile {
