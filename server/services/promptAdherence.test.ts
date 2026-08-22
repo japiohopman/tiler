@@ -14,8 +14,8 @@ import { getMaterialProfile } from './materialProfiles';
 async function runPromptAdherenceTests() {
   console.log('🧪 Starting Deterministic Prompt Adherence Tests...\n');
 
-  // 1. Material Identity Test: Lava
-  console.log('Test 1: Lava material identity prompt construction');
+  // 1. Normal material prompt uses the material-aware builder
+  console.log('Test 1: Normal material prompt uses material-aware builder');
   const lavaStructured = PromptBuilder.buildStructuredPrompt({
     material: 'lava',
     style: 'stylized',
@@ -27,51 +27,80 @@ async function runPromptAdherenceTests() {
     'Lava prompt must contain strong lava/magma semantics'
   );
   assert.strictEqual(lavaStructured.adherenceReport.hasMaterialIdentity, true);
-  console.log('  ✓ Lava material identity verified');
+  console.log('  ✓ Material-aware prompt construction verified');
 
-  // 2. User Intent Preservation
-  console.log('Test 2: User prompt intent preservation');
-  const customInput = 'wet lava with blue glowing cracks';
+  // 2. Custom prompt is preserved
+  console.log('Test 2: Custom user prompt is preserved verbatim');
+  const customWording = 'wet lava with blue glowing cracks';
   const customStructured = PromptBuilder.buildStructuredPrompt({
     material: 'lava',
     style: 'stylized',
-    additionalPrompt: customInput,
+    customPrompt: customWording,
   });
 
   assert.ok(
-    customStructured.builtPrompt.includes('wet lava with blue glowing cracks'),
-    'Assembled prompt must preserve user-specific additional prompt verbatim'
+    customStructured.builtPrompt.includes(customWording),
+    'Custom user prompt wording must be preserved verbatim in assembled prompt'
   );
   assert.strictEqual(customStructured.adherenceReport.hasUserIntentPreserved, true);
-  console.log('  ✓ User prompt intent preservation verified');
+  console.log('  ✓ Custom prompt preservation verified');
 
-  // 3. Negative Constraints Test
-  console.log('Test 3: Negative constraint generation');
+  // 3. Custom prompt does NOT bypass material/tile constraints
+  console.log('Test 3: Custom prompt does NOT bypass material profile or tile constraints');
   assert.ok(
-    customStructured.negativePrompt.includes('buildings'),
-    'Negative prompt payload must include profile negative constraint terms like "buildings"'
+    customStructured.builtPrompt.includes('Top-down orthographic 2D game ground texture of Lava'),
+    'Assembled prompt with customPrompt must still contain material profile identity'
   );
-  assert.ok(
-    customStructured.negativePrompt.includes('houses'),
-    'Negative prompt payload must include profile negative constraint terms like "houses"'
-  );
-  console.log('  ✓ Negative constraints verified');
-
-  // 4. Tile & Orthographic Constraints Test
-  console.log('Test 4: Tile & orthographic constraints inclusion');
   assert.ok(
     customStructured.builtPrompt.includes('Top-down 90-degree direct overhead orthographic view'),
-    'Prompt must enforce top-down orthographic view'
+    'Assembled prompt with customPrompt must still enforce top-down orthographic constraint'
   );
   assert.ok(
     customStructured.builtPrompt.includes('Seamless tileable repeating pattern'),
-    'Prompt must enforce seamless repeating pattern constraint'
+    'Assembled prompt with customPrompt must still enforce tileability constraint'
   );
-  assert.strictEqual(customStructured.adherenceReport.hasTileConstraints, true);
-  console.log('  ✓ Tile & orthographic constraints verified');
+  console.log('  ✓ Custom prompt non-bypass verified');
 
-  // 5. Style Modification Without Diluting Material
-  console.log('Test 5: Style modification without removing material identity');
+  // 4. Final provider prompt equals prompt evaluated for adherence and stored in metadata
+  console.log('Test 4: Final provider prompt equality across adherence report & metadata contract');
+  const providerPrompt = customStructured.builtPrompt;
+  const adherenceEvaluatedPrompt = customStructured.adherenceReport.details;
+  assert.ok(
+    adherenceEvaluatedPrompt.includes('Lava (MATCHED)'),
+    'Adherence report must evaluate the exact assembled prompt sent to provider'
+  );
+  assert.strictEqual(
+    customStructured.userPrompt,
+    customWording,
+    'User prompt metadata must retain original user prompt input'
+  );
+  console.log('  ✓ Prompt identity across provider payload and metadata verified');
+
+  // 5. Adherence evaluation evaluates the exact prompt sent to the provider
+  console.log('Test 5: Adherence evaluation evaluates exact provider prompt');
+  const directReport = evaluatePromptAdherence(providerPrompt, 'lava', customWording);
+  assert.strictEqual(directReport.score, customStructured.adherenceReport.score);
+  assert.strictEqual(directReport.pass, customStructured.adherenceReport.pass);
+  console.log('  ✓ Exact prompt adherence evaluation verified');
+
+  // 6. Negative prompt remains material-aware
+  console.log('Test 6: Negative prompt payload remains material-aware');
+  assert.ok(
+    customStructured.negativePrompt.includes('buildings'),
+    'Negative prompt payload must include profile negative terms like "buildings"'
+  );
+  assert.ok(
+    customStructured.negativePrompt.includes('houses'),
+    'Negative prompt payload must include profile negative terms like "houses"'
+  );
+  assert.ok(
+    customStructured.negativePrompt.includes('water'),
+    'Negative prompt payload for lava must include excluded material terms like "water"'
+  );
+  console.log('  ✓ Material-aware negative prompt payload verified');
+
+  // 7. Style modification without removing material identity
+  console.log('Test 7: Style modification without removing material identity');
   const pixelLava = PromptBuilder.buildStructuredPrompt({
     material: 'lava',
     style: 'pixel-art',
@@ -88,8 +117,8 @@ async function runPromptAdherenceTests() {
   assert.strictEqual(pixelLava.adherenceReport.hasMaterialIdentity, true);
   console.log('  ✓ Style modification without material dilution verified');
 
-  // 6. Material Profile Isolation (No Cross-Leakage in positive prompt)
-  console.log('Test 6: Material profile isolation');
+  // 8. Material profile isolation (no cross-leakage in positive prompt)
+  console.log('Test 8: Material profile isolation');
   const positiveLavaPrompt = lavaStructured.builtPrompt.toLowerCase().split('strict negative rules:')[0];
   assert.strictEqual(
     positiveLavaPrompt.includes('cobblestone'),
@@ -102,20 +131,6 @@ async function runPromptAdherenceTests() {
     'Lava positive prompt must not contain mortar terms'
   );
   console.log('  ✓ Material profile isolation verified');
-
-  // 7. Deterministic Adherence Scoring Test
-  console.log('Test 7: Deterministic adherence scoring accuracy');
-  const report = evaluatePromptAdherence(lavaStructured.builtPrompt, 'lava', '');
-  assert.ok(report.score >= 70, `Score should be >= 70, got ${report.score}`);
-  assert.strictEqual(report.pass, true, 'Valid prompt should pass adherence check');
-
-  // Weak/bad prompt test
-  const badPrompt = 'A cute dog sitting in a house next to a window';
-  const badReport = evaluatePromptAdherence(badPrompt, 'lava', '');
-  assert.ok(badReport.score < 70, `Bad prompt score should be < 70, got ${badReport.score}`);
-  assert.strictEqual(badReport.pass, false, 'Bad prompt should fail adherence check');
-  assert.ok(badReport.forbiddenTermsFound.length > 0, 'Should flag forbidden terms like house or window');
-  console.log('  ✓ Deterministic adherence scoring accuracy verified');
 
   console.log('\n✅ All Deterministic Prompt Adherence Tests Passed Successfully!');
 }

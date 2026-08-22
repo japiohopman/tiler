@@ -98,6 +98,8 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
     const startTime = performance.now();
     const resolution = request.resolution || 512;
 
+    // Single Authoritative Prompt Construction Boundary:
+    // PromptBuilder incorporates customPrompt/additionalPrompt while maintaining material profile & tile constraints
     const structuredPrompt = PromptBuilder.buildStructuredPrompt({
       material: request.material,
       style: request.style,
@@ -107,7 +109,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       resolution,
     });
 
-    const builtPrompt = request.customPrompt || structuredPrompt.builtPrompt;
+    const builtPrompt = structuredPrompt.builtPrompt;
     const negativePrompt = structuredPrompt.negativePrompt;
 
     const endpoint = this.getEndpoint();
