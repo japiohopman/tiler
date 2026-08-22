@@ -313,8 +313,7 @@ function createInitialWorkspaceState(): WorkspaceState {
   activeAsset = updatedAsset;
   genState = transitionGenerationState('completed', 'Completed', 100);
 
-  assert(activeAsset.id === 'asset-v2-cobble', 'Successful regeneration updates workspace asset');
-  assert(activeAsset.id !== initialAsset.id, 'Previous asset is no longer current after successful regeneration');
+  assert(activeAsset.id !== initialAsset.id, 'Successful regeneration produces a new asset with a unique ID');
 
   // Scenario B: Regeneration fails -> previous asset remains current
   let currentAssetBeforeFailedRegen = activeAsset;
@@ -576,6 +575,49 @@ function createInitialWorkspaceState(): WorkspaceState {
   let delRes3 = deleteAssetFromHistory([assetA], 'asset-A', 'asset-A');
   assert(delRes3.updatedAssets.length === 0, 'Final asset deleted');
   assert(delRes3.nextCurrentAssetId === null, 'Deleting final asset returns to empty workspace state (null)');
+
+  // Test E: Unique Asset ID Regression Test (Provider returns identical tileId)
+  const duplicateTileIdResponse1: GenerationResponse = {
+    success: true,
+    tileId: 'tile-provider-same-id',
+    rawImageUrl: 'data:image/png;base64,raw1',
+    prompt: 'cobblestone',
+  };
+
+  const duplicateTileIdResponse2: GenerationResponse = {
+    success: true,
+    tileId: 'tile-provider-same-id',
+    rawImageUrl: 'data:image/png;base64,raw2',
+    prompt: 'cobblestone',
+  };
+
+  const genAsset1 = createWorkspaceAssetFromResponse(
+    duplicateTileIdResponse1,
+    { material: 'cobblestone', style: 'stylized', resolution: 512 },
+    { algorithm: 'offset-crossfade', blendMarginPercent: 10 }
+  );
+
+  const genAsset2 = createWorkspaceAssetFromResponse(
+    duplicateTileIdResponse2,
+    { material: 'cobblestone', style: 'stylized', resolution: 512 },
+    { algorithm: 'offset-crossfade', blendMarginPercent: 10 }
+  );
+
+  assert(genAsset1.id !== genAsset2.id, 'Two generated assets have unique workspace asset IDs despite identical provider tileId');
+
+  let dupHistory = addAssetToHistory([], genAsset1);
+  dupHistory = addAssetToHistory(dupHistory, genAsset2);
+
+  assert(dupHistory.length === 2, 'Both generated assets with unique IDs remain in history');
+
+  let selectedId: string | null = genAsset1.id;
+  assert(selectedId === genAsset1.id, 'Asset 1 can be selected independently');
+  selectedId = genAsset2.id;
+  assert(selectedId === genAsset2.id, 'Asset 2 can be selected independently');
+
+  const delDupResult = deleteAssetFromHistory(dupHistory, genAsset1.id, genAsset2.id);
+  assert(delDupResult.updatedAssets.length === 1, 'Deleting asset 1 removes only asset 1');
+  assert(delDupResult.updatedAssets[0].id === genAsset2.id, 'Asset 2 remains intact in history');
 }
 
 console.log('======================================================');

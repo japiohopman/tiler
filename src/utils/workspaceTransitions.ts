@@ -89,6 +89,15 @@ export function generateReadableAssetName(
 }
 
 /**
+ * Helper to generate a unique asset ID.
+ */
+let assetCounter = 0;
+export function generateUniqueAssetId(): string {
+  assetCounter += 1;
+  return `tile-${Date.now()}-${assetCounter}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
  * Pure helper to construct WorkspaceAsset from GenerationResponse.
  */
 export function createWorkspaceAssetFromResponse(
@@ -100,7 +109,7 @@ export function createWorkspaceAssetFromResponse(
   const readableName = generateReadableAssetName(params.material, params.style, existingAssets);
 
   return {
-    id: genResponse.tileId || `tile-${Date.now()}`,
+    id: generateUniqueAssetId(),
     name: readableName,
     material: params.material,
     style: params.style,
