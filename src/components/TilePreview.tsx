@@ -38,6 +38,7 @@ export interface TilePreviewProps {
   seamReport?: SeamAnalysisResult;
   generationMetadata?: GenerationMetadata;
   onTextureSelect?: (dataUrl: string, sample: SampleTextureDefinition) => void;
+  onOpenEditor?: () => void;
   className?: string;
 }
 
@@ -50,6 +51,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
   seamReport,
   generationMetadata,
   onTextureSelect,
+  onOpenEditor,
   className = '',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -293,6 +295,19 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
                 RAW AI OUTPUT
               </button>
             </div>
+          )}
+
+          {/* Edit Asset Button */}
+          {onOpenEditor && (
+            <button
+              id="btn-open-editor"
+              onClick={onOpenEditor}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold transition-all cursor-pointer"
+              title="Open non-destructive image editor"
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-400" />
+              <span>EDIT ASSET</span>
+            </button>
           )}
 
           {/* 2. Grid Toggle & Seam Lines */}

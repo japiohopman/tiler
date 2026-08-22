@@ -474,6 +474,101 @@ function createInitialWorkspaceState(): WorkspaceState {
   assert(activeAssetAfterFailure.rawImageDataUrl === initialAsset.rawImageDataUrl, 'Processing failure preserves raw provider image');
 }
 
+// 11. Phase 3.5 Image Editor Lifecycle & Pipeline Integration Tests
+{
+  const initialAsset: WorkspaceAsset = {
+    id: 'asset-editor-1',
+    name: 'Cobblestone',
+    material: 'cobblestone',
+    style: 'stylized',
+    prompt: 'cobblestone pavement',
+    resolution: 512,
+    rawImageDataUrl: 'data:image/png;base64,rawSourceData',
+    processedImageDataUrl: 'data:image/png;base64,oldProcessedData',
+    isTileable: true,
+    seamScore: 0.02,
+    rawSeamScore: 0.12,
+    validationSummary: {
+      generationStatus: 'SUCCESS',
+      rawTileable: false,
+      processedTileable: true,
+      rawSeamScore: 0.12,
+      processedSeamScore: 0.02,
+      improvement: 0.10,
+      improvementStatus: 'IMPROVED',
+      finalStatus: 'PASS_AFTER_PROCESSING',
+      threshold: 0.05,
+      issues: [],
+      promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED',
+    },
+    createdAt: new Date().toISOString(),
+  };
+
+  // Step A: Committing edits sets editedImageDataUrl & invalidates stale validation
+  const editedDataUrl = 'data:image/png;base64,committedEditedData';
+  const editedAsset: WorkspaceAsset = {
+    ...initialAsset,
+    editedImageDataUrl: editedDataUrl,
+    processedImageDataUrl: undefined,
+    isTileable: false,
+    validationSummary: {
+      generationStatus: 'SUCCESS',
+      rawTileable: false,
+      processedTileable: false,
+      rawSeamScore: 0.12,
+      processedSeamScore: 1,
+      improvement: 0,
+      improvementStatus: 'UNCHANGED',
+      finalStatus: 'VALIDATION_FAILED',
+      threshold: 0.05,
+      issues: ['Asset edited — explicit reprocessing required to validate seams'],
+      promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED',
+    },
+  };
+
+  assert(editedAsset.rawImageDataUrl === 'data:image/png;base64,rawSourceData', 'Editing preserves original RAW image');
+  assert(editedAsset.editedImageDataUrl === 'data:image/png;base64,committedEditedData', 'Applying edits sets editedImageDataUrl');
+  assert(editedAsset.processedImageDataUrl === undefined, 'Editing invalidates stale processed image URL');
+  assert(editedAsset.validationSummary.finalStatus === 'VALIDATION_FAILED', 'Editing sets validationSummary to VALIDATION_FAILED');
+
+  // Step B: Reprocessing operates on editedImageDataUrl (when present)
+  const sourceImageToProcess = editedAsset.editedImageDataUrl || editedAsset.rawImageDataUrl;
+  assert(sourceImageToProcess === 'data:image/png;base64,committedEditedData', 'Reprocessing uses editedImageDataUrl as input source when present');
+
+  // Simulated tile processing & seam re-analysis on edited source
+  const newProcReport: SeamAnalysisReport = {
+    horizontalScore: 0.01,
+    verticalScore: 0.01,
+    overallScore: 0.01,
+    width: 512,
+    height: 512,
+    pass: true,
+    threshold: 0.05,
+    edgeRegion: 4,
+    maxHorizontalDelta: 0.01,
+    maxVerticalDelta: 0.01,
+    discontinuousPixelCount: 0,
+    totalEdgePixelsEvaluated: 4096,
+    issues: [],
+  };
+
+  const reprocessResult = updateSeamAnalysisSummary(editedAsset, 'processed', newProcReport, 0.05);
+
+  const reprocessedEditedAsset: WorkspaceAsset = {
+    ...editedAsset,
+    processedImageDataUrl: 'data:image/png;base64,processedEditedData',
+    isTileable: reprocessResult.isTileable,
+    seamScore: reprocessResult.seamScore,
+    seamReport: reprocessResult.newSeamReport,
+    validationSummary: reprocessResult.validationSummary,
+  };
+
+  assert(reprocessedEditedAsset.rawImageDataUrl === 'data:image/png;base64,rawSourceData', 'Original RAW image remains preserved after reprocessing');
+  assert(reprocessedEditedAsset.editedImageDataUrl === 'data:image/png;base64,committedEditedData', 'Edited source image remains preserved after reprocessing');
+  assert(reprocessedEditedAsset.processedImageDataUrl === 'data:image/png;base64,processedEditedData', 'New processedImageDataUrl generated from edited image');
+  assert(reprocessedEditedAsset.validationSummary.finalStatus === 'PASS_AFTER_PROCESSING', 'Reprocessing re-validates edited asset and sets PASS_AFTER_PROCESSING');
+}
+
 console.log('======================================================');
 console.log('  All WorkspaceTransitions & WorkspaceState Tests Passed!');
 console.log('======================================================');

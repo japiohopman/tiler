@@ -119,12 +119,44 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
     [asset, onNotify]
   );
 
+  // Apply image edits handler (commits edited source image to active asset and invalidates stale validation)
+  const handleApplyEdits = useCallback((editedDataUrl: string) => {
+    setAsset((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        editedImageDataUrl: editedDataUrl,
+        // Invalidate stale processed output & validation relationship until explicit reprocessing occurs
+        processedImageDataUrl: undefined,
+        isTileable: false,
+        validationSummary: {
+          generationStatus: prev.validationSummary?.generationStatus || 'SUCCESS',
+          rawTileable: prev.validationSummary?.rawTileable ?? false,
+          processedTileable: false,
+          rawSeamScore: prev.rawSeamScore ?? prev.seamScore ?? 1,
+          processedSeamScore: 1,
+          improvement: 0,
+          improvementStatus: 'UNCHANGED',
+          finalStatus: 'VALIDATION_FAILED',
+          threshold: prev.validationSummary?.threshold ?? 0.05,
+          issues: ['Asset edited — explicit reprocessing required to validate seams'],
+          promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED',
+        },
+      };
+    });
+
+    onNotify?.(
+      'Image edits committed to asset! Click REPROCESS EXISTING ASSET to run tile processing and seam validation.',
+      'info'
+    );
+  }, [onNotify]);
+
   // Re-processing handler (Modifies existing source asset without triggering AI generation)
   const handleProcessingOptionsChange = useCallback(
     async (newOpts: TileProcessingOptions, explicitThreshold?: number, explicitEdgeRegion?: EdgeRegionDepth) => {
-      if (!asset || !asset.rawImageDataUrl) {
-        return;
-      }
+      if (!asset) return;
+      const sourceImage = asset.editedImageDataUrl || asset.rawImageDataUrl;
+      if (!sourceImage) return;
 
       setProcessingState({
         status: 'processing',
@@ -132,8 +164,8 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
       });
 
       try {
-        // Step 1: Execute tile processing pipeline on the raw image
-        const procRes = await tileApiClient.processTile(asset.rawImageDataUrl, newOpts);
+        // Step 1: Execute tile processing pipeline on the edited or raw source image
+        const procRes = await tileApiClient.processTile(sourceImage, newOpts);
         if (!procRes.success || !procRes.processedImageUrl) {
           throw new Error(procRes.error || 'Tile processing failed');
         }
@@ -304,6 +336,7 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
     initDefaultSample,
     handleReanalyze,
     handleProcessingOptionsChange,
+    handleApplyEdits,
     handleTextureSelect,
     handleTileFromProcessor,
   };

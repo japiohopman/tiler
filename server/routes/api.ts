@@ -361,7 +361,7 @@ apiRouter.get('/test-seams', async (req, res) => {
 apiRouter.post('/export', async (req, res) => {
   try {
     const { tile, options } = req.body;
-    const imageData = tile?.processedImageDataUrl || tile?.rawImageDataUrl;
+    const imageData = tile?.processedImageDataUrl || tile?.editedImageDataUrl || tile?.rawImageDataUrl;
 
     if (!imageData) {
       return res.status(400).json({ error: 'No image data to export.', stage: 'export' });

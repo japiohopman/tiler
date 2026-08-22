@@ -120,7 +120,7 @@ export interface WorkspaceConfig {
 export type WorkspaceAsset = Tile;
 
 export interface WorkspaceState {
-  activeView: 'workspace' | 'processor';
+  activeView: 'workspace' | 'editor' | 'processor';
   backendStatus: 'online' | 'offline' | 'checking';
   config: WorkspaceConfig;
   generation: GenerationState;
@@ -244,6 +244,7 @@ export interface Tile {
   prompt: string;
   resolution: number; // 512
   rawImageDataUrl?: string;
+  editedImageDataUrl?: string;
   processedImageDataUrl?: string;
   isTileable: boolean;
   seamScore?: number;

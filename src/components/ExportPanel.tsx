@@ -74,10 +74,16 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/50 text-amber-200 text-xs space-y-1">
           <div className="flex items-center space-x-2 font-semibold text-amber-300">
             <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
-            <span>Exporting Unvalidated Texture</span>
+            <span>
+              {currentTile.editedImageDataUrl && !currentTile.processedImageDataUrl
+                ? 'Exporting Unprocessed Edited Asset'
+                : 'Exporting Unvalidated Texture'}
+            </span>
           </div>
           <p className="text-[11px] text-amber-200/90 leading-relaxed">
-            This texture failed seam validation. You can export it for inspection or testing, but it is not validated as tileable.
+            {currentTile.editedImageDataUrl && !currentTile.processedImageDataUrl
+              ? 'This asset has uncommitted or unprocessed edits. Click REPROCESS EXISTING ASSET to run tile processing and seam validation before exporting.'
+              : 'This texture failed seam validation. You can export it for inspection or testing, but it is not validated as tileable.'}
           </p>
         </div>
       )}

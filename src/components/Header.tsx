@@ -8,8 +8,8 @@ import { Layers, Sparkles, Sliders, CheckCircle2, ShieldCheck } from 'lucide-rea
 
 interface HeaderProps {
   backendStatus: 'online' | 'offline' | 'checking';
-  activeView: 'processor' | 'workspace';
-  onViewChange: (view: 'processor' | 'workspace') => void;
+  activeView: 'workspace' | 'editor' | 'processor';
+  onViewChange: (view: 'workspace' | 'editor' | 'processor') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ backendStatus, activeView, onViewChange }) => {
@@ -49,6 +49,17 @@ export const Header: React.FC<HeaderProps> = ({ backendStatus, activeView, onVie
               }`}
             >
               Tile Preview
+            </button>
+            <button
+              id="view-editor-btn"
+              onClick={() => onViewChange('editor')}
+              className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                activeView === 'editor'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Image Editor
             </button>
             <button
               id="view-processor-btn"

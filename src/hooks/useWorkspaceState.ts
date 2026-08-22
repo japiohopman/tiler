@@ -20,7 +20,7 @@ import { useWorkspaceAsset } from './useWorkspaceAsset';
 import { useGeneration } from './useGeneration';
 
 export function useWorkspaceState() {
-  const [activeView, setActiveView] = useState<'workspace' | 'processor'>('workspace');
+  const [activeView, setActiveView] = useState<'workspace' | 'editor' | 'processor'>('workspace');
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [activeProvider, setActiveProvider] = useState<string>('pixazo');
   const [providerConfigured, setProviderConfigured] = useState<boolean>(true);
@@ -54,6 +54,7 @@ export function useWorkspaceState() {
     initDefaultSample,
     handleReanalyze: executeReanalyze,
     handleProcessingOptionsChange: executeProcessingOptionsChange,
+    handleApplyEdits,
     handleTextureSelect,
     handleTileFromProcessor,
   } = useWorkspaceAsset(handleNotify);
@@ -140,6 +141,7 @@ export function useWorkspaceState() {
       handleGenerate,
       handleReanalyze,
       handleExport,
+      handleApplyEdits,
       handleTextureSelect,
       handleTileFromProcessor,
       setSelectedSource,
