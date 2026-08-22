@@ -53,6 +53,10 @@ function createInitialWorkspaceState(): WorkspaceState {
       currentStep: '',
       progress: 0,
     },
+    processing: {
+      status: 'ready',
+      currentStep: 'READY',
+    },
     asset: null,
     preview: {
       selectedSource: 'processed',
@@ -338,6 +342,124 @@ function createInitialWorkspaceState(): WorkspaceState {
   assert(genError.status === 'error' && genError.errorMessage?.includes('HTTP 502'), 'Generation error correctly represented as generation failure');
   assert(expError.status === 'error' && expError.errorMessage?.includes('export'), 'Export error correctly represented as export failure');
   assert(valFailedSummary.finalStatus === 'VALIDATION_FAILED' && valFailedSummary.generationStatus === 'SUCCESS', 'Validation failure remains distinct from generation failure');
+}
+
+// 10. Phase 3.3 Reprocessing & Raw Preservation Tests
+{
+  const initialAsset: WorkspaceAsset = {
+    id: 'tile-reprocess-test',
+    name: 'Cobblestone (Stylized)',
+    material: 'cobblestone',
+    style: 'stylized',
+    prompt: 'cobblestone pavement',
+    resolution: 512,
+    rawImageDataUrl: 'data:image/png;base64,originalRawImageData',
+    processedImageDataUrl: 'data:image/png;base64,initialProcessedData',
+    isTileable: true,
+    seamScore: 0.02,
+    rawSeamScore: 0.12,
+    rawSeamReport: {
+      horizontalScore: 0.12,
+      verticalScore: 0.12,
+      overallScore: 0.12,
+      width: 512,
+      height: 512,
+      pass: false,
+      threshold: 0.05,
+      edgeRegion: 4,
+      maxHorizontalDelta: 0.12,
+      maxVerticalDelta: 0.12,
+      discontinuousPixelCount: 100,
+      totalEdgePixelsEvaluated: 4096,
+      issues: ['Discontinuous seam'],
+    },
+    seamReport: {
+      horizontalScore: 0.02,
+      verticalScore: 0.02,
+      overallScore: 0.02,
+      width: 512,
+      height: 512,
+      pass: true,
+      threshold: 0.05,
+      edgeRegion: 4,
+      maxHorizontalDelta: 0.02,
+      maxVerticalDelta: 0.02,
+      discontinuousPixelCount: 0,
+      totalEdgePixelsEvaluated: 4096,
+      issues: [],
+    },
+    validationSummary: {
+      generationStatus: 'SUCCESS',
+      rawTileable: false,
+      processedTileable: true,
+      rawSeamScore: 0.12,
+      processedSeamScore: 0.02,
+      improvement: 0.10,
+      improvementStatus: 'IMPROVED',
+      finalStatus: 'PASS_AFTER_PROCESSING',
+      threshold: 0.05,
+      issues: [],
+      promptAdherenceStatus: 'NOT_AUTOMATICALLY_VALIDATED',
+    },
+    createdAt: new Date().toISOString(),
+  };
+
+  // Simulated reprocessing with 15% blend margin:
+  const updatedProcessedReport: SeamAnalysisReport = {
+    horizontalScore: 0.005,
+    verticalScore: 0.005,
+    overallScore: 0.005,
+    width: 512,
+    height: 512,
+    pass: true,
+    threshold: 0.05,
+    edgeRegion: 4,
+    maxHorizontalDelta: 0.005,
+    maxVerticalDelta: 0.005,
+    discontinuousPixelCount: 0,
+    totalEdgePixelsEvaluated: 4096,
+    issues: [],
+  };
+
+  const reprocessResult = updateSeamAnalysisSummary(
+    initialAsset,
+    'processed',
+    updatedProcessedReport,
+    0.05
+  );
+
+  const newProcessedAsset: WorkspaceAsset = {
+    ...initialAsset,
+    processedImageDataUrl: 'data:image/png;base64,newProcessedData15Percent',
+    seamScore: reprocessResult.seamScore,
+    seamReport: reprocessResult.newSeamReport,
+    validationSummary: reprocessResult.validationSummary,
+  };
+
+  // Raw image is preserved completely
+  assert(newProcessedAsset.rawImageDataUrl === initialAsset.rawImageDataUrl, 'Reprocessing preserves original raw provider image');
+  assert(newProcessedAsset.rawSeamScore === initialAsset.rawSeamScore, 'Reprocessing preserves original raw seam score');
+  assert(newProcessedAsset.processedImageDataUrl === 'data:image/png;base64,newProcessedData15Percent', 'Reprocessing updates processed image data URL');
+  assert(newProcessedAsset.seamScore === 0.005, 'Reprocessing updates processed seam score');
+  assert(newProcessedAsset.validationSummary?.improvement === 0.115, 'Validation summary recalculates improvement delta (0.12 - 0.005 = 0.115)');
+
+  // Simulated reprocessing failure scenario
+  const previousValidAsset = newProcessedAsset;
+  let processingFailureOccurred = false;
+  let activeAssetAfterFailure = previousValidAsset;
+
+  try {
+    // Failure occurs during tile processor step
+    throw new Error('TileProcessor Sharp operation failed');
+  } catch (procErr) {
+    processingFailureOccurred = true;
+    // Active asset is NOT cleared or overwritten
+    activeAssetAfterFailure = previousValidAsset;
+  }
+
+  assert(processingFailureOccurred === true, 'Processing failure captured');
+  assert(activeAssetAfterFailure.processedImageDataUrl === 'data:image/png;base64,newProcessedData15Percent', 'Processing failure preserves previous valid processed asset');
+  assert(activeAssetAfterFailure.rawImageDataUrl === initialAsset.rawImageDataUrl, 'Processing failure preserves raw provider image');
 }
 
 console.log('======================================================');

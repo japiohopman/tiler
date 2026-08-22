@@ -22,6 +22,7 @@ export default function App() {
     backendStatus,
     config,
     generation,
+    processing,
     asset,
     preview,
     export: exportState,
@@ -90,7 +91,9 @@ export default function App() {
                 processingOptions={config.processingOptions}
                 onProcessingOptionsChange={actions.handleProcessingOptionsChange}
                 generationState={generation}
+                processingState={processing}
                 onGenerate={actions.handleGenerate}
+                onReprocess={() => actions.handleProcessingOptionsChange(config.processingOptions)}
                 currentTile={asset}
                 activeProvider={config.activeProvider}
                 providerConfigured={config.providerConfigured}
@@ -103,7 +106,8 @@ export default function App() {
                 report={activeReport}
                 rawReport={asset?.rawSeamReport}
                 validationSummary={asset?.validationSummary}
-                isLoading={generation.status === 'analyzing'}
+                selectedSource={preview.selectedSource}
+                isLoading={generation.status === 'analyzing' || processing.status === 'analyzing'}
                 onReanalyze={actions.handleReanalyze}
               />
 

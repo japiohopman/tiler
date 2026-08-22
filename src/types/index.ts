@@ -96,6 +96,14 @@ export interface ExportState {
   errorMessage?: string;
 }
 
+export type ProcessingLifecycleStatus = 'ready' | 'processing' | 'analyzing' | 'updated' | 'error';
+
+export interface ProcessingState {
+  status: ProcessingLifecycleStatus;
+  currentStep?: string;
+  errorMessage?: string;
+}
+
 export interface PreviewState {
   selectedSource: 'processed' | 'raw';
   mode: TilePreviewMode;
@@ -116,6 +124,7 @@ export interface WorkspaceState {
   backendStatus: 'online' | 'offline' | 'checking';
   config: WorkspaceConfig;
   generation: GenerationState;
+  processing: ProcessingState;
   asset: WorkspaceAsset | null;
   preview: PreviewState;
   export: ExportState;

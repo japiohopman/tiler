@@ -50,6 +50,7 @@ export function useWorkspaceState() {
   const {
     asset,
     setAsset,
+    processingState,
     initDefaultSample,
     handleReanalyze: executeReanalyze,
     handleProcessingOptionsChange: executeProcessingOptionsChange,
@@ -122,6 +123,7 @@ export function useWorkspaceState() {
     backendStatus,
     config,
     generation: generationState,
+    processing: processingState,
     asset,
     preview: previewState,
     export: exportState,

@@ -19,6 +19,7 @@ interface SeamAnalysisPanelProps {
   report?: SeamAnalysisResult;
   rawReport?: SeamAnalysisResult;
   validationSummary?: ValidationSummary;
+  selectedSource?: 'processed' | 'raw';
   isLoading?: boolean;
   onReanalyze?: (threshold: number, edgeRegion: EdgeRegionDepth) => void;
 }
@@ -27,6 +28,7 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
   report,
   rawReport,
   validationSummary,
+  selectedSource = 'processed',
   isLoading,
   onReanalyze,
 }) => {
@@ -103,6 +105,16 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
           <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
             Objective Seam Analyzer
           </h2>
+          <span
+            id="active-source-badge"
+            className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border uppercase ${
+              selectedSource === 'raw'
+                ? 'bg-sky-950/80 text-sky-300 border-sky-500/40'
+                : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+            }`}
+          >
+            {selectedSource === 'raw' ? 'RAW SOURCE' : 'PROCESSED TILE'}
+          </span>
         </div>
         <div
           className={`flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
