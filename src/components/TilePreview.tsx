@@ -393,6 +393,17 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
 
           {/* Floating Viewport Status Pill */}
           <div className="absolute bottom-3 left-3 flex items-center space-x-2.5 bg-slate-900/95 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-lg text-slate-300 text-xs shadow-lg">
+            <span
+              id="preview-source-badge"
+              className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase border ${
+                selectedSource === 'raw'
+                  ? 'bg-sky-950 text-sky-300 border-sky-500/50'
+                  : 'bg-emerald-950 text-emerald-300 border-emerald-500/50'
+              }`}
+            >
+              {selectedSource === 'raw' ? 'RAW AI SOURCE' : 'PROCESSED TILE'}
+            </span>
+            <span className="text-slate-600">|</span>
             <span className="font-semibold text-amber-400 capitalize">
               {previewMode === 'single'
                 ? 'Single Tile (1×1 Native)'

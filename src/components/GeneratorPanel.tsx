@@ -34,13 +34,17 @@ import {
   TileProcessingOptions,
 } from '../types';
 
+import { ProcessingState } from '../types';
+
 interface GeneratorPanelProps {
   params: GenerationParams;
   onParamsChange: (params: GenerationParams) => void;
   processingOptions: TileProcessingOptions;
   onProcessingOptionsChange: (opts: TileProcessingOptions) => void;
   generationState: GenerationState;
+  processingState?: ProcessingState;
   onGenerate: () => void;
+  onReprocess?: () => void;
   currentTile?: Tile | null;
   activeProvider?: string;
   providerConfigured?: boolean;
@@ -79,7 +83,9 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
   processingOptions,
   onProcessingOptionsChange,
   generationState,
+  processingState,
   onGenerate,
+  onReprocess,
   currentTile,
   activeProvider = 'pixazo',
   providerConfigured = true,
@@ -90,6 +96,8 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
   const currentDetail: DetailLevel = params.detail || 'high';
 
   const isGenerating = generationState.status === 'generating' || generationState.status === 'processing' || generationState.status === 'analyzing';
+  const isProcessing = processingState?.status === 'processing' || processingState?.status === 'analyzing';
+  const isBusy = isGenerating || isProcessing;
 
   const handleMaterialSelect = (materialId: MaterialId) => {
     const mat = TARGET_MATERIALS.find((m) => m.id === materialId);
@@ -188,7 +196,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
                 key={mat.id}
                 id={`material-select-${mat.id}`}
                 onClick={() => handleMaterialSelect(mat.id)}
-                disabled={isGenerating}
+                disabled={isBusy}
                 className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isSelected
                     ? 'bg-sky-950/40 border-sky-500/80 shadow-md shadow-sky-500/10 ring-1 ring-sky-500/30'
@@ -221,7 +229,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
                 key={style.id}
                 id={`style-select-${style.id}`}
                 onClick={() => handleStyleSelect(style.id)}
-                disabled={isGenerating}
+                disabled={isBusy}
                 className={`px-2.5 py-2 rounded-lg border text-left text-xs font-medium transition-all truncate cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isSelected
                     ? 'bg-indigo-950/60 border-indigo-500/80 text-indigo-200 shadow-sm'
@@ -247,7 +255,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
                 key={item.id}
                 id={`detail-select-${item.id}`}
                 onClick={() => handleDetailSelect(item.id)}
-                disabled={isGenerating}
+                disabled={isBusy}
                 className={`px-2 py-1.5 rounded-lg border text-center text-xs font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                   isSelected
                     ? 'bg-sky-950/50 border-sky-500 text-sky-200'
@@ -279,7 +287,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
           id="input-additional-prompt"
           rows={2}
           value={params.additionalPrompt ?? params.customPrompt ?? ''}
-          disabled={isGenerating}
+          disabled={isBusy}
           onChange={(e) =>
             onParamsChange({
               ...params,
@@ -318,31 +326,59 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
       </div>
 
       {/* Downstream Sharp Processing Controls */}
-      <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
           <span className="text-xs font-semibold text-emerald-400 flex items-center space-x-1.5">
             <Sliders className="w-3.5 h-3.5" />
-            <span>Sharp Offset-Crossfade Pipeline</span>
+            <span>2. Tile Processing Controls</span>
           </span>
-          <span className="text-[10px] bg-emerald-950/60 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
-            Guaranteed Seamless Tile
+          {/* Processing Lifecycle Status Badge */}
+          <span
+            id="processing-status-badge"
+            className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold border ${
+              processingState?.status === 'processing' || processingState?.status === 'analyzing'
+                ? 'bg-amber-950/80 text-amber-300 border-amber-500/50 animate-pulse'
+                : processingState?.status === 'updated'
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
+                : processingState?.status === 'error'
+                ? 'bg-rose-950/80 text-rose-300 border-rose-500/50'
+                : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/30'
+            }`}
+          >
+            {processingState?.currentStep || processingState?.status?.toUpperCase() || 'READY'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        {/* Reprocessing note */}
+        <p className="text-[11px] text-slate-400 leading-normal">
+          {currentTile
+            ? 'Adjust parameters below and reprocess the current raw asset locally. Modifies existing source image without calling Pixazo / AI generation.'
+            : 'Processing parameters will be applied to generated textures automatically using TileProcessor.'}
+        </p>
+
+        {/* Processing Error Notice */}
+        {processingState?.status === 'error' && processingState.errorMessage && (
+          <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-200 text-xs flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span className="font-mono text-[11px] truncate">{processingState.errorMessage}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-0.5">
           <div>
-            <label className="text-[11px] text-slate-400 block mb-1">Algorithm</label>
+            <label className="text-[11px] text-slate-400 block mb-1 font-medium">Processing Algorithm</label>
             <select
               id="select-algorithm"
-              value={processingOptions.algorithm}
-              disabled={isGenerating}
-              onChange={(e) =>
-                onProcessingOptionsChange({
+              value={processingOptions.algorithm || 'offset-crossfade'}
+              disabled={isBusy}
+              onChange={(e) => {
+                const newOpts = {
                   ...processingOptions,
                   algorithm: e.target.value as any,
-                })
-              }
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                };
+                onProcessingOptionsChange(newOpts);
+              }}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               <option value="offset-crossfade">Offset + Alpha Crossfade</option>
               <option value="none">Direct Passthrough (Raw AI)</option>
@@ -350,7 +386,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
           </div>
 
           <div>
-            <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+            <div className="flex justify-between text-[11px] text-slate-400 mb-1 font-medium">
               <span>Blend Margin</span>
               <span className="font-mono text-emerald-400">{processingOptions.blendMarginPercent ?? 10}%</span>
             </div>
@@ -360,17 +396,49 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
               max={20}
               step={5}
               value={processingOptions.blendMarginPercent ?? 10}
-              disabled={isGenerating}
-              onChange={(e) =>
-                onProcessingOptionsChange({
+              disabled={isBusy}
+              onChange={(e) => {
+                const newOpts = {
                   ...processingOptions,
                   blendMarginPercent: Number(e.target.value) as any,
-                })
-              }
+                };
+                onProcessingOptionsChange(newOpts);
+              }}
               className="w-full accent-emerald-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
         </div>
+
+        {/* Explicit Reprocess Action Button */}
+        {currentTile && (
+          <div className="pt-1">
+            <button
+              id="btn-reprocess-tile"
+              type="button"
+              onClick={() => {
+                if (onReprocess) {
+                  onReprocess();
+                } else {
+                  onProcessingOptionsChange(processingOptions);
+                }
+              }}
+              disabled={isBusy}
+              className="w-full py-2 px-3 rounded-lg bg-emerald-950/80 hover:bg-emerald-900/90 active:bg-emerald-950 border border-emerald-500/40 text-emerald-200 text-xs font-bold tracking-wide flex items-center justify-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {isProcessing ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-300" />
+                  <span>{processingState?.currentStep || 'PROCESSING TILE...'}</span>
+                </>
+              ) : (
+                <>
+                  <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>REPROCESS EXISTING ASSET</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Primary Action Button (Generate vs Regenerate) */}
@@ -378,7 +446,7 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
         <button
           id={currentTile ? 'btn-regenerate-tile' : 'btn-generate-tile'}
           onClick={onGenerate}
-          disabled={isGenerating}
+          disabled={isBusy}
           className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 active:from-sky-700 active:to-indigo-700 text-white text-xs font-bold tracking-wide uppercase flex items-center justify-center space-x-2 shadow-lg shadow-sky-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isGenerating ? (
@@ -389,12 +457,12 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
           ) : currentTile ? (
             <>
               <RefreshCw className="w-4 h-4" />
-              <span>REGENERATE TILE</span>
+              <span>REGENERATE NEW AI TILE</span>
             </>
           ) : (
             <>
               <Sparkles className="w-4 h-4" />
-              <span>GENERATE TILE</span>
+              <span>GENERATE AI TILE</span>
             </>
           )}
         </button>

@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import {
   EdgeRegionDepth,
+  ProcessingState,
   SeamAnalysisReport,
   TileProcessingMetadata,
   TileProcessingOptions,
@@ -17,6 +18,10 @@ import { updateSeamAnalysisSummary } from '../utils/workspaceTransitions';
 
 export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 'success' | 'warn') => void) {
   const [asset, setAsset] = useState<WorkspaceAsset | null>(null);
+  const [processingState, setProcessingState] = useState<ProcessingState>({
+    status: 'ready',
+    currentStep: 'READY',
+  });
 
   // Initialize with initial sample texture if needed
   const initDefaultSample = useCallback(() => {
@@ -64,6 +69,11 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
       const activeImage = targetImage || asset.processedImageDataUrl || asset.rawImageDataUrl;
       if (!activeImage) return;
 
+      setProcessingState({
+        status: 'analyzing',
+        currentStep: 'ANALYZING',
+      });
+
       try {
         const res = await tileApiClient.analyzeSeams(activeImage, {
           threshold,
@@ -87,54 +97,123 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
                 }
               : null
           );
+
+          setProcessingState({
+            status: 'updated',
+            currentStep: 'UPDATED',
+          });
+        } else {
+          throw new Error(res.error || 'Failed to analyze seams');
         }
       } catch (err: any) {
         console.error('Re-analysis error:', err);
+        const errMsg = err.message || 'Seam re-analysis failed';
+        setProcessingState({
+          status: 'error',
+          currentStep: 'ERROR',
+          errorMessage: errMsg,
+        });
+        onNotify?.(`Re-analysis failed: ${errMsg}`, 'warn');
       }
     },
-    [asset]
+    [asset, onNotify]
   );
 
-  // Re-processing handler
+  // Re-processing handler (Modifies existing source asset without triggering AI generation)
   const handleProcessingOptionsChange = useCallback(
-    async (newOpts: TileProcessingOptions) => {
-      if (asset && asset.rawImageDataUrl) {
-        try {
-          const procRes = await tileApiClient.processTile(asset.rawImageDataUrl, newOpts);
-          if (procRes.success) {
-            const analysisRes = await tileApiClient.analyzeSeams(procRes.processedImageUrl, {
-              threshold: asset.seamReport?.threshold ?? 0.05,
-              edgeRegion: (asset.seamReport?.edgeRegion as EdgeRegionDepth) ?? 4,
-              diagnosticMode: true,
-            });
+    async (newOpts: TileProcessingOptions, explicitThreshold?: number, explicitEdgeRegion?: EdgeRegionDepth) => {
+      if (!asset || !asset.rawImageDataUrl) {
+        return;
+      }
 
-            const updatedReport = analysisRes.report;
+      setProcessingState({
+        status: 'processing',
+        currentStep: 'PROCESSING',
+      });
 
-            setAsset((prevTile) =>
-              prevTile
-                ? {
-                    ...prevTile,
-                    processedImageDataUrl: procRes.processedImageUrl,
-                    isTileable: updatedReport.pass,
-                    seamScore: updatedReport.overallScore,
-                    seamReport: updatedReport,
-                    metadata: {
-                      ...prevTile.metadata,
-                      processingAlgorithm: newOpts.algorithm,
-                      processingTimeMs: procRes.metadata.processingTimeMs,
-                    },
-                  }
-                : null
-            );
-
-            onNotify?.(
-              `Updated processing pipeline (${newOpts.algorithm || 'offset-crossfade'}, ${newOpts.blendMarginPercent ?? 10}% blend margin). Tile re-processed & validated!`,
-              'info'
-            );
-          }
-        } catch (err: any) {
-          console.error('Re-processing error:', err);
+      try {
+        // Step 1: Execute tile processing pipeline on the raw image
+        const procRes = await tileApiClient.processTile(asset.rawImageDataUrl, newOpts);
+        if (!procRes.success || !procRes.processedImageUrl) {
+          throw new Error(procRes.error || 'Tile processing failed');
         }
+
+        setProcessingState({
+          status: 'analyzing',
+          currentStep: 'ANALYZING',
+        });
+
+        // Step 2: Re-run seam analysis on the new processed image
+        const activeThreshold = explicitThreshold ?? asset.seamReport?.threshold ?? 0.05;
+        const activeEdgeRegion = explicitEdgeRegion ?? (asset.seamReport?.edgeRegion as EdgeRegionDepth) ?? 4;
+
+        const analysisRes = await tileApiClient.analyzeSeams(procRes.processedImageUrl, {
+          threshold: activeThreshold,
+          edgeRegion: activeEdgeRegion,
+          diagnosticMode: true,
+        });
+
+        if (!analysisRes.success || !analysisRes.report) {
+          throw new Error(analysisRes.error || 'Seam analysis failed after processing');
+        }
+
+        const updatedReport = analysisRes.report;
+
+        // Step 3: Recalculate validation summary and update asset state
+        const updatedResult = updateSeamAnalysisSummary(
+          asset,
+          'processed',
+          updatedReport,
+          activeThreshold
+        );
+
+        setAsset((prevTile) =>
+          prevTile
+            ? {
+                ...prevTile,
+                processedImageDataUrl: procRes.processedImageUrl,
+                isTileable: updatedResult.isTileable,
+                seamScore: updatedResult.seamScore,
+                seamReport: updatedResult.newSeamReport,
+                rawSeamReport: prevTile.rawSeamReport || updatedResult.newRawSeamReport,
+                rawSeamScore: prevTile.rawSeamScore ?? updatedResult.rawSeamScore,
+                validationSummary: updatedResult.validationSummary,
+                generationMetadata: prevTile.generationMetadata
+                  ? {
+                      ...prevTile.generationMetadata,
+                      processingAlgorithm: newOpts.algorithm,
+                      blendMarginPercent: newOpts.blendMarginPercent,
+                      processedSeamScore: updatedResult.seamScore,
+                      processingTimeMs: procRes.metadata.processingTimeMs,
+                    }
+                  : prevTile.generationMetadata,
+                metadata: {
+                  ...prevTile.metadata,
+                  processingAlgorithm: newOpts.algorithm,
+                  processingTimeMs: procRes.metadata.processingTimeMs,
+                },
+              }
+            : null
+        );
+
+        setProcessingState({
+          status: 'updated',
+          currentStep: 'UPDATED',
+        });
+
+        onNotify?.(
+          `Updated processing pipeline (${newOpts.algorithm || 'offset-crossfade'}, ${newOpts.blendMarginPercent ?? 10}% blend margin). Tile re-processed & validated!`,
+          'info'
+        );
+      } catch (err: any) {
+        console.error('Re-processing error:', err);
+        const errMsg = err.message || 'Processing failed';
+        setProcessingState({
+          status: 'error',
+          currentStep: 'ERROR',
+          errorMessage: errMsg,
+        });
+        onNotify?.(`Processing failed: ${errMsg}`, 'warn');
       }
     },
     [asset, onNotify]
@@ -221,6 +300,7 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
   return {
     asset,
     setAsset,
+    processingState,
     initDefaultSample,
     handleReanalyze,
     handleProcessingOptionsChange,
