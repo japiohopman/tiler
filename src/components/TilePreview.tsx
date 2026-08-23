@@ -185,15 +185,26 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
 
   const handleMouseUp = () => setIsDragging(false);
 
-  // Wheel zoom handler (anchored zoom)
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    setZoom((prevZoom) => {
-      const nextZoom = prevZoom * zoomFactor;
-      return Math.min(6.0, Math.max(0.2, Number(nextZoom.toFixed(2))));
-    });
-  };
+  // Wheel zoom handler attached as non-passive native listener to prevent outer page scroll
+  // while avoiding browser passive event listener warnings
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      setZoom((prevZoom) => {
+        const nextZoom = prevZoom * zoomFactor;
+        return Math.min(6.0, Math.max(0.2, Number(nextZoom.toFixed(2))));
+      });
+    };
+
+    canvas.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleWheelNative);
+    };
+  }, []);
 
   const resetView = () => {
     setZoom(1.0);
@@ -386,7 +397,6 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
             style={{ imageRendering: 'pixelated' }}
             className="w-full h-full block"
           />
