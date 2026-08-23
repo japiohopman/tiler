@@ -19,14 +19,14 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  FileCode,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   DetailLevel,
   GenerationParams,
   GenerationState,
-  MaterialDefinition,
   MaterialId,
-  StyleDefinition,
   StyleId,
   TARGET_MATERIALS,
   TARGET_STYLES,
@@ -91,8 +91,8 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
   providerConfigured = true,
 }) => {
   const [showPromptDetails, setShowPromptDetails] = useState<boolean>(false);
-  const selectedMaterial = TARGET_MATERIALS.find((m) => m.id === params.material) || TARGET_MATERIALS[0];
-  const selectedStyle = TARGET_STYLES.find((s) => s.id === params.style) || TARGET_STYLES[0];
+  const [showPromptInspector, setShowPromptInspector] = useState<boolean>(false);
+
   const currentDetail: DetailLevel = params.detail || 'high';
 
   const isGenerating = generationState.status === 'generating' || generationState.status === 'processing' || generationState.status === 'analyzing';
@@ -130,6 +130,8 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
     if (activeProvider === 'huggingface') return 'Hugging Face';
     return activeProvider.toUpperCase();
   };
+
+  const adherence = currentTile?.generationMetadata?.promptAdherence;
 
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col gap-5 shadow-lg">
@@ -171,13 +173,31 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
         <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-200 text-xs space-y-1.5 animate-in fade-in duration-200">
           <div className="flex items-center space-x-2 font-semibold text-rose-300">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-            <span>Generation Failed</span>
+            <span>Generation Request Failed</span>
           </div>
           <p className="text-[11px] text-rose-200/90 leading-relaxed font-mono">
             {generationState.errorMessage}
           </p>
           <p className="text-[10px] text-rose-300/70 pt-1">
             Ensure your provider configuration (e.g., PIXAZO_API_KEY) is set in your server environment.
+          </p>
+        </div>
+      )}
+
+      {/* Material Adherence Warning (Distinct from Network/Generation Failure) */}
+      {currentTile && adherence && !adherence.pass && (
+        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/50 text-amber-200 text-xs space-y-1">
+          <div className="flex items-center justify-between font-semibold text-amber-300">
+            <span className="flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Generation Succeeded — Material Adherence Weak</span>
+            </span>
+            <span className="font-mono text-[10px] bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-700">
+              Score: {adherence.score}/100
+            </span>
+          </div>
+          <p className="text-[11px] text-amber-200/90 leading-relaxed">
+            {adherence.issues?.join(' | ') || 'The generated image met provider constraints, but material identity terms may be weakly reflected.'}
           </p>
         </div>
       )}
@@ -299,19 +319,34 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
           placeholder="e.g., mossy patches, weathered cracks, subtle gravel..."
         />
 
-        {/* Dedicated Prompt Builder Inspector Toggle */}
-        <div className="pt-0.5">
-          <button
-            type="button"
-            onClick={() => setShowPromptDetails(!showPromptDetails)}
-            className="flex items-center space-x-1 text-[11px] text-slate-400 hover:text-sky-300 transition-colors cursor-pointer"
-          >
-            <Info className="w-3 h-3 text-sky-400" />
-            <span>Dedicated Orthographic Prompt Rules</span>
-            {showPromptDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
+        {/* Developer Prompt Inspector Toggle */}
+        <div className="pt-1 flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowPromptDetails(!showPromptDetails)}
+              className="flex items-center space-x-1 text-[11px] text-slate-400 hover:text-sky-300 transition-colors cursor-pointer"
+            >
+              <Info className="w-3 h-3 text-sky-400" />
+              <span>Dedicated Orthographic Rules</span>
+              {showPromptDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+
+            {currentTile && (
+              <button
+                type="button"
+                onClick={() => setShowPromptInspector(!showPromptInspector)}
+                className="flex items-center space-x-1 text-[11px] text-amber-400 hover:text-amber-300 transition-colors cursor-pointer font-semibold"
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>Developer Prompt Inspector</span>
+                {showPromptInspector ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            )}
+          </div>
+
           {showPromptDetails && (
-            <div className="mt-2 p-2.5 rounded-lg bg-slate-950/90 border border-slate-800 text-[10px] text-slate-400 space-y-1 leading-relaxed">
+            <div className="mt-1 p-2.5 rounded-lg bg-slate-950/90 border border-slate-800 text-[10px] text-slate-400 space-y-1 leading-relaxed">
               <p className="font-semibold text-slate-300">Prompt Builder Enforcements:</p>
               <ul className="list-disc pl-4 space-y-0.5 text-slate-400">
                 <li>Top-down 90° direct overhead orthographic view</li>
@@ -320,6 +355,62 @@ export const GeneratorPanel: React.FC<GeneratorPanelProps> = ({
                 <li>Zero perspective, horizon, sky, characters, objects, or props</li>
                 <li>Zero borders, frames, UI, text, or watermarks</li>
               </ul>
+            </div>
+          )}
+
+          {/* Developer Prompt Inspector View */}
+          {showPromptInspector && currentTile && (
+            <div className="mt-2 p-3 rounded-xl bg-slate-950 border border-amber-500/40 text-[11px] font-mono text-slate-300 space-y-2">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                <span className="font-bold text-amber-400 flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Prompt Adherence Diagnostics
+                </span>
+                <span className="text-[10px] text-slate-400">Asset: {currentTile.id.slice(0, 8)}</span>
+              </div>
+
+              <div>
+                <span className="text-slate-500 text-[10px] block font-sans">User Original Prompt:</span>
+                <p className="text-slate-200 bg-slate-900 p-1.5 rounded border border-slate-800/80">
+                  {currentTile.generationMetadata?.userPrompt || params.additionalPrompt || '(None)'}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-slate-500 text-[10px] block font-sans">Resolved Material Profile:</span>
+                <p className="text-amber-300 font-bold">
+                  {currentTile.generationMetadata?.materialProfileId || currentTile.material}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-slate-500 text-[10px] block font-sans">Final Assembled Provider Prompt:</span>
+                <p className="text-slate-300 bg-slate-900 p-2 rounded border border-slate-800/80 break-words leading-relaxed">
+                  {currentTile.generationMetadata?.builtPrompt || currentTile.prompt}
+                </p>
+              </div>
+
+              {currentTile.generationMetadata?.negativePrompt && (
+                <div>
+                  <span className="text-slate-500 text-[10px] block font-sans">Negative Prompt Payload:</span>
+                  <p className="text-rose-300/90 bg-slate-900 p-1.5 rounded border border-slate-800/80 break-words">
+                    {currentTile.generationMetadata.negativePrompt}
+                  </p>
+                </div>
+              )}
+
+              {adherence && (
+                <div className="pt-1 border-t border-slate-800/80 space-y-1">
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="font-sans text-slate-400">Adherence Score:</span>
+                    <span className={`font-bold ${adherence.pass ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {adherence.score}/100 [{adherence.pass ? 'PASS' : 'WEAK_ADHERENCE'}]
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    {adherence.details}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

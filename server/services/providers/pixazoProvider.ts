@@ -7,9 +7,10 @@ import { PromptBuilder } from '../promptBuilder';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
 
 /**
- * Pixazo AI Image Generation Provider (Phase 2D Production-Hardened Integration)
+ * Pixazo AI Image Generation Provider (Phase 2D & 3.6 Production-Hardened Integration)
  *
  * Integrates Pixazo Serverless AI Gateway API targeting the FREE SDXL Base 1.0 model.
+ * Uses Material-Profile Negative Constraints via the API negative_prompt field.
  *
  * Official Specs & Sources:
  * - Free API Overview: https://www.pixazo.ai/api/free
@@ -97,15 +98,19 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
     const startTime = performance.now();
     const resolution = request.resolution || 512;
 
-    const builtPrompt =
-      request.customPrompt ||
-      PromptBuilder.buildPrompt({
-        material: request.material,
-        style: request.style,
-        detail: request.detail,
-        additionalPrompt: request.additionalPrompt,
-        resolution,
-      });
+    // Single Authoritative Prompt Construction Boundary:
+    // PromptBuilder incorporates customPrompt/additionalPrompt while maintaining material profile & tile constraints
+    const structuredPrompt = PromptBuilder.buildStructuredPrompt({
+      material: request.material,
+      style: request.style,
+      detail: request.detail,
+      additionalPrompt: request.additionalPrompt,
+      customPrompt: request.customPrompt,
+      resolution,
+    });
+
+    const builtPrompt = structuredPrompt.builtPrompt;
+    const negativePrompt = structuredPrompt.negativePrompt;
 
     const endpoint = this.getEndpoint();
     const model = this.getModelName();
@@ -119,7 +124,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
     const payload: Record<string, any> = {
       prompt: builtPrompt,
-      negative_prompt: 'blurry, distorted, low quality, 3d render, perspective view, character, face',
+      negative_prompt: negativePrompt,
       height: resolution,
       width: resolution,
       num_steps: 20,
@@ -248,6 +253,10 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
           requestId,
           resolution,
           requestedMaterial: request.material,
+          userPrompt: structuredPrompt.userPrompt,
+          materialProfileId: structuredPrompt.materialProfileId,
+          negativePrompt,
+          promptAdherence: structuredPrompt.adherenceReport,
         },
       };
     } catch (err: any) {
