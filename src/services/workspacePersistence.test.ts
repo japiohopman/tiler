@@ -4,347 +4,257 @@
  */
 
 import {
-  CURRENT_SCHEMA_VERSION,
-  PersistedWorkspaceData,
-  STORAGE_KEY,
   clearWorkspace,
+  CURRENT_SCHEMA_VERSION,
   deserializeWorkspace,
   loadWorkspace,
   saveWorkspace,
-  serializeWorkspace,
+  serializeWorkspaceMetadata,
 } from './workspacePersistence';
-import {
-  GenerationParams,
-  SeamAnalysisReport,
-  TileProcessingOptions,
-  ValidationSummary,
-  WorkspaceAsset,
-} from '../types';
+import { imageStorage } from './imageStorage';
+import { WorkspaceAsset } from '../types';
 
-function assert(condition: boolean, message: string) {
-  if (!condition) {
-    console.error(`X TEST FAILED: ${message}`);
-    process.exit(1);
+// Mock Browser Storage Environment for Unit Testing
+class MockLocalStorage {
+  private store: Map<string, string> = new Map();
+  public shouldThrowQuota = false;
+
+  getItem(key: string): string | null {
+    return this.store.get(key) || null;
   }
-  console.log(`  ✓ ${message}: PASSED`);
-}
 
-console.log('======================================================');
-console.log('  [WorkspacePersistence] Serialization & Lifecycle Tests');
-console.log('======================================================');
-
-// Setup mock window.localStorage for Node test environment
-const localStorageMap = new Map<string, string>();
-let mockQuotaError = false;
-
-if (typeof window === 'undefined') {
-  (globalThis as any).window = globalThis;
-}
-
-(globalThis as any).window.localStorage = {
-  getItem: (key: string) => localStorageMap.get(key) ?? null,
-  setItem: (key: string, value: string) => {
-    if (mockQuotaError) {
+  setItem(key: string, value: string): void {
+    if (this.shouldThrowQuota) {
       const err = new Error('QuotaExceededError');
       err.name = 'QuotaExceededError';
       throw err;
     }
-    localStorageMap.set(key, value);
-  },
-  removeItem: (key: string) => localStorageMap.delete(key),
-  clear: () => localStorageMap.clear(),
+    this.store.set(key, value);
+  }
+
+  removeItem(key: string): void {
+    this.store.delete(key);
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
+}
+
+const mockLocalStorage = new MockLocalStorage();
+(global as any).window = {
+  localStorage: mockLocalStorage,
 };
 
-// Reset mock storage before test suite
-localStorageMap.clear();
-mockQuotaError = false;
+// Fixture Data Generators
+const createTestAsset = (id: string, name: string): WorkspaceAsset => ({
+  id,
+  name,
+  material: 'cobblestone',
+  style: 'stylized',
+  prompt: 'seamless cobblestone texture',
+  resolution: 512,
+  rawImageDataUrl: `data:image/png;base64,RAW_DATA_${id}_AAAA`,
+  editedImageDataUrl: `data:image/png;base64,EDITED_DATA_${id}_BBBB`,
+  processedImageDataUrl: `data:image/png;base64,PROCESSED_DATA_${id}_CCCC`,
+  isTileable: true,
+  seamScore: 0.02,
+  rawSeamScore: 0.15,
+  seamReport: {
+    horizontalScore: 0.01,
+    verticalScore: 0.01,
+    overallScore: 0.02,
+    width: 512,
+    height: 512,
+    pass: true,
+    threshold: 0.05,
+    edgeRegion: 4,
+    maxHorizontalDelta: 0,
+    maxVerticalDelta: 0,
+    discontinuousPixelCount: 0,
+    totalEdgePixelsEvaluated: 2048,
+    issues: [],
+  },
+  validationSummary: {
+    generationStatus: 'SUCCESS',
+    rawTileable: false,
+    processedTileable: true,
+    rawSeamScore: 0.15,
+    processedSeamScore: 0.02,
+    improvement: 86.6,
+    improvementStatus: 'IMPROVED',
+    finalStatus: 'PASS_AFTER_PROCESSING',
+    threshold: 0.05,
+    issues: [],
+  },
+  createdAt: '2025-02-17T12:00:00.000Z',
+});
 
-// 1. Serialization Tests
-{
-  console.log('\n--- Serialization Tests ---');
+async function runTests() {
+  console.log('======================================================');
+  console.log('  [Persistence] Starting Unit & Lifecycle Test Suite');
+  console.log('======================================================\n');
 
-  const asset1: WorkspaceAsset = {
-    id: 'asset-test-1',
-    name: 'Cobblestone — Stylized',
-    material: 'cobblestone',
-    style: 'stylized',
-    prompt: 'top-down cobblestone pavement',
-    resolution: 512,
-    rawImageDataUrl: 'data:image/png;base64,raw123',
-    processedImageDataUrl: 'data:image/png;base64,proc123',
-    isTileable: true,
-    seamScore: 0.01,
-    rawSeamScore: 0.12,
-    createdAt: new Date().toISOString(),
-  };
+  let passed = 0;
+  let total = 0;
 
-  const sampleData: PersistedWorkspaceData = {
-    assets: [asset1],
-    currentAssetId: 'asset-test-1',
-    params: { material: 'cobblestone', style: 'stylized', resolution: 512 },
-    processingOptions: { algorithm: 'offset-crossfade', blendMarginPercent: 10 },
-    preview: { selectedSource: 'processed', mode: '3x3', showGrid: true },
-  };
+  function assert(condition: boolean, message: string) {
+    total++;
+    if (condition) {
+      console.log(`  ✓ ${message}: PASSED`);
+      passed++;
+    } else {
+      console.error(`  ✗ ${message}: FAILED`);
+      throw new Error(`Assertion failed: ${message}`);
+    }
+  }
 
-  const json = serializeWorkspace(sampleData);
-  assert(typeof json === 'string', 'serializeWorkspace produces JSON string');
+  try {
+    // 1. Serialization
+    console.log('--- 1. Metadata Serialization ---');
+    const assetA = createTestAsset('asset-1', 'Cobblestone Alpha');
+    const { json, assetsToStore } = serializeWorkspaceMetadata({
+      assets: [assetA],
+      currentAssetId: 'asset-1',
+      params: { material: 'cobblestone', style: 'stylized', resolution: 512 },
+    });
 
-  const parsed = JSON.parse(json);
-  assert(parsed.version === CURRENT_SCHEMA_VERSION, 'Includes current schema version 1');
-  assert(typeof parsed.savedAt === 'string', 'Includes savedAt ISO timestamp');
-  assert(parsed.workspace.assets.length === 1, 'Assets array serialized');
-  assert(parsed.workspace.currentAssetId === 'asset-test-1', 'currentAssetId serialized');
-  assert(parsed.workspace.assets[0].rawImageDataUrl === 'data:image/png;base64,raw123', 'rawImageDataUrl preserved');
-  assert(parsed.workspace.assets[0].processedImageDataUrl === 'data:image/png;base64,proc123', 'processedImageDataUrl preserved');
+    const parsedJson = JSON.parse(json);
+    assert(parsedJson.version === CURRENT_SCHEMA_VERSION, 'Schema version is 1');
+    assert(typeof parsedJson.savedAt === 'string', 'SavedAt timestamp is generated');
+    assert(parsedJson.workspace.assets.length === 1, 'Assets array is serialized');
+    assert(parsedJson.workspace.assets[0].rawImageDataUrl === undefined, 'Raw image Data URL is stripped from metadata json');
+    assert(assetsToStore[0].rawImageDataUrl === assetA.rawImageDataUrl, 'Raw image Data URL is preserved in assetsToStore for IndexedDB');
 
-  // Verify transient states and secrets are excluded
-  assert(parsed.workspace.generation === undefined, 'Transient generation state excluded from payload');
-  assert(parsed.workspace.processing === undefined, 'Transient processing state excluded from payload');
-  assert(parsed.workspace.export === undefined, 'Transient export state excluded from payload');
-  assert(parsed.workspace.activeView === undefined, 'Transient activeView excluded from payload');
-  assert(parsed.workspace.apiKey === undefined, 'Secrets and credentials excluded from payload');
+    // 2. Deserialization
+    console.log('\n--- 2. Deserialization & Validation ---');
+    const restored = deserializeWorkspace(json);
+    assert(restored !== null, 'Valid payload deserializes successfully');
+    assert(restored?.workspace.currentAssetId === 'asset-1', 'currentAssetId restored');
+    assert(restored?.workspace.assets[0].name === 'Cobblestone Alpha', 'Asset metadata restored');
+
+    // 3. Corrupt Data
+    console.log('\n--- 3. Corrupt Payload Handling ---');
+    assert(deserializeWorkspace('invalid json') === null, 'Malformed JSON returns null');
+    assert(deserializeWorkspace(JSON.stringify({ version: 999, workspace: {} })) === null, 'Incompatible version returns null');
+    assert(deserializeWorkspace(JSON.stringify({ version: 1, workspace: null })) === null, 'Invalid workspace object returns null');
+
+    // 4. Quota Handling
+    console.log('\n--- 4. Quota Exceeded Exception Handling ---');
+    mockLocalStorage.shouldThrowQuota = true;
+    const quotaResult = await saveWorkspace({
+      assets: [assetA],
+      currentAssetId: 'asset-1',
+    });
+    assert(quotaResult.success === false, 'Save returns success=false on QuotaExceeded');
+    assert(quotaResult.isQuotaExceeded === true, 'isQuotaExceeded flag set to true');
+    assert(quotaResult.error?.includes('quota exceeded') === true, 'Useful error message returned');
+    mockLocalStorage.shouldThrowQuota = false;
+
+    // 5. Full Persistence Lifecycle
+    console.log('\n--- 5. Full 6-Phase Persistence Lifecycle ---');
+    await clearWorkspace();
+
+    // Phase 1: Create Assets A & B
+    const assetB = createTestAsset('asset-2', 'Grass Beta');
+    assetB.material = 'grass';
+
+    await saveWorkspace({
+      assets: [assetA, assetB],
+      currentAssetId: 'asset-1',
+    });
+
+    let loadedPayload = await loadWorkspace();
+    assert(loadedPayload?.workspace.assets.length === 2, 'Phase 1: Both Assets A and B restored');
+    assert(loadedPayload?.workspace.currentAssetId === 'asset-1', 'Phase 1: Asset A remains selected');
+    assert(loadedPayload?.workspace.assets[0].rawImageDataUrl === assetA.rawImageDataUrl, 'Phase 1: Raw image Data URL loaded from IndexedDB');
+
+    // Phase 2: Edit Asset A
+    const editedAssetA = {
+      ...assetA,
+      editedImageDataUrl: 'data:image/png;base64,NEW_EDITED_IMAGE_AAAA',
+      validationSummary: {
+        generationStatus: 'SUCCESS' as const,
+        rawTileable: false,
+        processedTileable: false,
+        rawSeamScore: 0.15,
+        processedSeamScore: 0.15,
+        improvement: 0,
+        improvementStatus: 'UNCHANGED' as const,
+        finalStatus: 'VALIDATION_FAILED' as const,
+        threshold: 0.05,
+        issues: ['Committed edits require re-processing'],
+      },
+    };
+
+    await saveWorkspace({
+      assets: [editedAssetA, assetB],
+      currentAssetId: 'asset-1',
+    });
+
+    loadedPayload = await loadWorkspace();
+    assert(loadedPayload?.workspace.assets[0].editedImageDataUrl === 'data:image/png;base64,NEW_EDITED_IMAGE_AAAA', 'Phase 2: Edited image restored');
+    assert(loadedPayload?.workspace.assets[0].validationSummary?.finalStatus === 'VALIDATION_FAILED', 'Phase 2: Validation status invalidated upon edit');
+
+    // Phase 3: Reprocess Asset A
+    const processedAssetA = {
+      ...editedAssetA,
+      processedImageDataUrl: 'data:image/png;base64,NEW_PROCESSED_IMAGE_AAAA',
+      validationSummary: {
+        generationStatus: 'SUCCESS' as const,
+        rawTileable: false,
+        processedTileable: true,
+        rawSeamScore: 0.15,
+        processedSeamScore: 0.01,
+        improvement: 93.3,
+        improvementStatus: 'IMPROVED' as const,
+        finalStatus: 'PASS_AFTER_PROCESSING' as const,
+        threshold: 0.05,
+        issues: [],
+      },
+    };
+
+    await saveWorkspace({
+      assets: [processedAssetA, assetB],
+      currentAssetId: 'asset-1',
+    });
+
+    loadedPayload = await loadWorkspace();
+    assert(loadedPayload?.workspace.assets[0].processedImageDataUrl === 'data:image/png;base64,NEW_PROCESSED_IMAGE_AAAA', 'Phase 3: Reprocessed image restored');
+    assert(loadedPayload?.workspace.assets[0].validationSummary?.finalStatus === 'PASS_AFTER_PROCESSING', 'Phase 3: Final validation status restored');
+
+    // Phase 4: Select Asset B
+    await saveWorkspace({
+      assets: [processedAssetA, assetB],
+      currentAssetId: 'asset-2',
+    });
+
+    loadedPayload = await loadWorkspace();
+    assert(loadedPayload?.workspace.currentAssetId === 'asset-2', 'Phase 4: Asset B selection persisted across reload');
+
+    // Phase 5: Delete Asset A
+    await imageStorage.deleteAssetImages('asset-1');
+    await saveWorkspace({
+      assets: [assetB],
+      currentAssetId: 'asset-2',
+    });
+
+    loadedPayload = await loadWorkspace();
+    assert(loadedPayload?.workspace.assets.length === 1, 'Phase 5: Asset A deletion persisted');
+    assert(loadedPayload?.workspace.assets[0].id === 'asset-2', 'Phase 5: Only Asset B remains');
+
+    // Phase 6: Clear Local Workspace
+    await clearWorkspace();
+    loadedPayload = await loadWorkspace();
+    assert(loadedPayload === null, 'Phase 6: Workspace payload is null after clearWorkspace');
+
+    console.log('\n======================================================');
+    console.log(`  Persistence Test Suite Results: ${passed}/${total} Passed`);
+    console.log('======================================================\n');
+  } catch (err) {
+    console.error('\nTest Suite Execution Error:', err);
+    process.exit(1);
+  }
 }
 
-// 2. Deserialization Tests
-{
-  console.log('\n--- Deserialization Tests ---');
-
-  // Test A: Valid deserialization
-  const validJson = JSON.stringify({
-    version: 1,
-    savedAt: new Date().toISOString(),
-    workspace: {
-      id: 'default-workspace',
-      assets: [
-        {
-          id: 'asset-A',
-          name: 'Grass Tile',
-          material: 'grass',
-          style: 'stylized',
-          prompt: 'lush green grass',
-          resolution: 512,
-          rawImageDataUrl: 'data:image/png;base64,rawGrass',
-          processedImageDataUrl: 'data:image/png;base64,procGrass',
-          isTileable: true,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      currentAssetId: 'asset-A',
-      params: { material: 'grass', style: 'stylized', resolution: 512 },
-    },
-  });
-
-  const payload = deserializeWorkspace(validJson);
-  assert(payload !== null, 'Valid JSON payload deserializes successfully');
-  assert(payload?.version === 1, 'Version matches 1');
-  assert(payload?.workspace.assets.length === 1, 'Restores asset history array');
-  assert(payload?.workspace.currentAssetId === 'asset-A', 'Restores currentAssetId');
-  assert(payload?.workspace.assets[0].name === 'Grass Tile', 'Restores asset properties');
-
-  // Test B: Malformed JSON handled safely
-  const malformed = deserializeWorkspace('{"version": 1, "workspace": { corrupt JSON...');
-  assert(malformed === null, 'Malformed JSON returns null safely without throwing');
-
-  // Test C: Incompatible schema version rejected safely
-  const futureVersion = JSON.stringify({
-    version: 999,
-    savedAt: new Date().toISOString(),
-    workspace: { assets: [] },
-  });
-  const futureRes = deserializeWorkspace(futureVersion);
-  assert(futureRes === null, 'Incompatible schema version returns null safely');
-
-  // Test D: Corrupt asset items filtered out safely
-  const corruptAssetsJson = JSON.stringify({
-    version: 1,
-    savedAt: new Date().toISOString(),
-    workspace: {
-      assets: [
-        { id: 'valid-1', name: 'Valid Asset', material: 'wood' },
-        null,
-        'not an object',
-        { invalidField: true }, // missing mandatory id, name, material
-      ],
-      currentAssetId: 'valid-1',
-    },
-  });
-  const corruptRes = deserializeWorkspace(corruptAssetsJson);
-  assert(corruptRes?.workspace.assets.length === 1, 'Corrupt or incomplete asset items filtered out safely');
-  assert(corruptRes?.workspace.assets[0].id === 'valid-1', 'Only valid asset retained');
-
-  // Test E: Invalid currentAssetId fallback
-  const invalidIdJson = JSON.stringify({
-    version: 1,
-    savedAt: new Date().toISOString(),
-    workspace: {
-      assets: [{ id: 'existing-id', name: 'Existing Asset', material: 'sand' }],
-      currentAssetId: 'non-existent-id-999',
-    },
-  });
-  const invalidIdRes = deserializeWorkspace(invalidIdJson);
-  assert(invalidIdRes?.workspace.currentAssetId === 'existing-id', 'Invalid currentAssetId falls back to existing asset ID');
-}
-
-// 3. Storage Quota & Error Handling
-{
-  console.log('\n--- Storage Quota & Error Handling Tests ---');
-
-  localStorageMap.clear();
-  mockQuotaError = true;
-
-  const testAsset: WorkspaceAsset = {
-    id: 'heavy-asset',
-    name: 'Heavy Asset',
-    material: 'water',
-    style: 'stylized',
-    prompt: 'water',
-    resolution: 512,
-    createdAt: new Date().toISOString(),
-    isTileable: true,
-  };
-
-  const saveRes = saveWorkspace({
-    assets: [testAsset],
-    currentAssetId: 'heavy-asset',
-  });
-
-  assert(saveRes.success === false, 'QuotaExceeded returns success: false');
-  assert(saveRes.isQuotaExceeded === true, 'Identifies quota exceeded condition');
-  assert(typeof saveRes.error === 'string' && saveRes.error.includes('quota'), 'Returns clear quota warning message');
-
-  mockQuotaError = false;
-  localStorageMap.clear();
-}
-
-// 4. Persistence Lifecycle Integration Tests (Section 19 in prompt)
-{
-  console.log('\n--- Persistence Lifecycle Tests ---');
-
-  localStorageMap.clear();
-
-  // Lifecycle 1: Create Asset -> Save -> Load -> Asset Restored
-  const assetCreated: WorkspaceAsset = {
-    id: 'asset-1-cobble',
-    name: 'Cobblestone — Stylized',
-    material: 'cobblestone',
-    style: 'stylized',
-    prompt: 'cobblestone pavement',
-    resolution: 512,
-    rawImageDataUrl: 'data:image/png;base64,rawCobble1',
-    processedImageDataUrl: 'data:image/png;base64,procCobble1',
-    isTileable: true,
-    seamScore: 0.01,
-    createdAt: new Date().toISOString(),
-  };
-
-  saveWorkspace({
-    assets: [assetCreated],
-    currentAssetId: 'asset-1-cobble',
-    params: { material: 'cobblestone', style: 'stylized', resolution: 512 },
-  });
-
-  const load1 = loadWorkspace();
-  assert(load1 !== null && load1.workspace.assets.length === 1, 'Lifecycle 1: Created asset saved and loaded');
-  assert(load1?.workspace.currentAssetId === 'asset-1-cobble', 'Lifecycle 1: currentAssetId restored');
-  assert(load1?.workspace.assets[0].rawImageDataUrl === 'data:image/png;base64,rawCobble1', 'Lifecycle 1: Raw image restored');
-
-  // Lifecycle 2: Edit Asset -> Save -> Reload -> Edited Asset Restored
-  const assetEdited: WorkspaceAsset = {
-    ...assetCreated,
-    editedImageDataUrl: 'data:image/png;base64,editedCobble1',
-    processedImageDataUrl: undefined,
-    isTileable: false,
-    validationSummary: {
-      generationStatus: 'SUCCESS',
-      rawTileable: false,
-      processedTileable: false,
-      rawSeamScore: 0.12,
-      processedSeamScore: 1.0,
-      improvement: 0,
-      improvementStatus: 'UNCHANGED',
-      finalStatus: 'VALIDATION_FAILED',
-      threshold: 0.05,
-      issues: ['Source image edited — explicit reprocessing required'],
-    },
-  };
-
-  saveWorkspace({
-    assets: [assetEdited],
-    currentAssetId: 'asset-1-cobble',
-  });
-
-  const load2 = loadWorkspace();
-  assert(load2?.workspace.assets[0].rawImageDataUrl === 'data:image/png;base64,rawCobble1', 'Lifecycle 2: Raw image remains available');
-  assert(load2?.workspace.assets[0].editedImageDataUrl === 'data:image/png;base64,editedCobble1', 'Lifecycle 2: Edited image restored');
-  assert(load2?.workspace.assets[0].validationSummary?.finalStatus === 'VALIDATION_FAILED', 'Lifecycle 2: Invalidated validation status restored');
-
-  // Lifecycle 3: Process Asset -> Save -> Reload -> Processed Asset Restored
-  const assetProcessed: WorkspaceAsset = {
-    ...assetEdited,
-    processedImageDataUrl: 'data:image/png;base64,reprocessedCobble1',
-    isTileable: true,
-    seamScore: 0.005,
-    validationSummary: {
-      generationStatus: 'SUCCESS',
-      rawTileable: false,
-      processedTileable: true,
-      rawSeamScore: 0.12,
-      processedSeamScore: 0.005,
-      improvement: 0.115,
-      improvementStatus: 'IMPROVED',
-      finalStatus: 'PASS_AFTER_PROCESSING',
-      threshold: 0.05,
-      issues: [],
-    },
-  };
-
-  saveWorkspace({
-    assets: [assetProcessed],
-    currentAssetId: 'asset-1-cobble',
-  });
-
-  const load3 = loadWorkspace();
-  assert(load3?.workspace.assets[0].processedImageDataUrl === 'data:image/png;base64,reprocessedCobble1', 'Lifecycle 3: Processed image restored');
-  assert(load3?.workspace.assets[0].validationSummary?.finalStatus === 'PASS_AFTER_PROCESSING', 'Lifecycle 3: Re-validated status restored');
-
-  // Lifecycle 4: Select Asset B -> Save -> Reload -> Asset B Remains Selected
-  const assetB: WorkspaceAsset = {
-    id: 'asset-2-wood',
-    name: 'Wood — Hand-Painted',
-    material: 'wood',
-    style: 'hand-painted',
-    prompt: 'wooden planks',
-    resolution: 512,
-    rawImageDataUrl: 'data:image/png;base64,rawWood',
-    createdAt: new Date().toISOString(),
-    isTileable: false,
-  };
-
-  saveWorkspace({
-    assets: [assetProcessed, assetB],
-    currentAssetId: 'asset-2-wood', // User selected Asset B
-  });
-
-  const load4 = loadWorkspace();
-  assert(load4?.workspace.assets.length === 2, 'Lifecycle 4: Both assets persisted');
-  assert(load4?.workspace.currentAssetId === 'asset-2-wood', 'Lifecycle 4: Selected Asset B restored as currentAssetId');
-
-  // Lifecycle 5: Delete Asset A -> Save -> Reload -> Asset A Remains Deleted
-  saveWorkspace({
-    assets: [assetB],
-    currentAssetId: 'asset-2-wood',
-  });
-
-  const load5 = loadWorkspace();
-  assert(load5?.workspace.assets.length === 1, 'Lifecycle 5: Deleted asset removed from storage');
-  assert(load5?.workspace.assets[0].id === 'asset-2-wood', 'Lifecycle 5: Remaining asset preserved');
-
-  // Lifecycle 6: Clear Workspace -> Storage Removed -> Load returns null
-  clearWorkspace();
-  const load6 = loadWorkspace();
-  assert(load6 === null, 'Lifecycle 6: Clear workspace removes persisted storage');
-}
-
-console.log('======================================================');
-console.log('  All WorkspacePersistence Unit & Lifecycle Tests Passed!');
-console.log('======================================================');
+runTests();

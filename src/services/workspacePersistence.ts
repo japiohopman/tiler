@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { imageStorage } from './imageStorage';
 import {
   GenerationParams,
   PreviewState,
@@ -37,15 +38,16 @@ export interface SaveWorkspaceResult {
 }
 
 /**
- * Pure function to serialize workspace state into a versioned JSON payload.
- * Strictly excludes transient execution state, active network requests, and secret credentials.
+ * Strips heavy base64 Data URLs from assets before local storage serialization.
+ * Returns metadata workspace with image fields removed.
  */
-export function serializeWorkspace(
+export function serializeWorkspaceMetadata(
   data: PersistedWorkspaceData,
   version: number = CURRENT_SCHEMA_VERSION
-): string {
-  // Sanitize assets to ensure no temporary non-serializable fields remain
-  const sanitizedAssets: WorkspaceAsset[] = (data.assets || []).map((asset) => {
+): { json: string; assetsToStore: WorkspaceAsset[] } {
+  const assetsToStore = data.assets || [];
+
+  const sanitizedAssets: WorkspaceAsset[] = assetsToStore.map((asset) => {
     return {
       id: asset.id,
       name: asset.name,
@@ -53,9 +55,10 @@ export function serializeWorkspace(
       style: asset.style,
       prompt: asset.prompt,
       resolution: asset.resolution,
-      rawImageDataUrl: asset.rawImageDataUrl,
-      editedImageDataUrl: asset.editedImageDataUrl,
-      processedImageDataUrl: asset.processedImageDataUrl,
+      // Strip heavy data URLs for localStorage metadata json
+      rawImageDataUrl: undefined,
+      editedImageDataUrl: undefined,
+      processedImageDataUrl: undefined,
       isTileable: asset.isTileable,
       seamScore: asset.seamScore,
       rawSeamScore: asset.rawSeamScore,
@@ -88,7 +91,60 @@ export function serializeWorkspace(
     },
   };
 
-  return JSON.stringify(payload);
+  return {
+    json: JSON.stringify(payload),
+    assetsToStore,
+  };
+}
+
+/**
+ * Saves workspace state using dual-layer architecture:
+ * 1. Image Data URLs are stored as blobs in IndexedDB (`imageStorage`).
+ * 2. Lightweight asset metadata is serialized to localStorage.
+ */
+export async function saveWorkspace(data: PersistedWorkspaceData): Promise<SaveWorkspaceResult> {
+  try {
+    const { json, assetsToStore } = serializeWorkspaceMetadata(data);
+
+    // Step 1: Save image blobs in IndexedDB
+    for (const asset of assetsToStore) {
+      if (asset.rawImageDataUrl) {
+        await imageStorage.saveImage(`raw_${asset.id}`, asset.rawImageDataUrl);
+      }
+      if (asset.editedImageDataUrl) {
+        await imageStorage.saveImage(`edited_${asset.id}`, asset.editedImageDataUrl);
+      }
+      if (asset.processedImageDataUrl) {
+        await imageStorage.saveImage(`processed_${asset.id}`, asset.processedImageDataUrl);
+      }
+    }
+
+    // Step 2: Save metadata in localStorage
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(STORAGE_KEY, json);
+    }
+
+    return {
+      success: true,
+      bytesWritten: json.length,
+    };
+  } catch (err: any) {
+    const isQuota =
+      err?.name === 'QuotaExceededError' ||
+      err?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      err?.code === 22 ||
+      err?.code === 1014;
+
+    console.warn('[WorkspacePersistence] Failed to save workspace:', err?.message || err);
+
+    return {
+      success: false,
+      isQuotaExceeded: isQuota,
+      error: isQuota
+        ? 'Local storage quota exceeded. Workspace changes will remain active in memory.'
+        : `Storage error: ${err?.message || 'Failed to save workspace'}`,
+    };
+  }
 }
 
 /**
@@ -112,7 +168,6 @@ export function deserializeWorkspace(
     // Version Check
     const version = typeof raw.version === 'number' ? raw.version : 0;
     if (version !== CURRENT_SCHEMA_VERSION) {
-      // Future migration boundary can be added here
       console.warn(`[WorkspacePersistence] Incompatible schema version ${version}. Expected ${CURRENT_SCHEMA_VERSION}.`);
       return null;
     }
@@ -226,48 +281,9 @@ export function deserializeWorkspace(
 }
 
 /**
- * Saves workspace state to local storage.
- * Gracefully handles QuotaExceededError and browser storage unavailability.
+ * Loads metadata from localStorage and hydrates image blobs from IndexedDB.
  */
-export function saveWorkspace(data: PersistedWorkspaceData): SaveWorkspaceResult {
-  try {
-    const serialized = serializeWorkspace(data);
-
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return {
-        success: false,
-        error: 'Browser localStorage is not available in this environment',
-      };
-    }
-
-    window.localStorage.setItem(STORAGE_KEY, serialized);
-    return {
-      success: true,
-      bytesWritten: serialized.length,
-    };
-  } catch (err: any) {
-    const isQuota =
-      err?.name === 'QuotaExceededError' ||
-      err?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
-      err?.code === 22 ||
-      err?.code === 1014;
-
-    console.warn('[WorkspacePersistence] Failed to save workspace:', err?.message || err);
-
-    return {
-      success: false,
-      isQuotaExceeded: isQuota,
-      error: isQuota
-        ? 'Local storage quota exceeded. Workspace changes will remain active in memory but cannot be saved locally.'
-        : `Storage error: ${err?.message || 'Failed to save workspace'}`,
-    };
-  }
-}
-
-/**
- * Loads and deserializes persisted workspace state from local storage.
- */
-export function loadWorkspace(): PersistedWorkspacePayload | null {
+export async function loadWorkspace(): Promise<PersistedWorkspacePayload | null> {
   try {
     if (typeof window === 'undefined' || !window.localStorage) {
       return null;
@@ -278,7 +294,31 @@ export function loadWorkspace(): PersistedWorkspacePayload | null {
       return null;
     }
 
-    return deserializeWorkspace(raw);
+    const payload = deserializeWorkspace(raw);
+    if (!payload) {
+      return null;
+    }
+
+    // Hydrate image blobs from IndexedDB into assets
+    const hydratedAssets: WorkspaceAsset[] = await Promise.all(
+      payload.workspace.assets.map(async (asset) => {
+        const [rawImg, editedImg, processedImg] = await Promise.all([
+          asset.rawImageDataUrl || imageStorage.loadImage(`raw_${asset.id}`),
+          asset.editedImageDataUrl || imageStorage.loadImage(`edited_${asset.id}`),
+          asset.processedImageDataUrl || imageStorage.loadImage(`processed_${asset.id}`),
+        ]);
+
+        return {
+          ...asset,
+          rawImageDataUrl: rawImg || undefined,
+          editedImageDataUrl: editedImg || undefined,
+          processedImageDataUrl: processedImg || undefined,
+        };
+      })
+    );
+
+    payload.workspace.assets = hydratedAssets;
+    return payload;
   } catch (err) {
     console.error('[WorkspacePersistence] Failed to load workspace:', err);
     return null;
@@ -286,13 +326,14 @@ export function loadWorkspace(): PersistedWorkspacePayload | null {
 }
 
 /**
- * Safely removes persisted workspace data from local storage.
+ * Safely removes persisted workspace metadata from localStorage and image blobs from IndexedDB.
  */
-export function clearWorkspace(): void {
+export async function clearWorkspace(): Promise<void> {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.removeItem(STORAGE_KEY);
     }
+    await imageStorage.clearAllImages();
   } catch (err) {
     console.error('[WorkspacePersistence] Failed to clear workspace:', err);
   }

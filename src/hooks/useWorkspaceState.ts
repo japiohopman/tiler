@@ -100,39 +100,43 @@ export function useWorkspaceState() {
       }
     }
 
-    // Attempt to restore local workspace
-    const persisted = loadWorkspace();
-    if (persisted && persisted.workspace) {
-      const { assets: restoredAssets, currentAssetId: restoredId, params: restoredParams, processingOptions: restoredOpts, preview: restoredPreview } = persisted.workspace;
+    async function initWorkspace() {
+      // Attempt to restore local workspace asynchronously (loads image blobs from IndexedDB)
+      const persisted = await loadWorkspace();
+      if (persisted && persisted.workspace) {
+        const { assets: restoredAssets, currentAssetId: restoredId, params: restoredParams, processingOptions: restoredOpts, preview: restoredPreview } = persisted.workspace;
 
-      if (restoredAssets && restoredAssets.length > 0) {
-        restoreAssets(restoredAssets, restoredId);
-      }
-      if (restoredParams) {
-        setParams(restoredParams);
-      }
-      if (restoredOpts) {
-        setProcessingOptions(restoredOpts);
-      }
-      if (restoredPreview) {
-        setPreviewState(restoredPreview);
+        if (restoredAssets && restoredAssets.length > 0) {
+          restoreAssets(restoredAssets, restoredId);
+        }
+        if (restoredParams) {
+          setParams(restoredParams);
+        }
+        if (restoredOpts) {
+          setProcessingOptions(restoredOpts);
+        }
+        if (restoredPreview) {
+          setPreviewState(restoredPreview);
+        }
+
+        if (restoredAssets && restoredAssets.length > 0) {
+          handleNotify(`Workspace restored from local storage (${restoredAssets.length} asset${restoredAssets.length > 1 ? 's' : ''})`, 'info');
+        }
       }
 
-      if (restoredAssets && restoredAssets.length > 0) {
-        handleNotify(`Workspace restored from local storage (${restoredAssets.length} asset${restoredAssets.length > 1 ? 's' : ''})`, 'info');
-      }
+      isLoadedRef.current = true;
+      verifyBackendAndInit();
     }
 
-    isLoadedRef.current = true;
-    verifyBackendAndInit();
+    initWorkspace();
   }, [restoreAssets, setPreviewState, handleNotify]);
 
   // Debounced Auto-Save on Workspace State Transitions
   useEffect(() => {
     if (!isLoadedRef.current) return;
 
-    const timeoutId = setTimeout(() => {
-      const result = saveWorkspace({
+    const timeoutId = setTimeout(async () => {
+      const result = await saveWorkspace({
         assets,
         currentAssetId,
         params,
@@ -152,8 +156,8 @@ export function useWorkspaceState() {
   }, [assets, currentAssetId, params, processingOptions, previewState, handleNotify]);
 
   // Intentional Workspace Clear Action
-  const handleClearWorkspace = useCallback(() => {
-    clearWorkspace();
+  const handleClearWorkspace = useCallback(async () => {
+    await clearWorkspace();
     clearAllAssets();
     setParams({
       material: 'cobblestone',
