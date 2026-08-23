@@ -89,6 +89,7 @@ export default function App() {
             currentAssetId={currentAssetId}
             onSelectAsset={actions.selectAsset}
             onDeleteAsset={actions.deleteAsset}
+            onClearWorkspace={actions.handleClearWorkspace}
             activeProvider={config.activeProvider}
           />
         </main>
@@ -113,6 +114,7 @@ export default function App() {
             currentAssetId={currentAssetId}
             onSelectAsset={actions.selectAsset}
             onDeleteAsset={actions.deleteAsset}
+            onClearWorkspace={actions.handleClearWorkspace}
             activeProvider={config.activeProvider}
           />
 

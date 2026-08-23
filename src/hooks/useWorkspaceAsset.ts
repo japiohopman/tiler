@@ -373,6 +373,16 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
     [addAsset]
   );
 
+  const clearAllAssets = useCallback(() => {
+    setAssets([]);
+    setCurrentAssetId(null);
+  }, []);
+
+  const restoreAssets = useCallback((newAssets: WorkspaceAsset[], newCurrentAssetId: string | null) => {
+    setAssets(newAssets);
+    setCurrentAssetId(newCurrentAssetId);
+  }, []);
+
   return {
     assets,
     setAssets,
@@ -383,6 +393,8 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
     deleteAsset,
     addAsset,
     updateAsset,
+    clearAllAssets,
+    restoreAssets,
     handleApplyEdits,
     handleResetEdits,
     processingState,
