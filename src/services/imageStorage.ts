@@ -17,6 +17,12 @@ const DB_NAME = 'tiler_workspace_db';
 const DB_VERSION = 1;
 const STORE_NAME = 'images';
 
+export interface SaveImageResult {
+  success: boolean;
+  isPersistent: boolean;
+  error?: string;
+}
+
 class ImageStorage {
   private dbPromise: Promise<IDBDatabase | null> | null = null;
   private inMemoryFallback: Map<string, string> = new Map();
@@ -68,33 +74,52 @@ class ImageStorage {
   }
 
   /**
-   * Saves a base64 Data URL image string into IndexedDB under key
+   * Saves a base64 Data URL image string into IndexedDB under key.
+   * Returns isPersistent = true ONLY if saved to durable IndexedDB storage.
+   * If IndexedDB is unavailable or fails, saves to runtime Map and returns isPersistent = false.
    */
-  public async saveImage(key: string, dataUrl: string): Promise<void> {
-    if (!key || !dataUrl) return;
+  public async saveImage(key: string, dataUrl: string): Promise<SaveImageResult> {
+    if (!key || !dataUrl) {
+      return { success: false, isPersistent: false, error: 'Key and dataUrl are required' };
+    }
 
     const db = await this.getDB();
     if (!db) {
       this.inMemoryFallback.set(key, dataUrl);
-      return;
+      return {
+        success: true,
+        isPersistent: false,
+        error: 'IndexedDB is unavailable; stored in runtime memory fallback only.',
+      };
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       try {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         const req = store.put(dataUrl, key);
 
-        req.onsuccess = () => resolve();
+        req.onsuccess = () => {
+          resolve({ success: true, isPersistent: true });
+        };
+
         req.onerror = () => {
           console.warn(`[ImageStorage] Failed to store image for key ${key}:`, req.error);
           this.inMemoryFallback.set(key, dataUrl);
-          resolve(); // Resolve non-blockingly
+          resolve({
+            success: true,
+            isPersistent: false,
+            error: `IndexedDB write error (${req.error?.message || 'unknown'}); stored in runtime memory fallback.`,
+          });
         };
-      } catch (err) {
+      } catch (err: any) {
         console.warn(`[ImageStorage] Transaction exception for key ${key}:`, err);
         this.inMemoryFallback.set(key, dataUrl);
-        resolve();
+        resolve({
+          success: true,
+          isPersistent: false,
+          error: `IndexedDB transaction exception (${err?.message || 'unknown'}); stored in runtime memory fallback.`,
+        });
       }
     });
   }

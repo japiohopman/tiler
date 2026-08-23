@@ -149,6 +149,8 @@ export function useWorkspaceState() {
           'Local storage quota exceeded. Workspace session remains active, but changes cannot be saved locally.',
           'warn'
         );
+      } else if (result.success && !result.isPersistent && result.error) {
+        handleNotify(result.error, 'warn');
       }
     }, 300);
 

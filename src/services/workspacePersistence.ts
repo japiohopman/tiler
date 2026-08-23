@@ -32,6 +32,7 @@ export interface PersistedWorkspacePayload {
 
 export interface SaveWorkspaceResult {
   success: boolean;
+  isPersistent: boolean;
   error?: string;
   isQuotaExceeded?: boolean;
   bytesWritten?: number;
@@ -105,17 +106,21 @@ export function serializeWorkspaceMetadata(
 export async function saveWorkspace(data: PersistedWorkspaceData): Promise<SaveWorkspaceResult> {
   try {
     const { json, assetsToStore } = serializeWorkspaceMetadata(data);
+    let allBlobsPersistent = true;
 
     // Step 1: Save image blobs in IndexedDB
     for (const asset of assetsToStore) {
       if (asset.rawImageDataUrl) {
-        await imageStorage.saveImage(`raw_${asset.id}`, asset.rawImageDataUrl);
+        const res = await imageStorage.saveImage(`raw_${asset.id}`, asset.rawImageDataUrl);
+        if (!res.isPersistent) allBlobsPersistent = false;
       }
       if (asset.editedImageDataUrl) {
-        await imageStorage.saveImage(`edited_${asset.id}`, asset.editedImageDataUrl);
+        const res = await imageStorage.saveImage(`edited_${asset.id}`, asset.editedImageDataUrl);
+        if (!res.isPersistent) allBlobsPersistent = false;
       }
       if (asset.processedImageDataUrl) {
-        await imageStorage.saveImage(`processed_${asset.id}`, asset.processedImageDataUrl);
+        const res = await imageStorage.saveImage(`processed_${asset.id}`, asset.processedImageDataUrl);
+        if (!res.isPersistent) allBlobsPersistent = false;
       }
     }
 
@@ -126,7 +131,11 @@ export async function saveWorkspace(data: PersistedWorkspaceData): Promise<SaveW
 
     return {
       success: true,
+      isPersistent: allBlobsPersistent,
       bytesWritten: json.length,
+      error: allBlobsPersistent
+        ? undefined
+        : 'Workspace metadata saved, but image blobs fell back to session memory only and will not survive reload.',
     };
   } catch (err: any) {
     const isQuota =
@@ -139,6 +148,7 @@ export async function saveWorkspace(data: PersistedWorkspaceData): Promise<SaveW
 
     return {
       success: false,
+      isPersistent: false,
       isQuotaExceeded: isQuota,
       error: isQuota
         ? 'Local storage quota exceeded. Workspace changes will remain active in memory.'

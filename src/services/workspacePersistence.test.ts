@@ -139,8 +139,8 @@ async function runTests() {
     assert(deserializeWorkspace(JSON.stringify({ version: 999, workspace: {} })) === null, 'Incompatible version returns null');
     assert(deserializeWorkspace(JSON.stringify({ version: 1, workspace: null })) === null, 'Invalid workspace object returns null');
 
-    // 4. Quota Handling
-    console.log('\n--- 4. Quota Exceeded Exception Handling ---');
+    // 4. Quota & Memory Fallback Semantics
+    console.log('\n--- 4. Quota & Memory Fallback Semantics ---');
     mockLocalStorage.shouldThrowQuota = true;
     const quotaResult = await saveWorkspace({
       assets: [assetA],
@@ -150,6 +150,22 @@ async function runTests() {
     assert(quotaResult.isQuotaExceeded === true, 'isQuotaExceeded flag set to true');
     assert(quotaResult.error?.includes('quota exceeded') === true, 'Useful error message returned');
     mockLocalStorage.shouldThrowQuota = false;
+
+    // Test in-memory image fallback semantics when IndexedDB is unavailable
+    const saveImgFallbackRes = await imageStorage.saveImage('fallback_test_key', 'data:image/png;base64,FALLBACK_IMG');
+    assert(saveImgFallbackRes.success === true, 'Image save succeeds in fallback Map');
+    assert(saveImgFallbackRes.isPersistent === false, 'Image save explicitly reports isPersistent=false when using in-memory Map');
+
+    const loadedFallbackImg = await imageStorage.loadImage('fallback_test_key');
+    assert(loadedFallbackImg === 'data:image/png;base64,FALLBACK_IMG', 'Loaded image from in-memory fallback Map');
+
+    const saveWsFallbackRes = await saveWorkspace({
+      assets: [assetA],
+      currentAssetId: 'asset-1',
+    });
+    assert(saveWsFallbackRes.success === true, 'Workspace save returns success=true');
+    assert(saveWsFallbackRes.isPersistent === false, 'Workspace save explicitly reports isPersistent=false when blobs rely on memory fallback');
+    assert(typeof saveWsFallbackRes.error === 'string', 'Workspace save returns warning message for non-persistent fallback');
 
     // 5. Full Persistence Lifecycle
     console.log('\n--- 5. Full 6-Phase Persistence Lifecycle ---');
@@ -239,6 +255,16 @@ async function runTests() {
       currentAssetId: 'asset-2',
     });
 
+    const deletedRawImgA = await imageStorage.loadImage('raw_asset-1');
+    const deletedEditedImgA = await imageStorage.loadImage('edited_asset-1');
+    const deletedProcessedImgA = await imageStorage.loadImage('processed_asset-1');
+    assert(deletedRawImgA === null, 'Phase 5: Raw image blob for Asset A deleted from storage');
+    assert(deletedEditedImgA === null, 'Phase 5: Edited image blob for Asset A deleted from storage');
+    assert(deletedProcessedImgA === null, 'Phase 5: Processed image blob for Asset A deleted from storage');
+
+    const remainingRawImgB = await imageStorage.loadImage('raw_asset-2');
+    assert(remainingRawImgB === assetB.rawImageDataUrl, 'Phase 5: Asset B image blob remains untouched');
+
     loadedPayload = await loadWorkspace();
     assert(loadedPayload?.workspace.assets.length === 1, 'Phase 5: Asset A deletion persisted');
     assert(loadedPayload?.workspace.assets[0].id === 'asset-2', 'Phase 5: Only Asset B remains');
@@ -247,6 +273,9 @@ async function runTests() {
     await clearWorkspace();
     loadedPayload = await loadWorkspace();
     assert(loadedPayload === null, 'Phase 6: Workspace payload is null after clearWorkspace');
+
+    const clearedRawImgB = await imageStorage.loadImage('raw_asset-2');
+    assert(clearedRawImgB === null, 'Phase 6: All image blobs cleared from storage');
 
     console.log('\n======================================================');
     console.log(`  Persistence Test Suite Results: ${passed}/${total} Passed`);
