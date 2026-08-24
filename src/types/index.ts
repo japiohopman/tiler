@@ -150,6 +150,7 @@ export interface WorkspaceState {
   preview: PreviewState;
   export: ExportState;
   notification: { message: string; type: 'info' | 'success' | 'warn' } | null;
+  isPersistent?: boolean;
 }
 
 export type EdgeRegionDepth = 1 | 2 | 4 | 8;

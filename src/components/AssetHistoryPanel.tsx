@@ -27,6 +27,7 @@ interface AssetHistoryPanelProps {
   onDeleteAsset: (id: string) => void;
   onClearWorkspace?: () => void;
   activeProvider?: string;
+  isPersistent?: boolean;
 }
 
 export const AssetHistoryPanel: React.FC<AssetHistoryPanelProps> = ({
@@ -36,6 +37,7 @@ export const AssetHistoryPanel: React.FC<AssetHistoryPanelProps> = ({
   onDeleteAsset,
   onClearWorkspace,
   activeProvider = 'pixazo',
+  isPersistent = true,
 }) => {
   const currentAsset = assets.find((a) => a.id === currentAssetId) || null;
 
@@ -102,10 +104,17 @@ export const AssetHistoryPanel: React.FC<AssetHistoryPanelProps> = ({
           </h2>
         </div>
         <div className="flex items-center space-x-2">
-          <span className="text-[10px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center space-x-1">
-            <HardDrive className="w-3 h-3 text-emerald-400" />
-            <span>Saved locally</span>
-          </span>
+          {isPersistent ? (
+            <span className="text-[10px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center space-x-1">
+              <HardDrive className="w-3 h-3 text-emerald-400" />
+              <span>Saved locally</span>
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono bg-amber-950/80 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded flex items-center space-x-1" title="Workspace image blobs stored in session memory fallback only. Changes will not survive reload.">
+              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              <span>Session only — not persisted</span>
+            </span>
+          )}
           <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
             {assets.length} / 20 Assets
           </span>

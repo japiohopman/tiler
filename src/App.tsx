@@ -91,6 +91,7 @@ export default function App() {
             onDeleteAsset={actions.deleteAsset}
             onClearWorkspace={actions.handleClearWorkspace}
             activeProvider={config.activeProvider}
+            isPersistent={state.isPersistent}
           />
         </main>
       ) : (
@@ -116,6 +117,7 @@ export default function App() {
             onDeleteAsset={actions.deleteAsset}
             onClearWorkspace={actions.handleClearWorkspace}
             activeProvider={config.activeProvider}
+            isPersistent={state.isPersistent}
           />
 
           {/* Configuration & Pipeline Controls */}

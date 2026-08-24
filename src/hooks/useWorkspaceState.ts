@@ -31,6 +31,7 @@ export function useWorkspaceState() {
   const [activeProvider, setActiveProvider] = useState<string>('pixazo');
   const [providerConfigured, setProviderConfigured] = useState<boolean>(true);
   const [notification, setNotification] = useState<{ message: string; type: 'info' | 'success' | 'warn' } | null>(null);
+  const [isPersistent, setIsPersistent] = useState<boolean>(true);
 
   // Generation & Processing Parameters
   const [params, setParams] = useState<GenerationParams>({
@@ -145,12 +146,16 @@ export function useWorkspaceState() {
       });
 
       if (!result.success && result.isQuotaExceeded) {
+        setIsPersistent(false);
         handleNotify(
           'Local storage quota exceeded. Workspace session remains active, but changes cannot be saved locally.',
           'warn'
         );
       } else if (result.success && !result.isPersistent && result.error) {
+        setIsPersistent(false);
         handleNotify(result.error, 'warn');
+      } else if (result.success && result.isPersistent) {
+        setIsPersistent(true);
       }
     }, 300);
 
@@ -215,6 +220,7 @@ export function useWorkspaceState() {
     preview: previewState,
     export: exportState,
     notification,
+    isPersistent,
   };
 
   return {

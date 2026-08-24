@@ -32,7 +32,18 @@ src/services/workspacePersistence.ts   # Synchronous/Asynchronous metadata seria
 
 3. **Runtime Fallback Only (Memory Map)**:
    - If IndexedDB is unavailable or fails to initialize, `imageStorage` stores images in a runtime `Map`.
-   - **Important**: In-memory Map storage is a **runtime session fallback only — not durable persistence**. `saveWorkspace()` detects in-memory fallback and sets `isPersistent: false`, triggering a non-blocking user warning ("Changes stored in session memory only — will not survive reload").
+   - **Important**: In-memory Map storage is a **runtime session fallback only — not durable persistence**. `saveWorkspace()` detects in-memory fallback and returns `isPersistent: false`, updating UI state.
+
+---
+
+## UI Persistence Indicators
+
+In `AssetHistoryPanel.tsx`, the workspace header displays an explicit indicator based on storage durability:
+
+- **Durable Storage Success (`isPersistent: true`)**:
+  Renders green badge: **Saved locally**
+- **Session Memory Fallback (`isPersistent: false`)**:
+  Renders amber/yellow badge: **Session only — not persisted** with tooltip explaining that changes will not survive browser reload.
 
 ---
 
