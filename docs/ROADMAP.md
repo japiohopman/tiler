@@ -24,9 +24,9 @@ The deterministic processing and validation pipeline remains the authority for w
 | **2B** | Benchmark framework | Complete / historical | Repeatable provider benchmarking and comparable reports |
 | **2C** | Provider research PoCs | Complete / historical | Determine which external image-generation providers are technically viable |
 | **2D** | Pixazo productionization | Complete | Establish one reliable end-to-end generation vertical slice |
-| **3** | Functional product / vertical slice | Next | Expand the working slice into a genuinely usable Tiler application |
-| **4** | UX, quality & hardening | Planned | Make the working product pleasant, robust, observable, and safe to operate |
-| **5** | Release / ecosystem | Future | Packaging, deployment, documentation, and additional providers/features |
+| **3** | Product completion | In progress | Turn the technical slice into a genuinely usable creative application |
+| **4** | Production readiness, UX polish & hardening | Planned | Make the complete product polished, robust, accessible, observable, and safe to operate |
+| **5** | Release / ecosystem | Future | Packaging, deployment, additional providers, and advanced workflows |
 
 ---
 
@@ -60,103 +60,178 @@ The goal is not to build the entire final application yet. The goal is to prove 
 
 The real Pixazo provider path has been connected to the application and verified through the UI and backend.
 
-Exit condition:
-
-- Real generation request reaches Pixazo.
-- Real provider image is returned to Tiler.
-- The generated image enters the normal processing pipeline.
-- The UI can display the generated result.
-
 ## 2D.2 — Processing & Validation — Complete
 
 The raw provider result and processed result are handled as distinct stages.
 
-Completed capabilities include:
-
-- raw seam analysis
-- processed seam analysis
-- validation summary
-- deterministic final-status handling
-- independent raw/processed pass information
-- UI reporting of improvement, worsening, or unchanged processing results
+Completed capabilities include raw seam analysis, processed seam analysis, validation summary, deterministic final-status handling, independent raw/processed pass information, and UI reporting of improvement, worsening, or unchanged processing results.
 
 The backend `validationSummary.finalStatus` is the authoritative source for the user-facing final validation status.
 
 ## 2D.3 — Export & Output — Complete
 
-The generated and processed results can be taken through the output/export path.
-
-The phase established the minimum output contract needed for the vertical slice and separated source, processed, validation, and export concerns.
+The generated and processed results can be taken through the output/export path, including multi-tile spritesheet compositing.
 
 ## 2D.4 — Reliability & Failure Handling — Complete
 
-This phase hardened the real application path, handling and verifying all core success and failure states:
-
-- missing or invalid Pixazo credentials (HTTP 502 Bad Gateway with structured `stage: 'provider'` error)
-- provider rejection and network/API timeout
-- invalid or empty image response
-- image processing failure
-- validation failure handling without treating non-tileable generation as application failure
-- successful generation and validation flow
-- export validation indicators and notice when exporting unvalidated results
-- deterministic state transitions and prevention of silent fallback to mock output when Pixazo is selected
+The real application path handles and verifies core success and failure states, including provider credential failures, provider/API failures, invalid image responses, processing failures, validation failures, explicit export validation state, deterministic state transitions, and no silent fallback to mock output when Pixazo is selected.
 
 ## 2D.5 — Vertical Slice Acceptance — Complete
 
-End-to-end acceptance pass verified against the real local application path:
+End-to-end acceptance verified:
 
 `prompt → Pixazo → image → TileProcessor → validation → preview → export`
-
-Acceptance confirmed that UI state, backend state, `validationSummary.finalStatus` authority, raw/processed seam reports, preview renders, and exported outputs remain completely consistent.
 
 ### Phase 2D exit criteria
 
 Phase 2D is **complete**. The local setup reliably demonstrates the complete vertical slice with explicit success and failure states, robust credential redaction, multi-tile spritesheet export compositing, and automated tests covering the provider integration and pipeline boundaries.
 
-At that point Tiler has a **working technical product slice** and Phase 3 can focus on product completeness rather than proving whether the underlying generation path works.
+At this point Tiler has a **working technical product slice**. Phase 3 is therefore focused on product completion and real user workflow quality rather than proving whether the underlying generation path works.
 
 ---
 
-# Phase 3 — Functional product / vertical slice
+# Phase 3 — Product completion
 
-Phase 3 starts **after the Pixazo path passes the Phase 2D acceptance criteria**.
+Phase 3 is now the active product-building phase.
 
-The goal is to turn the working technical slice into the actual Tiler application.
+The goal is to turn the working technical slice into the actual Tiler application: a coherent creative workflow in which users can generate, inspect, edit, process, validate, manage, and export tile assets without needing to understand the underlying engineering pipeline.
 
-Likely areas include:
+Phase 3 work should be driven by real use of the application. We should prefer meaningful workflow improvements over isolated technical tasks or speculative infrastructure.
 
-- proper application state management
-- generation history
-- regenerate / retry flows
-- configurable tile-processing options
-- side-by-side and tiled previews
-- useful validation feedback
-- asset naming and metadata
-- export formats and dimensions
-- persistence where appropriate
-- clearer separation between source, candidate, processed, and validated asset
+## 3.1 — Application State & Workspace Foundation — Complete
 
-Phase 3 should be driven by real user workflows discovered while using the working application. It should not prematurely become a collection of speculative features.
+Established the workspace state boundaries and the foundation for treating the application as a coherent workspace rather than a collection of disconnected component states.
+
+## 3.2 — Generation & Regenerate UX — Complete
+
+Established clear Generate and Regenerate behavior, including duplicate-generation protection and user-visible generation state.
+
+## 3.3 — Processing Controls & Live Preview — Complete
+
+Established explicit processing controls and live preview behavior while preserving the distinction between raw and processed imagery.
+
+## 3.4 — Generation History & Asset Management — Complete
+
+Established in-memory asset history and current-asset selection.
+
+Completed capabilities include:
+
+- distinct assets for successful generations and regenerations;
+- independent raw and processed image state per asset;
+- per-asset validation summary and metadata;
+- selecting historical assets without triggering generation or processing;
+- isolated reprocessing of the selected asset;
+- deterministic asset deletion behavior;
+- bounded in-memory history;
+- guaranteed unique workspace asset identities.
+
+## 3.5 — Tiler Image Editor & UX Foundation — Next
+
+This is the next major product milestone.
+
+The objective is to give the user meaningful control over generated imagery instead of treating provider output as untouchable.
+
+The editor must use a **Tiler-owned UI**. Do not expose a third-party editor UI through an iframe.
+
+Photopea may be evaluated and used as an underlying image-processing/editing engine where technically appropriate, but its UI must not become the Tiler user experience.
+
+Likely capabilities include:
+
+- crop and framing;
+- rotate and flip;
+- transform;
+- brightness, contrast, saturation and related basic adjustments;
+- before/after inspection;
+- editing raw or selected source imagery without corrupting immutable source data;
+- applying edits back into the workspace asset model;
+- reprocessing, validation and export after editing;
+- a substantial UX/UI refinement pass around the complete creative workflow;
+- clearer empty, loading, success, failure and recovery states;
+- clearer RAW vs PROCESSED semantics;
+- consistent controls and interaction patterns;
+- accessibility and responsive-layout fundamentals.
+
+The goal is **not** to recreate Photoshop or Photopea. Build only the editing capabilities that materially improve Tiler's tile-generation workflow.
+
+## 3.6 — Prompt & Material Adherence — Planned
+
+Address a major product-quality problem observed during real use: generated content can ignore the requested material or semantic subject, for example a request for lava producing architecture or unrelated scene content.
+
+This phase should investigate and improve:
+
+- material-aware prompt construction;
+- explicit positive generation constraints;
+- explicit negative constraints where supported;
+- tile-specific composition instructions;
+- generation parameter choices;
+- deterministic prompt templates or material profiles where useful;
+- measurable adherence tests and benchmark cases.
+
+The objective is not to guarantee perfect generative output. The objective is to materially improve adherence to the user's requested material and tile intent, and to make failures understandable and recoverable.
+
+## 3.7 — Workspace Persistence & Project Sessions — Planned
+
+After the core creative workflow is strong, add appropriate persistence for workspace/project sessions.
+
+The exact persistence architecture should be chosen from evidence gathered during Phase 3.5 and 3.6 rather than prematurely committing to a database or cloud architecture.
+
+Potential capabilities include:
+
+- saving and reopening a Tiler project;
+- preserving assets and relevant generation/processing settings;
+- restoring current asset selection;
+- safe handling of image data and project size limits.
+
+This phase should not begin until the editing and generation-adherence workflows have established what actually needs to be persisted.
 
 ---
 
-# Phase 4 — UX, quality & hardening
+# Phase 3 exit criteria
 
-Once the complete product flow works, improve it systematically rather than prematurely polishing individual screens.
+Phase 3 is complete only when Tiler is a coherent, genuinely usable creative workflow rather than merely a technically functioning pipeline.
+
+Minimum exit criteria:
+
+- Generate → Regenerate → Edit → Process → Validate → Preview → Export works as one coherent workflow.
+- Users can manage multiple generated assets without losing previous results.
+- Users can make meaningful corrections to generated imagery before processing/export.
+- Material/prompt adherence is materially improved and measured for representative cases.
+- Major UX friction discovered during real use has been addressed.
+- Empty, loading, success, failure and recovery states are understandable without developer knowledge.
+- RAW, EDITED, PROCESSED and VALIDATED states have clear semantics.
+- The application does not silently substitute mock output for real provider output.
+- Core automated tests and real-browser verification cover the complete workflow.
+
+A formal Phase 3 exit audit should be performed before starting Phase 4.
+
+---
+
+# Phase 4 — Production readiness, UX polish & hardening
+
+Phase 4 is **not** merely a cosmetic polish pass. It begins after the core product workflow is genuinely complete.
+
+The goal is to make Tiler production-ready in engineering, UX, reliability and operational terms.
 
 Areas include:
 
-- UX refinement
-- accessibility
-- performance
-- caching and request management
-- cancellation/retry behaviour
-- observability and diagnostics
-- security and secret handling
-- resource limits
-- image quality controls
-- regression benchmarks
-- browser/device testing
+- comprehensive UI/UX polish across the application;
+- accessibility and keyboard navigation;
+- responsive behavior and browser/device compatibility;
+- performance profiling and optimization;
+- image memory/resource management;
+- request cancellation, retry and concurrency controls;
+- error recovery and user-safe failure states;
+- observability and diagnostics;
+- security and secret handling;
+- resource and upload limits;
+- image quality controls and regression benchmarks;
+- automated regression coverage;
+- CI/CD and quality gates;
+- GitHub Actions and release checks;
+- production configuration and environment validation;
+- documentation and operational runbooks.
+
+Phase 4 should harden the product that Phase 3 creates. It should not be used to compensate for missing core product workflows.
 
 ---
 
@@ -164,14 +239,14 @@ Areas include:
 
 Future work can include:
 
-- deployment and hosted operation
-- packaging/distribution
-- provider selection/configuration for users
-- additional validated providers
-- batch generation
-- advanced texture workflows
-- community or project presets
-- extended documentation
+- deployment and hosted operation;
+- packaging/distribution;
+- provider selection/configuration for users;
+- additional validated providers;
+- batch generation;
+- advanced texture workflows;
+- community or project presets;
+- extended documentation.
 
 New providers should only be added when they have a concrete product or quality benefit. Provider count is not itself a product goal.
 
@@ -193,17 +268,21 @@ When implementation reveals a genuinely new constraint, the issue/ADR can refine
 
 ## Current position
 
-The project has completed **Phase 2D — Pixazo Productionization**.
+The project has completed **Phase 2D — Pixazo Productionization** and completed Phase 3.1 through Phase 3.4.
 
 Completed work:
 
 - Phase 2C provider research and production candidate selection.
 - Phase 2D.1 functional Pixazo generation baseline.
 - Phase 2D.2 processing and validation integration.
-- Phase 2D.3 export and output path (including 3×3 tiled spritesheet compositing).
+- Phase 2D.3 export and output path.
 - Phase 2D.4 reliability and failure handling.
 - Phase 2D.5 vertical slice acceptance and end-to-end verification.
+- Phase 3.1 application state and workspace foundation.
+- Phase 3.2 generation and regenerate UX.
+- Phase 3.3 processing controls and live preview.
+- Phase 3.4 generation history and asset management.
 
-The next planned target is **Phase 3 — Functional Product / Vertical Slice**.
+The next planned target is **Phase 3.5 — Tiler Image Editor & UX Foundation**.
 
-> We do not need to finish the entire application before making it functional. We need one complete, reliable vertical slice first.
+> The technical vertical slice is proven. The next challenge is making Tiler a genuinely controllable, understandable and pleasant creative application before production hardening begins.
