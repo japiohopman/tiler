@@ -24,6 +24,8 @@ import {
   Info,
   Cpu,
   Clock,
+  Columns,
+  Flame,
 } from 'lucide-react';
 import { GenerationMetadata, SeamAnalysisResult, TilePreviewMode } from '../types';
 import { TileCanvasRenderer, TileRenderOptions } from '../utils/tileCanvasRenderer';
@@ -69,6 +71,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
   // 3 Primary Preview Modes: 'single' (1x1), '3x3', 'infinite'
   const [previewMode, setPreviewMode] = useState<TilePreviewMode>('3x3');
   const [showGrid, setShowGrid] = useState<boolean>(true);
+  const [highlightSeams, setHighlightSeams] = useState<boolean>(false);
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -115,7 +118,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
   const vScore = seamReport?.verticalScore ?? 0.0;
   const overallScore = seamReport?.overallScore ?? 0.0;
 
-  // Redraw canvas
+  // Redraw canvas with bounds
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -125,7 +128,9 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
       showGrid,
       zoom,
       pan,
+      highlightSeams,
       isPass,
+      gridColor: highlightSeams ? 'rgba(239, 68, 68, 0.95)' : undefined,
     };
 
     TileCanvasRenderer.render(
@@ -134,7 +139,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
       options,
       loadedImage ? undefined : `Tile Preview (${materialName})`
     );
-  }, [previewMode, showGrid, zoom, pan, loadedImage, isPass, materialName]);
+  }, [previewMode, showGrid, zoom, pan, highlightSeams, isPass, materialName]);
 
   // Adjust canvas size to container using ResizeObserver
   useEffect(() => {
@@ -169,24 +174,30 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
     redraw();
   }, [redraw]);
 
-  // Mouse pan handlers
+  // Bounded Mouse Pan Handlers (prevents dragging completely off-screen)
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging) return;
+    if (!isDragging || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const maxPanX = Math.max(100, rect.width * 0.85);
+    const maxPanY = Math.max(100, rect.height * 0.85);
+
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+
     setPan({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
+      x: Math.min(maxPanX, Math.max(-maxPanX, newX)),
+      y: Math.min(maxPanY, Math.max(-maxPanY, newY)),
     });
   };
 
   const handleMouseUp = () => setIsDragging(false);
 
-  // Wheel zoom handler attached as non-passive native listener to prevent outer page scroll
-  // while avoiding browser passive event listener warnings
+  // Smooth wheel zoom handler [0.1x to 10.0x bounds] with non-passive listener
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -196,7 +207,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
       const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
       setZoom((prevZoom) => {
         const nextZoom = prevZoom * zoomFactor;
-        return Math.min(6.0, Math.max(0.2, Number(nextZoom.toFixed(2))));
+        return Math.min(10.0, Math.max(0.1, Number(nextZoom.toFixed(2))));
       });
     };
 
@@ -306,7 +317,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             </div>
           )}
 
-          {/* 2. Grid Toggle & Seam Lines */}
+          {/* 2. Grid Toggle & Seam Highlights */}
           <div className="flex items-center space-x-2">
             <button
               id="btn-toggle-grid"
@@ -321,15 +332,29 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
               {showGrid ? <Eye className="w-3.5 h-3.5 text-sky-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
               <span>Grid: {showGrid ? 'ON' : 'OFF'}</span>
             </button>
+
+            <button
+              id="btn-toggle-seam-highlight"
+              onClick={() => setHighlightSeams(!highlightSeams)}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition-all ${
+                highlightSeams
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm font-semibold'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
+              }`}
+              title="Highlight edge seams with high-contrast indicator"
+            >
+              <Flame className={`w-3.5 h-3.5 ${highlightSeams ? 'text-rose-400' : 'text-slate-500'}`} />
+              <span>Seam Highlights: {highlightSeams ? 'ON' : 'OFF'}</span>
+            </button>
           </div>
 
-          {/* 3. Zoom Controls */}
+          {/* 3. Refined Zoom Controls (0.1x to 10.0x) */}
           <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
             <button
               id="btn-preview-zoom-out"
-              onClick={() => setZoom((z) => Math.max(0.25, Number((z - 0.25).toFixed(2))))}
+              onClick={() => setZoom((z) => Math.max(0.1, Number((z - 0.25).toFixed(2))))}
               className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Zoom out"
+              title="Zoom out (Min: 10%)"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
@@ -345,9 +370,9 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
 
             <button
               id="btn-preview-zoom-in"
-              onClick={() => setZoom((z) => Math.min(5.0, Number((z + 0.25).toFixed(2))))}
+              onClick={() => setZoom((z) => Math.min(10.0, Number((z + 0.25).toFixed(2))))}
               className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Zoom in"
+              title="Zoom in (Max: 1000%)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
@@ -433,7 +458,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
 
           {/* Quick pan hint */}
           <div className="absolute top-3 right-3 text-[11px] text-slate-400 bg-slate-900/85 backdrop-blur px-2.5 py-1 rounded-md border border-slate-800 pointer-events-none hidden sm:block">
-            Click & drag to pan • Scroll to zoom
+            Click & drag to pan • Scroll to zoom (10% - 1000%)
           </div>
         </div>
       </div>
