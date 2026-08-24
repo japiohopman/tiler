@@ -43,11 +43,11 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   }
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+    <section role="region" aria-label="Export Game Texture Controls" className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center space-x-2">
-          <Download className="w-4 h-4 text-emerald-400" />
+          <Download className="w-4 h-4 text-emerald-400" aria-hidden="true" />
           <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
             3. Export Game Texture
           </h2>
@@ -58,12 +58,12 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           </span>
         ) : isPass === false ? (
           <span className="text-[11px] font-mono text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40 flex items-center space-x-1">
-            <AlertTriangle className="w-3 h-3 text-amber-400 inline shrink-0" />
+            <AlertTriangle className="w-3 h-3 text-amber-400 inline shrink-0" aria-hidden="true" />
             <span>UNVALIDATED / NON-TILEABLE</span>
           </span>
         ) : (
           <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30 flex items-center space-x-1">
-            <CheckCircle2 className="w-3 h-3 text-emerald-400 inline shrink-0" />
+            <CheckCircle2 className="w-3 h-3 text-emerald-400 inline shrink-0" aria-hidden="true" />
             <span>VALIDATED SEAMLESS</span>
           </span>
         )}
@@ -71,9 +71,9 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
       {/* Validation Status Notice if Unvalidated / Failed Validation */}
       {currentTile && isPass === false && (
-        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/50 text-amber-200 text-xs space-y-1">
+        <div role="status" className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/50 text-amber-200 text-xs space-y-1">
           <div className="flex items-center space-x-2 font-semibold text-amber-300">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" aria-hidden="true" />
             <span>Exporting Unvalidated Texture</span>
           </div>
           <p className="text-[11px] text-amber-200/90 leading-relaxed">
@@ -87,13 +87,15 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         {/* Output Format */}
         <div>
           <label className="text-[11px] text-slate-400 block mb-1">Target Format</label>
-          <div className="flex space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+          <div role="radiogroup" aria-label="Target Format" className="flex space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
             {(['png', 'webp', 'jpeg'] as const).map((fmt) => (
               <button
                 key={fmt}
                 id={`export-fmt-${fmt}`}
+                role="radio"
+                aria-checked={options.format === fmt}
                 onClick={() => setOptions({ ...options, format: fmt })}
-                className={`flex-1 py-1 rounded text-center uppercase font-mono font-medium transition-all ${
+                className={`flex-1 py-1 rounded text-center uppercase font-mono font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                   options.format === fmt
                     ? 'bg-emerald-500 text-white shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -108,13 +110,15 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         {/* Resolution */}
         <div>
           <label className="text-[11px] text-slate-400 block mb-1">Resolution</label>
-          <div className="flex space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+          <div role="radiogroup" aria-label="Resolution" className="flex space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
             {([256, 512, 1024] as const).map((res) => (
               <button
                 key={res}
                 id={`export-res-${res}`}
+                role="radio"
+                aria-checked={options.resolution === res}
                 onClick={() => setOptions({ ...options, resolution: res })}
-                className={`flex-1 py-1 rounded text-center font-mono font-medium transition-all ${
+                className={`flex-1 py-1 rounded text-center font-mono font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                   options.resolution === res
                     ? 'bg-emerald-500 text-white shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -130,9 +134,11 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       {/* Grid Sheet Toggle */}
       <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2">
-          <Layers className="w-4 h-4 text-sky-400" />
+          <Layers className="w-4 h-4 text-sky-400" aria-hidden="true" />
           <div>
-            <div className="font-semibold text-slate-200">Export as 3×3 Tiled Spritesheet</div>
+            <label htmlFor="toggle-grid-sheet-export" className="font-semibold text-slate-200 cursor-pointer">
+              Export as 3×3 Tiled Spritesheet
+            </label>
             <div className="text-[11px] text-slate-400">Pre-tiled surface for immediate engine testing</div>
           </div>
         </div>
@@ -141,7 +147,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           id="toggle-grid-sheet-export"
           checked={options.exportGridSheet}
           onChange={(e) => setOptions({ ...options, exportGridSheet: e.target.checked })}
-          className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+          className="w-4 h-4 accent-emerald-500 rounded cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
         />
       </div>
 
@@ -150,15 +156,15 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         id="btn-download-export"
         onClick={handleTriggerExport}
         disabled={isExporting}
-        className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
+        className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-700 text-slate-100 text-xs font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:opacity-50"
       >
-        <Download className="w-4 h-4 text-emerald-400" />
+        <Download className="w-4 h-4 text-emerald-400" aria-hidden="true" />
         <span>
           {isExporting
             ? 'Preparing Game Asset...'
             : `Download ${options.resolution}×${options.resolution} ${options.format.toUpperCase()}`}
         </span>
       </button>
-    </div>
+    </section>
   );
 };
