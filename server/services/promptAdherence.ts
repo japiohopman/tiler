@@ -7,7 +7,7 @@ import { MaterialId } from '../../src/types';
 import { getMaterialProfile, MaterialProfile } from './materialProfiles';
 
 export interface PromptAdherenceReport {
-  materialId: MaterialId | string;
+  materialId: MaterialId;
   canonicalName: string;
   score: number; // 0 to 100
   pass: boolean; // score >= 70 and no critical forbidden terms
@@ -22,15 +22,22 @@ export interface PromptAdherenceReport {
   details: string;
 }
 
+/**
+ * Required surface tileability keywords for SDXL material texture generation
+ * Focuses on material surface characteristics and seamless tileability constraints.
+ */
 const REQUIRED_TILE_KEYWORDS = [
-  'top-down',
-  'orthographic',
-  'overhead',
-  'texture',
   'seamless',
+  'tileable',
+  'texture',
   'surface',
+  'pattern',
+  'uniform',
 ];
 
+/**
+ * Composition words forbidden in positive prompts per SDXL Rule 2
+ */
 const COMPOSITION_FORBIDDEN_WORDS = [
   'centered',
   'foreground',
@@ -64,7 +71,7 @@ export function evaluatePromptAdherence(
   const issues: string[] = [];
 
   // 1. Check Material Identity
-  if (promptLower.includes(profile.canonicalName.toLowerCase()) || promptLower.includes(String(profile.id))) {
+  if (promptLower.includes(profile.canonicalName.toLowerCase()) || promptLower.includes(profile.id)) {
     matchedMaterialTerms.push(profile.canonicalName);
   }
 
@@ -87,7 +94,7 @@ export function evaluatePromptAdherence(
     issues.push(`Prompt missing canonical material terms for '${profile.canonicalName}'`);
   }
 
-  // 2. Check Tile Constraints
+  // 2. Check Surface Tileability Constraints
   for (const kw of REQUIRED_TILE_KEYWORDS) {
     if (promptLower.includes(kw)) {
       matchedTileTerms.push(kw);
@@ -96,7 +103,7 @@ export function evaluatePromptAdherence(
 
   const hasTileConstraints = matchedTileTerms.length >= 2;
   if (!hasTileConstraints) {
-    issues.push('Prompt lacks sufficient top-down / orthographic / seamless tile constraint terms');
+    issues.push('Prompt lacks sufficient seamless tileability constraint terms');
   }
 
   // 3. Check Forbidden Material & Composition Terms in positive prompt

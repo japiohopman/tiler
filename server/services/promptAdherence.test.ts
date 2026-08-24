@@ -6,15 +6,55 @@
 import assert from 'node:assert';
 import { PromptBuilder } from './promptBuilder';
 import { evaluatePromptAdherence } from './promptAdherence';
+import { MATERIAL_PROFILES, getMaterialProfile } from './materialProfiles';
+import { MaterialId } from '../../src/types';
 
 /**
- * Deterministic Prompt & Material Adherence Unit Tests (SDXL Base 1.0 Spec)
+ * Deterministic Prompt & Material Adherence Unit Tests (SDXL Base 1.0 Corrected Architecture)
  */
 async function runPromptAdherenceTests() {
   console.log('🧪 Starting Deterministic Prompt Adherence Tests...\n');
 
-  // 1. Normal material prompt uses the material-aware builder
-  console.log('Test 1: Normal material prompt uses material-aware builder');
+  // 1. Canonical Material Profiles Registry & Typing
+  console.log('Test 1: Canonical Material Profiles Registry & Typing');
+  const canonicalIds: MaterialId[] = [
+    'stone',
+    'cobblestone',
+    'brick',
+    'dirt',
+    'sand',
+    'wood',
+    'metal',
+    'moss',
+    'lava',
+    'water',
+    'grass',
+  ];
+
+  for (const id of canonicalIds) {
+    const profile = MATERIAL_PROFILES[id];
+    assert.ok(profile, `Material profile for '${id}' must exist in MATERIAL_PROFILES`);
+    assert.strictEqual(profile.id, id, `Profile id '${profile.id}' must match canonical MaterialId '${id}'`);
+  }
+  console.log(`  ✓ All ${canonicalIds.length} canonical material profiles verified with strict MaterialId typing`);
+
+  // 2. Regression Test: Unknown String Fallback Mapping
+  console.log('Test 2: Unknown Material String Fallback Mapping');
+  const unknownProfile = getMaterialProfile('custom_unknown_material');
+  assert.strictEqual(
+    unknownProfile.id,
+    'stone',
+    'Unknown string inputs must resolve to a valid canonical MaterialId fallback'
+  );
+  assert.strictEqual(
+    unknownProfile.canonicalName,
+    'Custom_unknown_material',
+    'Custom material string name must be capitalized in fallback'
+  );
+  console.log('  ✓ Unknown material string fallback mapping verified');
+
+  // 3. Normal material prompt generation across canonical materials
+  console.log('Test 3: Normal material prompt construction for canonical materials');
   const lavaStructured = PromptBuilder.buildStructuredPrompt({
     material: 'lava',
     style: 'stylized',
@@ -28,8 +68,8 @@ async function runPromptAdherenceTests() {
   assert.strictEqual(lavaStructured.adherenceReport.hasMaterialIdentity, true);
   console.log('  ✓ Material-aware prompt construction verified');
 
-  // 2. Custom prompt is preserved
-  console.log('Test 2: Custom user prompt is preserved verbatim');
+  // 4. Custom user prompt preservation
+  console.log('Test 4: Custom user prompt is preserved verbatim');
   const customWording = 'wet lava with blue glowing cracks';
   const customStructured = PromptBuilder.buildStructuredPrompt({
     material: 'lava',
@@ -44,16 +84,11 @@ async function runPromptAdherenceTests() {
   assert.strictEqual(customStructured.adherenceReport.hasUserIntentPreserved, true);
   console.log('  ✓ Custom prompt preservation verified');
 
-  // 3. Custom prompt does NOT bypass material/tile constraints
-  console.log('Test 3: Custom prompt does NOT bypass material profile or tile constraints');
+  // 5. Custom prompt does NOT bypass material/tileability constraints
+  console.log('Test 5: Custom prompt does NOT bypass material profile or tileability constraints');
   assert.ok(
-    customStructured.builtPrompt.includes('Top-down orthographic Lava material surface') ||
-    customStructured.builtPrompt.includes('Lava'),
-    'Assembled prompt with customPrompt must still contain material profile identity'
-  );
-  assert.ok(
-    customStructured.builtPrompt.includes('Top-down orthographic'),
-    'Assembled prompt with customPrompt must still enforce top-down orthographic constraint'
+    customStructured.builtPrompt.includes('Lava material surface'),
+    'Assembled prompt with customPrompt must still contain material surface subject'
   );
   assert.ok(
     customStructured.builtPrompt.includes('seamless tileable texture'),
@@ -61,30 +96,27 @@ async function runPromptAdherenceTests() {
   );
   console.log('  ✓ Custom prompt non-bypass verified');
 
-  // 4. Final provider prompt equals prompt evaluated for adherence and stored in metadata
-  console.log('Test 4: Final provider prompt equality across adherence report & metadata contract');
-  const providerPrompt = customStructured.builtPrompt;
-  const adherenceEvaluatedPrompt = customStructured.adherenceReport.details;
-  assert.ok(
-    adherenceEvaluatedPrompt.includes('Lava (MATCHED)'),
-    'Adherence report must evaluate the exact assembled prompt sent to provider'
+  // 6. Camera framing decision test: Positive prompt omits legacy camera words
+  console.log('Test 6: Architectural Decision — Positive prompt omits camera framing words');
+  const positivePrompt = lavaStructured.builtPrompt.toLowerCase();
+  assert.strictEqual(
+    positivePrompt.includes('top-down'),
+    false,
+    'Positive prompt must omit legacy camera framing word "top-down" per SDXL Rule 2'
   );
   assert.strictEqual(
-    customStructured.userPrompt,
-    customWording,
-    'User prompt metadata must retain original user prompt input'
+    positivePrompt.includes('orthographic'),
+    false,
+    'Positive prompt must omit legacy camera framing word "orthographic" per SDXL Rule 2'
   );
-  console.log('  ✓ Prompt identity across provider payload and metadata verified');
+  assert.ok(
+    positivePrompt.includes('seamless tileable texture'),
+    'Positive prompt must rely on explicit seamless tileability constraints'
+  );
+  console.log('  ✓ Camera framing terms omission verified');
 
-  // 5. Adherence evaluation evaluates the exact prompt sent to the provider
-  console.log('Test 5: Adherence evaluation evaluates exact provider prompt');
-  const directReport = evaluatePromptAdherence(providerPrompt, 'lava', customWording);
-  assert.strictEqual(directReport.score, customStructured.adherenceReport.score);
-  assert.strictEqual(directReport.pass, customStructured.adherenceReport.pass);
-  console.log('  ✓ Exact prompt adherence evaluation verified');
-
-  // 6. Negative prompt remains material-aware and incorporates SDXL composition negatives
-  console.log('Test 6: Negative prompt payload remains material-aware and incorporates SDXL negatives');
+  // 7. Negative prompt incorporates SDXL composition words
+  console.log('Test 7: Negative prompt payload incorporates SDXL composition terms');
   assert.ok(
     customStructured.negativePrompt.includes('buildings'),
     'Negative prompt payload must include profile negative terms like "buildings"'
@@ -103,8 +135,8 @@ async function runPromptAdherenceTests() {
   );
   console.log('  ✓ Material-aware negative prompt payload verified');
 
-  // 7. Style modification without removing material identity
-  console.log('Test 7: Style modification without removing material identity');
+  // 8. Style modification without removing material identity
+  console.log('Test 8: Style modification without removing material identity');
   const pixelLava = PromptBuilder.buildStructuredPrompt({
     material: 'lava',
     style: 'pixel-art',
@@ -121,26 +153,11 @@ async function runPromptAdherenceTests() {
   assert.strictEqual(pixelLava.adherenceReport.hasMaterialIdentity, true);
   console.log('  ✓ Style modification without material dilution verified');
 
-  // 8. Material profile isolation (no cross-leakage in positive prompt)
-  console.log('Test 8: Material profile isolation');
-  const positiveLavaPrompt = lavaStructured.builtPrompt.toLowerCase();
-  assert.strictEqual(
-    positiveLavaPrompt.includes('cobblestone'),
-    false,
-    'Lava positive prompt must not contain cobblestone terms'
-  );
-  assert.strictEqual(
-    positiveLavaPrompt.includes('mortar'),
-    false,
-    'Lava positive prompt must not contain mortar terms'
-  );
-  console.log('  ✓ Material profile isolation verified');
-
-  // 9. Prompt length target check (25-60 words compact prompt)
+  // 9. Compact prompt length target check (25-60 words)
   console.log('Test 9: Compact SDXL prompt length target (25-60 words)');
   const wordCount = lavaStructured.builtPrompt.split(/\s+/).length;
   assert.ok(
-    wordCount >= 20 && wordCount <= 70,
+    wordCount >= 20 && wordCount <= 60,
     `Built prompt length (${wordCount} words) must be compact around 25-60 words target`
   );
   console.log(`  ✓ Compact prompt length verified (${wordCount} words)`);

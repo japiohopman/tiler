@@ -40,7 +40,7 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
 
   if (isLoading) {
     return (
-      <div role="status" aria-live="polite" className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-center min-h-[160px]">
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg flex items-center justify-center min-h-[160px]">
         <div className="text-center space-y-2">
           <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-xs text-slate-400 font-mono">
@@ -80,6 +80,7 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
       isFinalPass = false;
     }
   } else if (report) {
+    // Fallback when validationSummary is unavailable: handle safely without silently assuming success
     isFinalPass = !!report.pass;
     finalStatusText = isFinalPass ? 'PASS AFTER PROCESSING' : 'VALIDATION FAILED';
   } else {
@@ -96,11 +97,11 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
   };
 
   return (
-    <section role="region" aria-label="Objective Seam Analysis Metrics" className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
+    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center space-x-2">
-          <BarChart3 className="w-4 h-4 text-amber-400" aria-hidden="true" />
+          <BarChart3 className="w-4 h-4 text-amber-400" />
           <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
             Objective Seam Analyzer
           </h2>
@@ -116,7 +117,6 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
           </span>
         </div>
         <div
-          role="status"
           className={`flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
             isFinalPass
               ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
@@ -125,12 +125,12 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
         >
           {isFinalPass ? (
             <>
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               <span>PASSED (≤ {currentThreshold})</span>
             </>
           ) : (
             <>
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" aria-hidden="true" />
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
               <span>SEAM DISCONTINUITY</span>
             </>
           )}
@@ -216,7 +216,7 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
       <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800/80 space-y-2.5 text-xs">
         <div className="flex items-center justify-between text-slate-300">
           <span className="flex items-center space-x-1.5 font-medium">
-            <Sliders className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+            <Sliders className="w-3.5 h-3.5 text-amber-400" />
             <span>Analysis Parameters</span>
           </span>
           <span className="text-[11px] font-mono text-slate-400">
@@ -230,15 +230,13 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
             <label className="text-[11px] text-slate-400 block mb-1">
               Edge Region Width:
             </label>
-            <div role="radiogroup" aria-label="Edge Region Width" className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-4 gap-1">
               {([1, 2, 4, 8] as EdgeRegionDepth[]).map((d) => (
                 <button
                   key={d}
                   type="button"
-                  role="radio"
-                  aria-checked={currentEdgeRegion === d}
                   onClick={() => handleSettingChange(threshold, d)}
-                  className={`py-1 text-center rounded text-[11px] font-mono font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                  className={`py-1 text-center rounded text-[11px] font-mono font-semibold transition-all ${
                     currentEdgeRegion === d
                       ? 'bg-amber-500 text-slate-950 shadow'
                       : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
@@ -255,15 +253,13 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
             <label className="text-[11px] text-slate-400 block mb-1">
               Tolerance Threshold:
             </label>
-            <div role="radiogroup" aria-label="Tolerance Threshold" className="grid grid-cols-3 gap-1">
+            <div className="grid grid-cols-3 gap-1">
               {[0.01, 0.05, 0.1].map((t) => (
                 <button
                   key={t}
                   type="button"
-                  role="radio"
-                  aria-checked={currentThreshold === t}
                   onClick={() => handleSettingChange(t, edgeRegion)}
-                  className={`py-1 text-center rounded text-[11px] font-mono font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                  className={`py-1 text-center rounded text-[11px] font-mono font-semibold transition-all ${
                     currentThreshold === t
                       ? 'bg-amber-500 text-slate-950 shadow'
                       : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
@@ -282,12 +278,11 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
         <div className="space-y-2">
           <button
             type="button"
-            aria-expanded={showDiagnosticMap}
             onClick={() => setShowDiagnosticMap(!showDiagnosticMap)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-300 transition-colors"
           >
             <span className="flex items-center space-x-1.5">
-              <Eye className="w-3.5 h-3.5 text-sky-400" aria-hidden="true" />
+              <Eye className="w-3.5 h-3.5 text-sky-400" />
               <span>Diagnostic Seam Heatmap</span>
             </span>
             <span className="text-[11px] text-sky-400 underline">
@@ -306,11 +301,11 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
               </div>
               <div className="flex items-center justify-center space-x-3 text-[10px] text-slate-400">
                 <span className="flex items-center space-x-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" aria-hidden="true" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
                   <span>Match (≤ {currentThreshold})</span>
                 </span>
                 <span className="flex items-center space-x-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" aria-hidden="true" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
                   <span>Mismatch (&gt; {currentThreshold})</span>
                 </span>
               </div>
@@ -323,7 +318,7 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
       <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 space-y-2 text-xs">
         <div className="flex items-center justify-between font-semibold text-slate-200 border-b border-slate-800/80 pb-2">
           <span className="flex items-center space-x-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Validation & Improvement Summary</span>
           </span>
           <span className="text-[10px] font-mono text-slate-400">
@@ -425,9 +420,9 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
 
       {/* Diagnostic details if validation failed */}
       {!isFinalPass && (
-        <div role="alert" className="bg-rose-950/30 border border-rose-500/40 rounded-xl p-3 text-xs space-y-1.5 text-rose-200">
+        <div className="bg-rose-950/30 border border-rose-500/40 rounded-xl p-3 text-xs space-y-1.5 text-rose-200">
           <div className="font-bold text-rose-300 flex items-center space-x-1.5">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" aria-hidden="true" />
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>Validation Failure Details</span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-rose-300/90 pt-1">
@@ -445,7 +440,7 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
       {/* Status messages / Technical Seam Assessment */}
       <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-800/80 text-xs space-y-1">
         <div className="text-slate-300 font-medium flex items-center space-x-1.5">
-          <Info className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+          <Info className="w-3.5 h-3.5 text-amber-400" />
           <span>Technical Seam Assessment</span>
         </div>
         <p className="text-slate-400 text-[11px] leading-relaxed">
@@ -454,6 +449,6 @@ export const SeamAnalysisPanel: React.FC<SeamAnalysisPanelProps> = ({
             : `Mathematically seamless: all evaluated edge boundary pixels across the ${currentEdgeRegion}px sampling depth conform to tolerance threshold ≤ ${currentThreshold}.`}
         </p>
       </div>
-    </section>
+    </div>
   );
 };

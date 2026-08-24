@@ -7,11 +7,10 @@ import { PromptBuilder } from '../promptBuilder';
 import { GeneratedImage, GenerationRequest, ImageGenerationProvider, ProviderError } from './types';
 
 /**
- * Pixazo AI Image Generation Provider (Phase 2D, 3.6 & 4.4 Hardened Integration)
+ * Pixazo AI Image Generation Provider (Phase 2D & 3.6 Production-Hardened Integration)
  *
  * Integrates Pixazo Serverless AI Gateway API targeting the FREE SDXL Base 1.0 model.
- * Uses Material-Profile Negative Constraints via the API negative_prompt field and logs
- * sanitized diagnostic payloads per docs/errors.md specifications.
+ * Uses Material-Profile Negative Constraints via the API negative_prompt field.
  *
  * Official Specs & Sources:
  * - Free API Overview: https://www.pixazo.ai/api/free
@@ -252,9 +251,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
           pricingTier: 'free-tier/open-beta',
           supportsSeed: typeof request.seed === 'number',
           requestId,
-          httpStatus: 200,
           resolution,
-          promptLength: builtPrompt.length,
           requestedMaterial: request.material,
           userPrompt: structuredPrompt.userPrompt,
           materialProfileId: structuredPrompt.materialProfileId,

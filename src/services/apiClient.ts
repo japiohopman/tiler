@@ -70,7 +70,6 @@ export interface HealthCheckResponse {
  * Client service abstraction for communicating with backend tile services.
  * All image generation, Sharp processing, and seam analysis are executed server-side
  * to keep API keys secure and leverage native C++ Sharp image processing modules.
- * Supports client-side request cancellation via AbortController / AbortSignal.
  */
 class TileApiClient {
   private baseUrl = '/api';
@@ -78,17 +77,14 @@ class TileApiClient {
   /**
    * Health check to ensure server-side pipeline is active
    */
-  async checkHealth(signal?: AbortSignal): Promise<HealthCheckResponse> {
+  async checkHealth(): Promise<HealthCheckResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/health`, { signal });
+      const response = await fetch(`${this.baseUrl}/health`);
       if (!response.ok) {
         throw new Error(`Server returned status ${response.status}`);
       }
       return await response.json();
-    } catch (error: any) {
-      if (error?.name === 'AbortError') {
-        throw error;
-      }
+    } catch (error) {
       console.warn('Backend health check failed:', error);
       return { status: 'offline', activeProvider: 'mock', providerConfigured: false, sharpReady: false };
     }
@@ -98,17 +94,13 @@ class TileApiClient {
    * Triggers server-side AI visual texture generation via configured provider (e.g., Pixazo, Mock, Gemini)
    * and executes full Sharp seamless pipeline + Seam continuity analyzer.
    */
-  async generateTile(
-    params: GenerateTileRequest | GenerationParams,
-    signal?: AbortSignal
-  ): Promise<GenerateApiResponse> {
+  async generateTile(params: GenerateTileRequest | GenerationParams): Promise<GenerateApiResponse> {
     const response = await fetch(`${this.baseUrl}/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(params),
-      signal,
     });
 
     if (!response.ok) {
@@ -128,8 +120,7 @@ class TileApiClient {
    */
   async processTile(
     tileImageData: string,
-    options: TileProcessingOptions,
-    signal?: AbortSignal
+    options: TileProcessingOptions
   ): Promise<ProcessApiResponse> {
     const response = await fetch(`${this.baseUrl}/process`, {
       method: 'POST',
@@ -140,7 +131,6 @@ class TileApiClient {
         image: tileImageData,
         options,
       }),
-      signal,
     });
 
     if (!response.ok) {
@@ -159,8 +149,7 @@ class TileApiClient {
    */
   async analyzeSeams(
     tileImageData: string,
-    options?: SeamAnalysisOptions,
-    signal?: AbortSignal
+    options?: SeamAnalysisOptions
   ): Promise<AnalyzeApiResponse> {
     const response = await fetch(`${this.baseUrl}/analyze`, {
       method: 'POST',
@@ -168,7 +157,6 @@ class TileApiClient {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ image: tileImageData, options }),
-      signal,
     });
 
     if (!response.ok) {
@@ -185,8 +173,8 @@ class TileApiClient {
   /**
    * Runs the automated test suite on the backend TileProcessor
    */
-  async runProcessorTests(signal?: AbortSignal): Promise<{ success: boolean; suite: any }> {
-    const response = await fetch(`${this.baseUrl}/test-processor`, { signal });
+  async runProcessorTests(): Promise<{ success: boolean; suite: any }> {
+    const response = await fetch(`${this.baseUrl}/test-processor`);
     if (!response.ok) {
       throw new Error(`Test suite runner failed with status ${response.status}`);
     }
@@ -196,8 +184,8 @@ class TileApiClient {
   /**
    * Runs the automated test suite on the backend Seam Analyzer
    */
-  async runSeamTests(signal?: AbortSignal): Promise<{ success: boolean; suite: any }> {
-    const response = await fetch(`${this.baseUrl}/test-seams`, { signal });
+  async runSeamTests(): Promise<{ success: boolean; suite: any }> {
+    const response = await fetch(`${this.baseUrl}/test-seams`);
     if (!response.ok) {
       throw new Error(`Seam test suite runner failed with status ${response.status}`);
     }
@@ -207,14 +195,13 @@ class TileApiClient {
   /**
    * Requests texture export in selected format and grid layout
    */
-  async exportTile(tile: Tile, options: ExportOptions, signal?: AbortSignal): Promise<Blob> {
+  async exportTile(tile: Tile, options: ExportOptions): Promise<Blob> {
     const response = await fetch(`${this.baseUrl}/export`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ tile, options }),
-      signal,
     });
 
     if (!response.ok) {

@@ -24,8 +24,6 @@ import {
   Info,
   Cpu,
   Clock,
-  Columns,
-  Flame,
 } from 'lucide-react';
 import { GenerationMetadata, SeamAnalysisResult, TilePreviewMode } from '../types';
 import { TileCanvasRenderer, TileRenderOptions } from '../utils/tileCanvasRenderer';
@@ -71,7 +69,6 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
   // 3 Primary Preview Modes: 'single' (1x1), '3x3', 'infinite'
   const [previewMode, setPreviewMode] = useState<TilePreviewMode>('3x3');
   const [showGrid, setShowGrid] = useState<boolean>(true);
-  const [highlightSeams, setHighlightSeams] = useState<boolean>(false);
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -85,7 +82,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
 
   const activeImageDataUrl = (selectedSource === 'raw' && rawImageDataUrl) ? rawImageDataUrl : (imageDataUrl || rawImageDataUrl);
 
-  // Load image object safely with unmount memory cleanup
+  // Load image object whenever activeImageDataUrl or activeSample changes
   useEffect(() => {
     let targetSrc = activeImageDataUrl;
     if (!targetSrc) {
@@ -99,26 +96,17 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
       return;
     }
 
-    let isMounted = true;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      if (!isMounted) return;
       setLoadedImage(img);
       setImageDimensions({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
     };
     img.onerror = () => {
-      if (!isMounted) return;
       setLoadedImage(null);
       setImageDimensions(null);
     };
     img.src = targetSrc;
-
-    return () => {
-      isMounted = false;
-      img.onload = null;
-      img.onerror = null;
-    };
   }, [activeImageDataUrl, activeSampleId]);
 
   // Pass / Fail assessment
@@ -127,7 +115,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
   const vScore = seamReport?.verticalScore ?? 0.0;
   const overallScore = seamReport?.overallScore ?? 0.0;
 
-  // Redraw canvas with bounds
+  // Redraw canvas
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -137,9 +125,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
       showGrid,
       zoom,
       pan,
-      highlightSeams,
       isPass,
-      gridColor: highlightSeams ? 'rgba(239, 68, 68, 0.95)' : undefined,
     };
 
     TileCanvasRenderer.render(
@@ -148,7 +134,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
       options,
       loadedImage ? undefined : `Tile Preview (${materialName})`
     );
-  }, [previewMode, showGrid, zoom, pan, highlightSeams, isPass, materialName]);
+  }, [previewMode, showGrid, zoom, pan, loadedImage, isPass, materialName]);
 
   // Adjust canvas size to container using ResizeObserver
   useEffect(() => {
@@ -183,30 +169,24 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
     redraw();
   }, [redraw]);
 
-  // Bounded Mouse Pan Handlers (prevents dragging completely off-screen)
+  // Mouse pan handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const maxPanX = Math.max(100, rect.width * 0.85);
-    const maxPanY = Math.max(100, rect.height * 0.85);
-
-    const newX = e.clientX - dragStart.x;
-    const newY = e.clientY - dragStart.y;
-
+    if (!isDragging) return;
     setPan({
-      x: Math.min(maxPanX, Math.max(-maxPanX, newX)),
-      y: Math.min(maxPanY, Math.max(-maxPanY, newY)),
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
     });
   };
 
   const handleMouseUp = () => setIsDragging(false);
 
-  // Smooth wheel zoom handler [0.1x to 10.0x bounds] with non-passive listener
+  // Wheel zoom handler attached as non-passive native listener to prevent outer page scroll
+  // while avoiding browser passive event listener warnings
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -216,7 +196,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
       const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
       setZoom((prevZoom) => {
         const nextZoom = prevZoom * zoomFactor;
-        return Math.min(10.0, Math.max(0.1, Number(nextZoom.toFixed(2))));
+        return Math.min(6.0, Math.max(0.2, Number(nextZoom.toFixed(2))));
       });
     };
 
@@ -248,71 +228,63 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
         {/* Controls Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-950/90 border-b border-slate-800 text-xs">
           {/* 1. Preview Mode Switcher: 1x1, 3x3, Infinite */}
-          <div role="radiogroup" aria-label="Preview Grid Mode" className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+          <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
             <span className="text-slate-400 font-semibold px-1.5 hidden sm:inline">Mode:</span>
 
             {/* 1x1 (Single) */}
             <button
               id="btn-preview-mode-single"
-              role="radio"
-              aria-checked={previewMode === 'single'}
               onClick={() => setPreviewMode('single')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
                 previewMode === 'single'
                   ? 'bg-amber-500 text-slate-950 font-bold shadow-sm shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
               title="Display one tile at its native aspect ratio & exact pixel dimensions"
             >
-              <Square className="w-3.5 h-3.5" aria-hidden="true" />
+              <Square className="w-3.5 h-3.5" />
               <span>1×1</span>
             </button>
 
             {/* 3x3 */}
             <button
               id="btn-preview-mode-3x3"
-              role="radio"
-              aria-checked={previewMode === '3x3'}
               onClick={() => setPreviewMode('3x3')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
                 previewMode === '3x3'
                   ? 'bg-amber-500 text-slate-950 font-bold shadow-sm shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
               title="Repeat the same tile nine times in a 3×3 grid"
             >
-              <Grid3X3 className="w-3.5 h-3.5" aria-hidden="true" />
+              <Grid3X3 className="w-3.5 h-3.5" />
               <span>3×3</span>
             </button>
 
             {/* Infinite */}
             <button
               id="btn-preview-mode-infinite"
-              role="radio"
-              aria-checked={previewMode === 'infinite'}
               onClick={() => setPreviewMode('infinite')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
                 previewMode === 'infinite'
                   ? 'bg-amber-500 text-slate-950 font-bold shadow-sm shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
               title="Dynamically repeat the texture infinitely across the full canvas"
             >
-              <InfinityIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              <InfinityIcon className="w-3.5 h-3.5" />
               <span>Infinite</span>
             </button>
           </div>
 
           {/* Texture Source Toggle (Processed Seamless vs Raw AI) */}
           {rawImageDataUrl && imageDataUrl && (
-            <div role="radiogroup" aria-label="Texture Source Selection" className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+            <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
               <span className="text-slate-400 font-semibold px-1.5 hidden md:inline">View:</span>
               <button
                 id="btn-view-processed"
-                role="radio"
-                aria-checked={selectedSource === 'processed'}
                 onClick={() => handleSourceToggle('processed')}
-                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide ${
                   selectedSource === 'processed'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -322,10 +294,8 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
               </button>
               <button
                 id="btn-view-raw"
-                role="radio"
-                aria-checked={selectedSource === 'raw'}
                 onClick={() => handleSourceToggle('raw')}
-                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide ${
                   selectedSource === 'raw'
                     ? 'bg-sky-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -336,54 +306,38 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             </div>
           )}
 
-          {/* 2. Grid Toggle & Seam Highlights */}
+          {/* 2. Grid Toggle & Seam Lines */}
           <div className="flex items-center space-x-2">
             <button
               id="btn-toggle-grid"
-              aria-pressed={showGrid}
               onClick={() => setShowGrid(!showGrid)}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition-all ${
                 showGrid
                   ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm font-semibold'
                   : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
               }`}
               title="Toggle boundary grid lines between repeating tiles"
             >
-              {showGrid ? <Eye className="w-3.5 h-3.5 text-sky-400" aria-hidden="true" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />}
+              {showGrid ? <Eye className="w-3.5 h-3.5 text-sky-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
               <span>Grid: {showGrid ? 'ON' : 'OFF'}</span>
-            </button>
-
-            <button
-              id="btn-toggle-seam-highlight"
-              aria-pressed={highlightSeams}
-              onClick={() => setHighlightSeams(!highlightSeams)}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-                highlightSeams
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm font-semibold'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
-              }`}
-              title="Highlight edge seams with high-contrast indicator"
-            >
-              <Flame className={`w-3.5 h-3.5 ${highlightSeams ? 'text-rose-400' : 'text-slate-500'}`} aria-hidden="true" />
-              <span>Seam Highlights: {highlightSeams ? 'ON' : 'OFF'}</span>
             </button>
           </div>
 
-          {/* 3. Refined Zoom Controls (0.1x to 10.0x) */}
+          {/* 3. Zoom Controls */}
           <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
             <button
               id="btn-preview-zoom-out"
-              onClick={() => setZoom((z) => Math.max(0.1, Number((z - 0.25).toFixed(2))))}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-              title="Zoom out (Min: 10%)"
+              onClick={() => setZoom((z) => Math.max(0.25, Number((z - 0.25).toFixed(2))))}
+              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Zoom out"
             >
-              <ZoomOut className="w-3.5 h-3.5" aria-hidden="true" />
+              <ZoomOut className="w-3.5 h-3.5" />
             </button>
 
             <button
               id="btn-preview-zoom-reset-100"
               onClick={resetView}
-              className="font-mono text-slate-200 px-2 py-0.5 rounded text-[11px] min-w-[3.5rem] text-center hover:bg-slate-800 transition-colors font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              className="font-mono text-slate-200 px-2 py-0.5 rounded text-[11px] min-w-[3.5rem] text-center hover:bg-slate-800 transition-colors font-medium"
               title="Click to reset to 100% Native 1:1 Scale"
             >
               {Math.round(zoom * 100)}%
@@ -391,11 +345,11 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
 
             <button
               id="btn-preview-zoom-in"
-              onClick={() => setZoom((z) => Math.min(10.0, Number((z + 0.25).toFixed(2))))}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-              title="Zoom in (Max: 1000%)"
+              onClick={() => setZoom((z) => Math.min(5.0, Number((z + 0.25).toFixed(2))))}
+              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Zoom in"
             >
-              <ZoomIn className="w-3.5 h-3.5" aria-hidden="true" />
+              <ZoomIn className="w-3.5 h-3.5" />
             </button>
 
             <div className="w-px h-3.5 bg-slate-800 mx-0.5" />
@@ -403,10 +357,10 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-preview-reset-view"
               onClick={resetView}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               title="Reset Pan & Zoom (Center View)"
             >
-              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+              <RotateCcw className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -415,10 +369,9 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
         {!isPass && (
           <div
             id="seam-failure-warning-banner"
-            role="alert"
             className="bg-rose-950/80 border-b border-rose-500/40 px-4 py-2.5 flex items-center space-x-2.5 text-xs text-rose-200 animate-fadeIn"
           >
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" aria-hidden="true" />
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
             <div className="flex-1">
               <span className="font-bold text-rose-300">SEAM FAILURE DETECTED: </span>
               <span>
@@ -435,7 +388,6 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
         {/* Interactive HTML5 Canvas Container */}
         <div
           ref={containerRef}
-          aria-label="Interactive Tile Preview Canvas"
           className="relative flex-1 min-h-[420px] bg-slate-950 cursor-grab active:cursor-grabbing overflow-hidden select-none"
         >
           <canvas
@@ -450,7 +402,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
           />
 
           {/* Floating Viewport Status Pill */}
-          <div role="status" className="absolute bottom-3 left-3 flex items-center space-x-2.5 bg-slate-900/95 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-lg text-slate-300 text-xs shadow-lg">
+          <div className="absolute bottom-3 left-3 flex items-center space-x-2.5 bg-slate-900/95 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-lg text-slate-300 text-xs shadow-lg">
             <span
               id="preview-source-badge"
               className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase border ${
@@ -481,7 +433,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
 
           {/* Quick pan hint */}
           <div className="absolute top-3 right-3 text-[11px] text-slate-400 bg-slate-900/85 backdrop-blur px-2.5 py-1 rounded-md border border-slate-800 pointer-events-none hidden sm:block">
-            Click & drag to pan • Scroll to zoom (10% - 1000%)
+            Click & drag to pan • Scroll to zoom
           </div>
         </div>
       </div>
@@ -492,7 +444,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-lg space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center space-x-2">
-              <Sliders className="w-4 h-4 text-amber-400" aria-hidden="true" />
+              <Sliders className="w-4 h-4 text-amber-400" />
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                 Seam Analysis
               </h3>
@@ -500,7 +452,6 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             {/* Status: PASS / FAIL Badge */}
             <div
               id="seam-status-badge"
-              role="status"
               className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                 isPass
                   ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
@@ -509,12 +460,12 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             >
               {isPass ? (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                   <span>PASS</span>
                 </>
               ) : (
                 <>
-                  <AlertTriangle className="w-3.5 h-3.5 text-rose-400" aria-hidden="true" />
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
                   <span>FAIL</span>
                 </>
               )}
@@ -598,7 +549,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
           {/* Technical Guarantee Note */}
           <div className="bg-slate-950/40 border border-slate-800/80 rounded-lg p-2.5 text-[11px] text-slate-400 space-y-1">
             <div className="flex items-center space-x-1.5 text-slate-300 font-medium">
-              <Info className="w-3.5 h-3.5 text-sky-400 shrink-0" aria-hidden="true" />
+              <Info className="w-3.5 h-3.5 text-sky-400 shrink-0" />
               <span>Exact Pixel Scale Guarantee</span>
             </div>
             <p className="text-slate-500 leading-normal">
@@ -612,7 +563,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
           <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-lg space-y-2.5">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <div className="flex items-center space-x-2">
-                <Cpu className="w-4 h-4 text-sky-400" aria-hidden="true" />
+                <Cpu className="w-4 h-4 text-sky-400" />
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
                   Generation Metadata
                 </h4>
@@ -651,7 +602,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
         {/* Quick Test Texture Presets */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-lg space-y-2.5">
           <div className="flex items-center space-x-2 border-b border-slate-800 pb-2">
-            <Sparkles className="w-4 h-4 text-amber-400" aria-hidden="true" />
+            <Sparkles className="w-4 h-4 text-amber-400" />
             <h4 className="text-xs font-bold text-white uppercase tracking-wider">
               Test Texture Presets
             </h4>
@@ -665,7 +616,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
                 key={sample.id}
                 id={`btn-sample-${sample.id}`}
                 onClick={() => handleSampleClick(sample)}
-                className={`w-full text-left p-2 rounded-lg border transition-all text-xs flex items-center justify-between focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                className={`w-full text-left p-2 rounded-lg border transition-all text-xs flex items-center justify-between ${
                   activeSampleId === sample.id && !imageDataUrl
                     ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
                     : 'bg-slate-950/60 border-slate-800 hover:bg-slate-800/80 text-slate-300'

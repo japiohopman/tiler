@@ -8,6 +8,14 @@ The generated image must represent a **material surface**, not an object, scene,
 
 ---
 
+## Architectural Decision: Omitting Camera Framing Terms (`top-down`, `orthographic`)
+
+In earlier prompt systems, camera framing descriptors such as `top-down` and `orthographic` were hardcoded into positive prompts. Under SDXL Base 1.0, camera and composition descriptors (including `top-down`, `orthographic`, `camera`, `perspective`) encourage the diffusion model to create composed 3D scenes or aerial photograph representations rather than pure material surfaces.
+
+Therefore, SDXL Base 1.0 prompts omit camera words in favor of direct **material surface descriptors** (`[MATERIAL] material surface`) combined with explicit **seamless tileability constraints** (`evenly distributed detail, uniform surface, flat neutral lighting, seamless tileable texture, continuous pattern, no visible borders`).
+
+---
+
 ## Prompt Construction
 
 Build the prompt around the following structure:

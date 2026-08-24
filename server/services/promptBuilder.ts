@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { MaterialId } from '../../src/types';
 import { getMaterialProfile, MaterialProfile } from './materialProfiles';
 import { evaluatePromptAdherence, PromptAdherenceReport } from './promptAdherence';
 
 export interface PromptBuildOptions {
-  material: string;
+  material: MaterialId | string;
   style?: string;
   detail?: string;
   additionalPrompt?: string;
@@ -19,7 +20,7 @@ export interface StructuredPromptResult {
   builtPrompt: string;
   negativePrompt: string;
   userPrompt: string;
-  materialProfileId: string;
+  materialProfileId: MaterialId;
   canonicalName: string;
   adherenceReport: PromptAdherenceReport;
 }
@@ -38,10 +39,13 @@ const STYLE_DESCRIPTORS: Record<string, string> = {
 /**
  * SDXL Base 1.0 — Tileable Texture Prompt Builder
  *
- * Implements standard SDXL 1.0 template:
+ * Implements standard SDXL 1.0 template (focusing on material surface descriptors and seamless tileability):
  * [MATERIAL] + [SURFACE STRUCTURE] + [COLOR / PALETTE] + [SMALL-SCALE DETAILS] + [NATURAL VARIATION] +
- * [USER MODIFIER] + [STYLE] +
+ * [STYLE] + [USER MODIFIER] +
  * evenly distributed detail, uniform surface, flat neutral lighting, seamless tileable texture, continuous pattern, no visible borders
+ *
+ * Note: Camera/viewpoint framing terms like 'top-down' and 'orthographic' are omitted from positive prompt language
+ * per SDXL Rule 2 (avoiding composition/camera descriptors that trigger composed scene generation rather than material surfaces).
  */
 export class PromptBuilder {
   /**
@@ -53,7 +57,7 @@ export class PromptBuilder {
   }
 
   /**
-   * Constructs both positive prompt, negative prompt, and deterministic adherence report
+   * Constructs positive prompt, negative prompt, and deterministic adherence report
    */
   static buildStructuredPrompt(options: PromptBuildOptions): StructuredPromptResult {
     const { material, style, additionalPrompt, customPrompt } = options;
@@ -64,8 +68,8 @@ export class PromptBuilder {
     // Preserve original user modifier intent verbatim
     const userModifier = (additionalPrompt || customPrompt || '').trim();
 
-    // 1. Material subject line with top-down orthographic camera framing
-    const materialSubject = `Top-down orthographic ${profile.canonicalName} material surface`;
+    // 1. Material subject line
+    const materialSubject = `${profile.canonicalName} material surface`;
 
     // 2. Structured material profile terms from SDXL template
     const structureClause = profile.surfaceStructure;
@@ -146,7 +150,7 @@ export class PromptBuilder {
       builtPrompt,
       negativePrompt,
       userPrompt: userModifier,
-      materialProfileId: String(profile.id),
+      materialProfileId: profile.id,
       canonicalName: profile.canonicalName,
       adherenceReport,
     };

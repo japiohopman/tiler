@@ -6,7 +6,7 @@
 import { MaterialId } from '../../src/types';
 
 export interface MaterialProfile {
-  id: MaterialId | string;
+  id: MaterialId;
   canonicalName: string;
   category: 'ground' | 'liquid' | 'organic' | 'stone' | 'metal';
   surfaceStructure: string;
@@ -22,7 +22,7 @@ export interface MaterialProfile {
   providerGuidance?: string;
 }
 
-export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
+export const MATERIAL_PROFILES: Record<MaterialId, MaterialProfile> = {
   stone: {
     id: 'stone',
     canonicalName: 'Stone',
@@ -44,10 +44,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'micro-cracks and pores',
     ],
     positiveConstraints: [
-      'top-down material surface',
+      'material surface',
       'seamless stone texture',
       'uniform rock coverage',
-      'flat overhead stone surface',
+      'overhead stone surface',
     ],
     negativeConstraints: [
       'buildings',
@@ -107,10 +107,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'interlocking paving stones',
     ],
     positiveConstraints: [
-      'top-down ground pavement surface',
+      'pavement surface',
       'seamless stone texture',
       'uniform ground coverage',
-      'flat overhead stone paving',
+      'stone paving',
     ],
     negativeConstraints: [
       'buildings',
@@ -145,7 +145,7 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'water',
       'grass',
     ],
-    providerGuidance: 'Emphasize tight stone paving blocks and mortar lines from direct top-down view.',
+    providerGuidance: 'Emphasize tight stone paving blocks and mortar lines from overhead view.',
   },
 
   brick: {
@@ -169,10 +169,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'weathered brick edges',
     ],
     positiveConstraints: [
-      'top-down brick surface',
+      'brick surface',
       'seamless brick texture',
       'uniform masonry coverage',
-      'flat overhead brickwork',
+      'brickwork',
     ],
     negativeConstraints: [
       'buildings',
@@ -224,7 +224,7 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'earthy soil undertones',
     ],
     positiveConstraints: [
-      'top-down dirt ground surface',
+      'dirt ground surface',
       'seamless soil texture',
       'uniform dirt coverage',
       'flat terrain ground',
@@ -255,7 +255,7 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'horizon',
       'asphalt',
     ],
-    providerGuidance: 'Direct top-down view of fine soil earth surface with micro pebbles.',
+    providerGuidance: 'Direct view of fine soil earth surface with micro pebbles.',
   },
 
   sand: {
@@ -278,7 +278,7 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'even golden tone',
     ],
     positiveConstraints: [
-      'top-down sand ground surface',
+      'sand ground surface',
       'seamless sand texture',
       'uniform sand coverage',
       'flat granular terrain',
@@ -312,7 +312,7 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'lava',
       'water',
     ],
-    providerGuidance: 'Direct overhead view of smooth sand grain ground.',
+    providerGuidance: 'Direct view of smooth sand grain ground.',
   },
 
   wood: {
@@ -336,10 +336,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'plank seams',
     ],
     positiveConstraints: [
-      'top-down wooden floor surface',
+      'wooden floor surface',
       'seamless wood texture',
       'uniform plank coverage',
-      'flat timber flooring',
+      'timber flooring',
     ],
     negativeConstraints: [
       'furniture',
@@ -371,7 +371,7 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'lava',
       'water',
     ],
-    providerGuidance: 'Direct overhead view of continuous wood planking.',
+    providerGuidance: 'Direct view of continuous wood planking.',
   },
 
   metal: {
@@ -395,10 +395,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'flat non-directional reflection',
     ],
     positiveConstraints: [
-      'top-down metal surface',
+      'metal surface',
       'seamless metal texture',
       'uniform metal coverage',
-      'flat metallic plate',
+      'metallic plate',
     ],
     negativeConstraints: [
       'robots',
@@ -452,10 +452,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'velvety surface depth',
     ],
     positiveConstraints: [
-      'top-down moss turf surface',
+      'moss turf surface',
       'seamless moss texture',
       'uniform vegetation coverage',
-      'flat organic growth',
+      'organic growth',
     ],
     negativeConstraints: [
       'trees',
@@ -508,10 +508,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'volcanic heat glow',
     ],
     positiveConstraints: [
-      'top-down material surface',
+      'material surface',
       'seamless ground texture',
       'uniform liquid magma coverage',
-      'flat overhead view of molten magma',
+      'molten magma surface',
     ],
     negativeConstraints: [
       'buildings',
@@ -578,10 +578,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'subtle underwater depth',
     ],
     positiveConstraints: [
-      'top-down fluid surface',
+      'fluid surface',
       'seamless water texture',
       'uniform liquid coverage',
-      'flat aquatic surface',
+      'aquatic surface',
     ],
     negativeConstraints: [
       'boats',
@@ -640,10 +640,10 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
       'subtle soil patches',
     ],
     positiveConstraints: [
-      'top-down meadow ground surface',
+      'meadow ground surface',
       'seamless grass texture',
       'uniform lawn coverage',
-      'flat vegetation turf',
+      'vegetation turf',
     ],
     negativeConstraints: [
       'houses',
@@ -680,18 +680,18 @@ export const MATERIAL_PROFILES: Record<string, MaterialProfile> = {
 };
 
 /**
- * Retrieves a material profile by ID or returns a default fallback profile
+ * Retrieves a material profile by canonical MaterialId or string, returning a strictly typed MaterialProfile
  */
-export function getMaterialProfile(materialId: string): MaterialProfile {
-  const norm = materialId.toLowerCase().trim();
-  if (MATERIAL_PROFILES[norm]) {
-    return MATERIAL_PROFILES[norm];
+export function getMaterialProfile(materialId: MaterialId | string): MaterialProfile {
+  const norm = (materialId || 'stone').toLowerCase().trim();
+  if (norm in MATERIAL_PROFILES) {
+    return MATERIAL_PROFILES[norm as MaterialId];
   }
 
-  // Fallback profile for unknown custom materials
+  // Fallback profile mapping custom unknown string inputs to a canonical MaterialProfile
   const capitalized = norm.charAt(0).toUpperCase() + norm.slice(1);
   return {
-    id: norm,
+    id: 'stone', // Canonical fallback ID
     canonicalName: capitalized,
     category: 'ground',
     surfaceStructure: `${norm} surface structure`,
@@ -700,7 +700,7 @@ export function getMaterialProfile(materialId: string): MaterialProfile {
     naturalVariation: `natural ${norm} variation`,
     descriptiveTerms: [`${norm} material surface`, `natural ${norm} texture`],
     visualCharacteristics: [`tactile ${norm} details`],
-    positiveConstraints: ['top-down material surface', 'seamless ground texture', 'uniform coverage'],
+    positiveConstraints: ['material surface', 'seamless ground texture', 'uniform coverage'],
     negativeConstraints: ['buildings', 'houses', 'roads', 'vehicles', 'characters', 'sky', 'horizon', 'landscape'],
     tileWording: ['seamless tileable texture', 'continuous pattern', 'no visible borders'],
     forbiddenTerms: ['building', 'house', 'road', 'vehicle', 'character', 'person', 'sky', 'horizon'],

@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Layers } from 'lucide-react';
+import { Layers, Sparkles, Sliders, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 interface HeaderProps {
   backendStatus: 'online' | 'offline' | 'checking';
@@ -14,11 +14,11 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ backendStatus, activeView, onViewChange }) => {
   return (
-    <header role="banner" className="border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 sm:px-6 py-3.5 sticky top-0 z-50">
+    <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 sm:px-6 py-3.5 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         {/* Title & Purpose */}
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 via-sky-500 to-emerald-500 p-0.5 flex items-center justify-center shadow-lg shadow-amber-500/10" aria-hidden="true">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 via-sky-500 to-emerald-500 p-0.5 flex items-center justify-center shadow-lg shadow-amber-500/10">
             <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
               <Layers className="w-5 h-5 text-amber-400" />
             </div>
@@ -38,12 +38,11 @@ export const Header: React.FC<HeaderProps> = ({ backendStatus, activeView, onVie
 
         {/* View Mode Switcher & Backend Status */}
         <div className="flex items-center space-x-3">
-          <nav aria-label="Main Navigation" className="flex items-center p-1 rounded-lg bg-slate-950 border border-slate-800 text-xs">
+          <div className="flex items-center p-1 rounded-lg bg-slate-950 border border-slate-800 text-xs">
             <button
               id="view-workspace-btn"
               onClick={() => onViewChange('workspace')}
-              aria-pressed={activeView === 'workspace'}
-              className={`px-3 py-1 rounded-md font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`px-3 py-1 rounded-md font-semibold transition-all ${
                 activeView === 'workspace'
                   ? 'bg-amber-500 text-slate-950 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -54,8 +53,7 @@ export const Header: React.FC<HeaderProps> = ({ backendStatus, activeView, onVie
             <button
               id="view-processor-btn"
               onClick={() => onViewChange('processor')}
-              aria-pressed={activeView === 'processor'}
-              className={`px-3 py-1 rounded-md font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`px-3 py-1 rounded-md font-semibold transition-all ${
                 activeView === 'processor'
                   ? 'bg-amber-500 text-slate-950 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -63,13 +61,10 @@ export const Header: React.FC<HeaderProps> = ({ backendStatus, activeView, onVie
             >
               Engine & Tests
             </button>
-          </nav>
+          </div>
 
           {/* Backend Status Pill */}
           <div
-            role="status"
-            aria-live="polite"
-            aria-label={`Server engine status: ${backendStatus}`}
             className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs border ${
               backendStatus === 'online'
                 ? 'bg-emerald-950/50 text-emerald-300 border-emerald-500/30'
