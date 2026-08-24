@@ -28,28 +28,20 @@ export interface StructuredPromptResult {
  * Visual style descriptor mapping for game asset rendering
  */
 const STYLE_DESCRIPTORS: Record<string, string> = {
-  'pixel-art': '16-bit retro pixel art game asset style, clean pixel clusters, subtle dithering, limited cohesive palette',
-  'hand-painted': 'stylized hand-painted game texture, painterly digital art brushstrokes, soft ambient occlusion',
-  'stylized': 'modern stylized game texture, clean defined shapes, vibrant saturation, smooth bevels, Blizzard/Riot game art style',
-  'photorealistic': 'photorealistic 2D ground scan texture, micro-surface details, ultra-high fidelity material texture',
-  'retro-16bit': 'classic 16-bit JRPG top-down tileset asset, crisp sprite-friendly boundaries, retro console aesthetic',
+  'pixel-art': '16-bit retro pixel art game asset style',
+  'hand-painted': 'stylized hand-painted game texture style',
+  'stylized': 'modern stylized game texture art style',
+  'photorealistic': 'photorealistic 2D ground surface scan style',
+  'retro-16bit': 'classic 16-bit JRPG top-down tileset style',
 };
 
 /**
- * Detail modifier descriptions
- */
-const DETAIL_DESCRIPTORS: Record<string, string> = {
-  subtle: 'clean low-frequency details, minimal noise, smooth surface readability',
-  medium: 'balanced surface texture, natural frequency variation, clear definition',
-  high: 'high surface complexity, rich micro-details, intricate crevices and texture depth',
-  ultra: 'maximum intricate texture detail, micro-grain, complex surface fractures and high definition',
-};
-
-/**
- * Dedicated Material-Aware Prompt Builder for 2D Game Ground Textures.
+ * SDXL Base 1.0 — Tileable Texture Prompt Builder
  *
- * Enforces technical, orthographic, lighting, material identity, and negative constraints
- * specified for game engine tileable ground textures.
+ * Implements standard SDXL 1.0 template:
+ * [MATERIAL] + [SURFACE STRUCTURE] + [COLOR / PALETTE] + [SMALL-SCALE DETAILS] + [NATURAL VARIATION] +
+ * [USER MODIFIER] + [STYLE] +
+ * evenly distributed detail, uniform surface, flat neutral lighting, seamless tileable texture, continuous pattern, no visible borders
  */
 export class PromptBuilder {
   /**
@@ -64,83 +56,86 @@ export class PromptBuilder {
    * Constructs both positive prompt, negative prompt, and deterministic adherence report
    */
   static buildStructuredPrompt(options: PromptBuildOptions): StructuredPromptResult {
-    const { material, style = 'stylized', detail = 'high', additionalPrompt, customPrompt } = options;
+    const { material, style, additionalPrompt, customPrompt } = options;
 
     const profile: MaterialProfile = getMaterialProfile(material);
-    const normalizedStyle = (style || 'stylized').toLowerCase().trim();
-    const normalizedDetail = (detail || 'high').toLowerCase().trim();
+    const normalizedStyle = (style || '').toLowerCase().trim();
 
-    const styleDescription = STYLE_DESCRIPTORS[normalizedStyle] || `${normalizedStyle} game art style`;
-    const detailDescription = DETAIL_DESCRIPTORS[normalizedDetail] || DETAIL_DESCRIPTORS.high;
-
-    // Preserve original user modifier intent
+    // Preserve original user modifier intent verbatim
     const userModifier = (additionalPrompt || customPrompt || '').trim();
 
-    // 1. Base Subject prioritizing Material Identity
-    const primaryDescriptiveTerms = profile.descriptiveTerms.slice(0, 3).join(', ');
-    const subject = `Top-down orthographic 2D game ground texture of ${profile.canonicalName} (${primaryDescriptiveTerms}).`;
+    // 1. Material subject line with top-down orthographic camera framing
+    const materialSubject = `Top-down orthographic ${profile.canonicalName} material surface`;
 
-    // 2. Visual Style & Artistic Rendering
-    const styleClause = `Visual Style: ${styleDescription}. Detail Level: ${detailDescription}.`;
+    // 2. Structured material profile terms from SDXL template
+    const structureClause = profile.surfaceStructure;
+    const paletteClause = profile.colorPalette;
+    const detailClause = profile.smallScaleDetails;
+    const variationClause = profile.naturalVariation;
 
-    // 3. User Additional Modifier Clause (preserves original user input verbatim)
-    const userClause = userModifier.length > 0 ? `Specific Features: ${userModifier}.` : '';
+    // 3. Style descriptor (if specified and not default)
+    const styleClause = normalizedStyle && STYLE_DESCRIPTORS[normalizedStyle]
+      ? STYLE_DESCRIPTORS[normalizedStyle]
+      : '';
 
-    // 4. Technical Ground Texture & Orthographic Tile Constraints
-    const technicalRequirements = [
-      'Top-down 90-degree direct overhead orthographic view.',
-      'Pure flat texture-only surface with 100% uniform seamless coverage filling the entire square frame from edge to edge.',
-      'Flat ambient non-directional lighting with no cast shadows, no direct sun angle, and no external lighting direction.',
-      'Seamless tileable repeating pattern design suitable as a 2D game ground terrain texture.',
-    ].join(' ');
+    // 4. User additional features (verbatim)
+    const userClause = userModifier.length > 0 ? userModifier : '';
 
-    // 5. Strict Negative Rules within prompt text
-    const negativeTextClause = [
-      'Strict Negative Rules:',
-      'NO perspective, NO angled isometric view, NO horizon line, NO sky, NO 3D scene depth.',
-      'NO characters, NO animals, NO monsters, NO trees, NO standalone objects, NO props, NO buildings, NO items.',
-      'NO borders, NO frames, NO vignetting, NO circular crop, NO rounded corners.',
-      'NO text, NO letters, NO numbers, NO watermark, NO logo, NO user interface (UI) elements.',
-      profile.negativeConstraints.length > 0 ? `NO ${profile.negativeConstraints.join(', NO ')}.` : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
+    // 5. Mandatory SDXL Tileable Texture Quality & Borderless Constraints
+    const qualityClause = 'evenly distributed detail, uniform surface, flat neutral lighting, seamless tileable texture, continuous pattern, no visible borders';
 
-    const builtPrompt = [
-      subject,
+    // Assemble compact positive prompt following template structure
+    const promptSegments = [
+      materialSubject,
+      structureClause,
+      paletteClause,
+      detailClause,
+      variationClause,
       styleClause,
       userClause,
-      technicalRequirements,
-      negativeTextClause,
-    ]
-      .filter(Boolean)
-      .join(' ');
+      qualityClause,
+    ].filter((segment) => Boolean(segment) && segment.length > 0);
 
-    // Build dedicated negative prompt parameter for providers supporting negative_prompt (e.g. Pixazo SDXL)
+    const builtPrompt = promptSegments.join(', ');
+
+    // Standard SDXL 1.0 Negative Prompt
     const baseNegativeTerms = [
+      'object',
+      'objects',
+      'scene',
+      'landscape',
+      'building',
+      'character',
+      'person',
+      'animal',
+      'furniture',
+      'centered object',
+      'focal point',
+      'perspective',
+      'horizon',
+      'foreground',
+      'background',
+      'frame',
+      'border',
+      'vignette',
+      'text',
+      'logo',
+      'watermark',
+      'UI',
+      'strong directional lighting',
+      'dramatic shadows',
+      'visible seams',
       'blurry',
       'distorted',
       'low quality',
       '3d render',
-      'perspective view',
-      'isometric',
-      'horizon',
-      'sky',
-      'character',
-      'person',
-      'face',
-      'building',
-      'house',
-      'street',
-      'vehicle',
-      'border',
-      'frame',
-      'watermark',
-      'text',
     ];
 
     const combinedNegatives = Array.from(
-      new Set([...baseNegativeTerms, ...profile.negativeConstraints.map((n) => n.toLowerCase())])
+      new Set([
+        ...baseNegativeTerms,
+        ...(profile.negativeConstraints || []).map((n) => n.toLowerCase()),
+      ])
     );
     const negativePrompt = combinedNegatives.join(', ');
 
@@ -151,7 +146,7 @@ export class PromptBuilder {
       builtPrompt,
       negativePrompt,
       userPrompt: userModifier,
-      materialProfileId: profile.id,
+      materialProfileId: String(profile.id),
       canonicalName: profile.canonicalName,
       adherenceReport,
     };

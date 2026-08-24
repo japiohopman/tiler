@@ -7,7 +7,7 @@ import { MaterialId } from '../../src/types';
 import { getMaterialProfile, MaterialProfile } from './materialProfiles';
 
 export interface PromptAdherenceReport {
-  materialId: MaterialId;
+  materialId: MaterialId | string;
   canonicalName: string;
   score: number; // 0 to 100
   pass: boolean; // score >= 70 and no critical forbidden terms
@@ -31,9 +31,23 @@ const REQUIRED_TILE_KEYWORDS = [
   'surface',
 ];
 
+const COMPOSITION_FORBIDDEN_WORDS = [
+  'centered',
+  'foreground',
+  'background',
+  'horizon',
+  'perspective',
+  'camera',
+  'close-up',
+  'wide shot',
+  'scene',
+  'landscape',
+  'focal point',
+];
+
 /**
  * Deterministically evaluates an assembled prompt for material identity, tile constraints,
- * user intent preservation, and absence of forbidden semantic terms.
+ * user intent preservation, and absence of forbidden semantic / composition terms.
  */
 export function evaluatePromptAdherence(
   prompt: string,
@@ -50,8 +64,7 @@ export function evaluatePromptAdherence(
   const issues: string[] = [];
 
   // 1. Check Material Identity
-  // The canonical name or descriptive terms must be present
-  if (promptLower.includes(profile.canonicalName.toLowerCase()) || promptLower.includes(profile.id)) {
+  if (promptLower.includes(profile.canonicalName.toLowerCase()) || promptLower.includes(String(profile.id))) {
     matchedMaterialTerms.push(profile.canonicalName);
   }
 
@@ -60,7 +73,6 @@ export function evaluatePromptAdherence(
     if (promptLower.includes(termLower)) {
       matchedMaterialTerms.push(term);
     } else {
-      // Check sub-words
       const subWords = termLower.split(' ').filter((w) => w.length > 3);
       for (const sw of subWords) {
         if (promptLower.includes(sw) && !matchedMaterialTerms.includes(sw)) {
@@ -87,23 +99,23 @@ export function evaluatePromptAdherence(
     issues.push('Prompt lacks sufficient top-down / orthographic / seamless tile constraint terms');
   }
 
-  // 3. Check Forbidden Terms
-  for (const forbidden of profile.forbiddenTerms) {
-    const forbiddenLower = forbidden.toLowerCase();
-    // Use regex word boundary check so "water" doesn't match "watermark" in negative rules unless specified
-    // But note: negative rules in prompt string might say "NO sky, NO buildings".
-    // Forbidden terms check verifies whether positive prompt accidentally contains forbidden concepts outside negative rules!
-    const positivePart = promptLower.split('strict negative rules:')[0] || promptLower.split('negative guidance:')[0] || promptLower;
+  // 3. Check Forbidden Material & Composition Terms in positive prompt
+  const positivePart = promptLower.split('strict negative rules:')[0] || promptLower.split('negative guidance:')[0] || promptLower;
 
-    // Check if forbidden term appears in the positive prompt section
-    const regex = new RegExp(`\\b${forbiddenLower}\\b`, 'i');
+  const forbiddenCheckList = Array.from(
+    new Set([...profile.forbiddenTerms, ...COMPOSITION_FORBIDDEN_WORDS])
+  );
+
+  for (const forbidden of forbiddenCheckList) {
+    const forbiddenLower = forbidden.toLowerCase();
+    const regex = new RegExp(`\\b${forbiddenLower.replace(/\s+/g, '\\s+')}\\b`, 'i');
     if (regex.test(positivePart)) {
       forbiddenTermsFound.push(forbidden);
     }
   }
 
   if (forbiddenTermsFound.length > 0) {
-    issues.push(`Positive prompt contains forbidden semantic terms: ${forbiddenTermsFound.join(', ')}`);
+    issues.push(`Positive prompt contains forbidden semantic/composition terms: ${forbiddenTermsFound.join(', ')}`);
   }
 
   // 4. Check User Intent Preservation
@@ -130,26 +142,21 @@ export function evaluatePromptAdherence(
   // Calculate deterministic score (0 to 100)
   let score = 0;
 
-  // Material identity: max 40 points
   if (hasMaterialIdentity) {
     score += Math.min(40, 20 + matchedMaterialTerms.length * 5);
   }
 
-  // Tile constraints: max 30 points
   if (hasTileConstraints) {
     score += Math.min(30, matchedTileTerms.length * 6);
   }
 
-  // User intent preservation: max 20 points
   if (hasUserIntentPreserved) {
     score += 20;
   }
 
-  // Absence of forbidden terms in positive section: max 10 points
   if (forbiddenTermsFound.length === 0) {
     score += 10;
   } else {
-    // Penalty for forbidden terms in positive section
     score = Math.max(0, score - forbiddenTermsFound.length * 15);
   }
 
