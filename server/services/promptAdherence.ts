@@ -10,7 +10,7 @@ export interface PromptAdherenceReport {
   materialId: MaterialId;
   canonicalName: string;
   score: number; // 0 to 100
-  pass: boolean; // score >= 70 and no critical forbidden terms
+  pass: boolean; // score >= 70 and no critical forbidden terms or excessive length
   hasMaterialIdentity: boolean;
   hasTileConstraints: boolean;
   hasUserIntentPreserved: boolean;
@@ -24,15 +24,11 @@ export interface PromptAdherenceReport {
 
 /**
  * Required surface tileability keywords for SDXL material texture generation
- * Focuses on material surface characteristics and seamless tileability constraints.
  */
 const REQUIRED_TILE_KEYWORDS = [
   'seamless',
   'tileable',
   'texture',
-  'surface',
-  'pattern',
-  'uniform',
 ];
 
 /**
@@ -58,7 +54,7 @@ const COMPOSITION_FORBIDDEN_WORDS = [
 /**
  * Deterministically evaluates an assembled prompt for material identity, tile constraints,
  * user intent preservation, absence of forbidden semantic / composition terms,
- * and absence of unrequested cross-material contamination.
+ * absence of unrequested cross-material contamination, and compact word length (target: 15–25 words, max 30 words).
  */
 export function evaluatePromptAdherence(
   prompt: string,
@@ -134,7 +130,6 @@ export function evaluatePromptAdherence(
     const otherProfile = MATERIAL_PROFILES[otherId];
     const otherName = otherProfile.canonicalName.toLowerCase();
 
-    // Check if other material ID or name appears in positive prompt
     const idRegex = new RegExp(`\\b${otherId}\\b`, 'i');
     const nameRegex = new RegExp(`\\b${otherName}\\b`, 'i');
 
@@ -150,7 +145,13 @@ export function evaluatePromptAdherence(
     issues.push(`Positive prompt contains forbidden semantic/composition/contamination terms: ${forbiddenTermsFound.join(', ')}`);
   }
 
-  // 5. Check User Intent Preservation
+  // 5. Check Prompt Compactness (Target: 15-25 words, Hard Max: 30 words)
+  const wordCount = prompt.trim().split(/\s+/).length;
+  if (wordCount > 30) {
+    issues.push(`Prompt length (${wordCount} words) exceeds hard maximum limit of 30 words`);
+  }
+
+  // 6. Check User Intent Preservation
   let hasUserIntentPreserved = true;
   if (userPrompt && userPrompt.trim().length > 0) {
     const userWords = userPrompt
@@ -179,23 +180,24 @@ export function evaluatePromptAdherence(
   }
 
   if (hasTileConstraints) {
-    score += Math.min(30, matchedTileTerms.length * 6);
+    score += Math.min(30, matchedTileTerms.length * 10);
   }
 
   if (hasUserIntentPreserved) {
     score += 20;
   }
 
-  if (forbiddenTermsFound.length === 0) {
+  if (forbiddenTermsFound.length === 0 && wordCount <= 30) {
     score += 10;
   } else {
-    score = Math.max(0, score - forbiddenTermsFound.length * 15);
+    score = Math.max(0, score - forbiddenTermsFound.length * 15 - (wordCount > 30 ? 20 : 0));
   }
 
-  const pass = score >= 70 && forbiddenTermsFound.length === 0 && hasMaterialIdentity;
+  const pass = score >= 70 && forbiddenTermsFound.length === 0 && hasMaterialIdentity && wordCount <= 30;
 
   const details = [
     `Material: ${profile.canonicalName} (${hasMaterialIdentity ? 'MATCHED' : 'MISSING'})`,
+    `Words: ${wordCount} (Target: 15-25, Max: 30)`,
     `Score: ${score}/100 [${pass ? 'PASS' : 'WEAK_ADHERENCE'}]`,
     `Matched Material Terms: ${matchedMaterialTerms.join(', ') || 'None'}`,
     `Matched Tile Constraints: ${matchedTileTerms.join(', ') || 'None'}`,

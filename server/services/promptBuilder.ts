@@ -54,17 +54,19 @@ const SCENE_CAMERA_WORDS = [
   'building',
   'castle',
   'house',
+  'tileset',
+  'top-down',
+  'orthographic',
 ];
 
 /**
- * SDXL Base 1.0 — Compact, Pure Tileable Texture Prompt Builder
+ * SDXL Base 1.0 — High Information-Density Compact Prompt Builder
  *
- * Implements high information-density formula:
- * [MATERIAL] + [SURFACE STRUCTURE] + [COLOR / PALETTE] + [SMALL-SCALE DETAILS] + [NATURAL VARIATION] +
- * [STYLE] + [USER MODIFIER] +
- * uniform detail, neutral lighting, seamless tileable texture
+ * Implements compact material prompt architecture:
+ * [promptDescriptor] + [optional style] + [optional userModifier] + seamless tileable texture
  *
- * Enforces material purity (no cross-material contamination) and separates style from camera framing.
+ * Target length: 15–25 words (hard maximum: 30 words).
+ * Uses a single authoritative compact material descriptor rather than concatenating profile fields.
  */
 export class PromptBuilder {
   /**
@@ -99,13 +101,12 @@ export class PromptBuilder {
     cleaned = cleaned.replace(/\s+/g, ' ').replace(/^[,.\s]+|[,.\s]+$/g, '').trim();
 
     // 2. Check for accidental cross-material contamination
-    // If user input is identical to another material's default description or single material name, strip it unless explicit combination requested
+    // If user input is strictly just the name or description of another material, strip it unless explicit combination requested
     const allMaterialIds = Object.keys(MATERIAL_PROFILES) as MaterialId[];
     for (const otherId of allMaterialIds) {
       if (otherId === activeMaterialId) continue;
 
       const otherProfile = MATERIAL_PROFILES[otherId];
-      // Check if user input is strictly just the name or description of another material
       if (
         cleaned.toLowerCase() === otherId ||
         cleaned.toLowerCase() === otherProfile.canonicalName.toLowerCase()
@@ -130,33 +131,23 @@ export class PromptBuilder {
     const rawUserModifier = (additionalPrompt || customPrompt || '').trim();
     const sanitizedUserModifier = this.sanitizeUserModifier(rawUserModifier, profile.id);
 
-    // 1. Material subject line
-    const materialSubject = `${profile.canonicalName.toLowerCase()} material surface`;
+    // 1. Authoritative Compact Canonical Material Descriptor
+    const materialDescriptor = profile.promptDescriptor;
 
-    // 2. Structured material profile terms (one concise descriptor per category)
-    const structureClause = profile.surfaceStructure;
-    const paletteClause = profile.colorPalette;
-    const detailClause = profile.smallScaleDetails;
-    const variationClause = profile.naturalVariation;
-
-    // 3. Style descriptor (subordinate rendering art style, no camera wording)
+    // 2. Style descriptor (subordinate rendering art style, no camera wording)
     const styleClause = normalizedStyle && STYLE_DESCRIPTORS[normalizedStyle]
       ? STYLE_DESCRIPTORS[normalizedStyle]
       : '';
 
-    // 4. User additional features (sanitized for purity and scene preservation)
+    // 3. User additional features (sanitized for purity and scene preservation)
     const userClause = sanitizedUserModifier.length > 0 ? sanitizedUserModifier : '';
 
-    // 5. Compact Universal Tileability Tail
-    const qualityClause = 'uniform detail, neutral lighting, seamless tileable texture';
+    // 4. Minimal Universal Tileability Constraint Tail
+    const qualityClause = 'seamless tileable texture';
 
-    // Assemble compact positive prompt following high-density template structure
+    // Assemble compact positive prompt following high information-density formula
     const promptSegments = [
-      materialSubject,
-      structureClause,
-      paletteClause,
-      detailClause,
-      variationClause,
+      materialDescriptor,
       styleClause,
       userClause,
       qualityClause,

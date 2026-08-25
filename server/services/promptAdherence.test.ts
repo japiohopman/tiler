@@ -10,7 +10,7 @@ import { MATERIAL_PROFILES, getMaterialProfile } from './materialProfiles';
 import { MaterialId } from '../../src/types';
 
 /**
- * Deterministic Prompt & Material Adherence Unit Tests (SDXL Base 1.0 High Information Density)
+ * Deterministic Prompt & Material Adherence Unit Tests (SDXL Base 1.0 Compact Material Architecture)
  */
 async function runPromptAdherenceTests() {
   console.log('🧪 Starting Deterministic Prompt Adherence Tests...\n');
@@ -35,8 +35,12 @@ async function runPromptAdherenceTests() {
     const profile = MATERIAL_PROFILES[id];
     assert.ok(profile, `Material profile for '${id}' must exist in MATERIAL_PROFILES`);
     assert.strictEqual(profile.id, id, `Profile id '${profile.id}' must match canonical MaterialId '${id}'`);
+    assert.ok(
+      profile.promptDescriptor && profile.promptDescriptor.length > 0,
+      `Profile '${id}' must have authoritative promptDescriptor`
+    );
   }
-  console.log(`  ✓ All ${canonicalIds.length} canonical material profiles verified with strict MaterialId typing`);
+  console.log(`  ✓ All ${canonicalIds.length} canonical material profiles verified with strict MaterialId typing and promptDescriptors`);
 
   // 2. Unknown Material String Fallback Mapping
   console.log('Test 2: Unknown Material String Fallback Mapping');
@@ -89,8 +93,22 @@ async function runPromptAdherenceTests() {
   );
   console.log('  ✓ Wood material purity verified (zero cross-material contamination)');
 
-  // 4. Style Separation Test: retro-16bit omits camera/composition words
-  console.log('Test 4: Style Separation — retro-16bit omits camera/composition words');
+  // 4. Stone Material Purity (Stone contains no Moss automatically)
+  console.log('Test 4: Stone Material Purity (Stone contains no Moss)');
+  const stoneStructured = PromptBuilder.buildStructuredPrompt({
+    material: 'stone',
+    style: 'stylized',
+  });
+  const stonePromptLower = stoneStructured.builtPrompt.toLowerCase();
+  assert.strictEqual(
+    stonePromptLower.includes('moss'),
+    false,
+    'Stone prompt must NOT contain "moss" automatically unless requested'
+  );
+  console.log('  ✓ Stone material purity verified (zero unrequested moss)');
+
+  // 5. Style Separation Test: retro-16bit omits camera/composition words
+  console.log('Test 5: Style Separation — retro-16bit omits camera/composition words');
   const retroWood = PromptBuilder.buildStructuredPrompt({
     material: 'wood',
     style: 'retro-16bit',
@@ -116,10 +134,10 @@ async function runPromptAdherenceTests() {
     retroPromptLower.includes('16-bit jrpg tile art style'),
     'retro-16bit style must include pure rendering art style descriptor'
   );
-  console.log('  ✓ Style separation verified (camera words omitted from style descriptors)');
+  console.log('  ✓ Style separation verified (camera/tileset words omitted from style descriptors)');
 
-  // 5. Cross-Material Contamination Isolation Across ALL Canonical Materials
-  console.log('Test 5: Cross-Material Contamination Isolation Across ALL Canonical Materials');
+  // 6. Cross-Material Contamination Isolation Across ALL Canonical Materials
+  console.log('Test 6: Cross-Material Contamination Isolation Across ALL Canonical Materials');
   for (const matId of canonicalIds) {
     const structured = PromptBuilder.buildStructuredPrompt({
       material: matId,
@@ -139,25 +157,25 @@ async function runPromptAdherenceTests() {
   }
   console.log(`  ✓ Cross-material isolation verified across all ${canonicalIds.length} materials`);
 
-  // 6. Non-Repetition Check for Wood Descriptors
-  console.log('Test 6: Non-Repetition Check for Wood Descriptors');
+  // 7. Non-Repetition Check for Wood Descriptors
+  console.log('Test 7: Non-Repetition Check for Wood Descriptors');
   const knotCount = (woodPromptLower.match(/\bknots\b/g) || []).length;
   const grainCount = (woodPromptLower.match(/\bgrain\b/g) || []).length;
 
   assert.strictEqual(
     knotCount,
     1,
-    `The word 'knots' should appear at most once in Wood prompt (found ${knotCount})`
+    `The word 'knots' should appear exactly once in Wood prompt (found ${knotCount})`
   );
   assert.strictEqual(
     grainCount,
-    2, // 'fine wood grain', 'organic grain variation'
-    `The word 'grain' should appear concisely without excessive repetition (found ${grainCount})`
+    1,
+    `The word 'grain' should appear exactly once without repetition (found ${grainCount})`
   );
-  console.log('  ✓ Descriptor non-repetition verified');
+  console.log('  ✓ Descriptor non-repetition verified (zero repeated phrases)');
 
-  // 7. Compact Prompt Word Count Target (25–45 words)
-  console.log('Test 7: Compact Prompt Word Count Target (25–45 words)');
+  // 8. Compact Prompt Word Count Target (15–25 words target, Hard Max: 30 words)
+  console.log('Test 8: Compact Prompt Word Count Target (15–25 words target, Max 30 words)');
   for (const matId of canonicalIds) {
     const structured = PromptBuilder.buildStructuredPrompt({
       material: matId,
@@ -165,14 +183,26 @@ async function runPromptAdherenceTests() {
     });
     const wordCount = structured.builtPrompt.split(/\s+/).length;
     assert.ok(
-      wordCount >= 20 && wordCount <= 50,
-      `Prompt for '${matId}' (${wordCount} words) must be compact within target range 25-45 words`
+      wordCount >= 12 && wordCount <= 25,
+      `Prompt for '${matId}' (${wordCount} words) must be compact within target range 15-25 words`
+    );
+    assert.ok(
+      wordCount <= 30,
+      `Prompt for '${matId}' (${wordCount} words) must NOT exceed hard maximum limit of 30 words`
     );
   }
-  console.log('  ✓ High information-density compact prompt length verified across all materials');
+  console.log('  ✓ High information-density compact prompt length verified across all materials (12-25 words)');
 
-  // 8. User Modifier Filtering: Filters Scene Camera Words
-  console.log('Test 8: User Modifier Filtering — Filters Scene Camera Words');
+  // 9. Minimal Tileability Constraint Tail Presence
+  console.log('Test 9: Minimal Tileability Constraint Tail Presence');
+  assert.ok(
+    woodPromptLower.includes('seamless tileable texture'),
+    'Positive prompt must end with minimal tileability constraint "seamless tileable texture"'
+  );
+  console.log('  ✓ Minimal tileability constraint tail verified');
+
+  // 10. User Modifier Filtering: Filters Scene Camera Words
+  console.log('Test 10: User Modifier Filtering — Filters Scene Camera Words');
   const sceneUserPrompt = PromptBuilder.buildStructuredPrompt({
     material: 'wood',
     customPrompt: 'castle in the background with camera perspective',
@@ -196,8 +226,8 @@ async function runPromptAdherenceTests() {
   );
   console.log('  ✓ User modifier filtering verified (scene/camera instructions stripped)');
 
-  // 9. Legitimate Material User Modifiers Preserved
-  console.log('Test 9: Legitimate Material User Modifiers Preserved');
+  // 11. Legitimate Material User Modifiers Preserved
+  console.log('Test 11: Legitimate Material User Modifiers Preserved');
   const validUserPrompt = PromptBuilder.buildStructuredPrompt({
     material: 'wood',
     customPrompt: 'weathered cracks with moss patches',
