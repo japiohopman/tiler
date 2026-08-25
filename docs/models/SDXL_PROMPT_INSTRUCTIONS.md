@@ -8,23 +8,56 @@ The generated image must represent a **material surface**, not an object, scene,
 
 ---
 
-## Architectural Decision: Omitting Camera Framing Terms (`top-down`, `orthographic`)
+## Architectural Principles & Prompt Quality Rules
 
-In earlier prompt systems, camera framing descriptors such as `top-down` and `orthographic` were hardcoded into positive prompts. Under SDXL Base 1.0, camera and composition descriptors (including `top-down`, `orthographic`, `camera`, `perspective`) encourage the diffusion model to create composed 3D scenes or aerial photograph representations rather than pure material surfaces.
+### 1. High Information Density (Target: 25–45 Words)
 
-Therefore, SDXL Base 1.0 prompts omit camera words in favor of direct **material surface descriptors** (`[MATERIAL] material surface`) combined with explicit **seamless tileability constraints** (`evenly distributed detail, uniform surface, flat neutral lighting, seamless tileable texture, continuous pattern, no visible borders`).
+A concise, materially precise prompt (25–45 words) is vastly superior to a verbose, repetitive prompt. Treat 60 words as an upper safety boundary, not the normal target. Every phrase must contribute unique physical or visual information.
 
 ---
 
-## Prompt Construction
+### 2. One Strong Descriptor Per Category
 
-Build the prompt around the following structure:
+Construct prompts using one concise, non-repetitive descriptor per semantic category:
 
-`[material] + [surface characteristics] + [color/palette] + [physical details] + [surface variation] + [texture quality] + seamless texture`
+`[MATERIAL], [SURFACE STRUCTURE], [COLOR / PALETTE], [SMALL-SCALE DETAILS], [NATURAL VARIATION], [STYLE], [USER MODIFIER], [COMPACT TILE CONSTRAINTS]`
 
-### Example
+Do **NOT** describe the same physical feature multiple times using different wording (e.g. avoid repeating "wood grain", "grain grooves", "grain variation", or "wood knots" across multiple phrases).
 
-`weathered dark stone, rough porous surface, irregular small cracks, subtle gray and charcoal color variation, natural mineral patterns, fine surface detail, evenly distributed texture, seamless tileable texture`
+---
+
+### 3. Strict Material Purity
+
+A canonical material prompt must remain isolated from unrelated materials.
+For example, a **Wood** prompt must **never** automatically contain `dirt`, `stone`, `brick`, `grass`, `sand`, `metal`, `lava`, `water`, or `moss`.
+
+Secondary material concepts are permitted **only** when explicitly requested in a user modifier (e.g., `wet wood with moss`).
+
+---
+
+### 4. Style Separation from Camera Framing
+
+Style descriptors (e.g., `16-bit JRPG tile art style`, `16-bit pixel art style`, `stylized hand-painted art style`) describe rendering art style only.
+
+Styles remain subordinate to the material surface and must **never** inject camera framing or composition terms (`top-down`, `orthographic`, `tileset`, `camera`, `perspective`).
+
+---
+
+### 5. Camera Words Omission
+
+Camera framing descriptors (`top-down`, `orthographic`, `camera`, `perspective`) are omitted from positive prompts per Rule 2 (avoiding composition/camera descriptors that encourage diffusion models to render 3D scenes or aerial map photos rather than flat material surfaces).
+
+Instead, prompts rely on direct **material surface descriptors** (`[material] material surface`) and a **compact universal tileability tail** (`uniform detail, neutral lighting, seamless tileable texture`).
+
+---
+
+## Prompt Construction Structure
+
+`[MATERIAL], [SURFACE STRUCTURE], [COLOR / PALETTE], [SMALL-SCALE DETAILS], [NATURAL VARIATION], [STYLE], [USER MODIFIER], uniform detail, neutral lighting, seamless tileable texture`
+
+### Example Output
+
+`wood material surface, parallel timber planks, warm oak and dark walnut tones, subtle knots and fine wood grain, organic grain variation, 16-bit JRPG tile art style, uniform detail, neutral lighting, seamless tileable texture`
 
 ---
 
@@ -33,11 +66,9 @@ Build the prompt around the following structure:
 ### 1. Describe the material, not an object
 
 Good:
-
 `aged wooden planks, weathered wood grain, rough surface`
 
 Bad:
-
 `an old wooden house`
 
 The model must generate **the surface itself**, not an object made from the material.
@@ -47,19 +78,7 @@ The model must generate **the surface itself**, not an object made from the mate
 ### 2. Avoid composition words
 
 Do NOT use:
-
-* `centered`
-* `foreground`
-* `background`
-* `horizon`
-* `perspective`
-* `camera`
-* `close-up`
-* `wide shot`
-* `scene`
-* `landscape`
-
-These encourage the model to create a composed image instead of a texture.
+`centered`, `foreground`, `background`, `horizon`, `perspective`, `camera`, `close-up`, `wide shot`, `scene`, `landscape`, `top-down`, `orthographic`, `tileset`
 
 ---
 
@@ -68,153 +87,71 @@ These encourage the model to create a composed image instead of a texture.
 The texture should contain detail across the entire image.
 
 Prefer:
-
-* `evenly distributed detail`
-* `uniform surface coverage`
-* `consistent surface pattern`
-* `continuous material surface`
-* `random natural variation`
+`uniform detail`, `uniform surface coverage`, `continuous material surface`
 
 Avoid:
-
-* `single large crack`
-* `one large stone`
-* `central pattern`
-* `focal point`
-* `distinct object`
+`single large crack`, `one large stone`, `central pattern`, `focal point`, `distinct object`
 
 ---
 
 ### 4. Avoid obvious borders
 
-The edges of the generated image must visually connect with the opposite edges.
-
-Always include:
-
-`seamless tileable texture, continuous pattern, no visible borders`
-
-The texture should not contain:
-
-* a frame
-* a border
-* a vignette
-* an obvious center
-* an obvious top or bottom
-* lighting that changes strongly across the image
+The edges of the generated image must visually connect with the opposite edges. Always include `seamless tileable texture`.
 
 ---
 
 ### 5. Keep lighting neutral
 
-Textures should preferably represent **albedo/material information**, not a rendered surface.
-
-Prefer:
-
-`flat lighting, neutral illumination, uniform brightness`
-
-Avoid:
-
-`dramatic lighting, cinematic lighting, strong shadows, rim lighting, directional spotlight`
-
-This prevents the texture from baking a particular lighting direction into the material.
+Prefer: `neutral lighting`, `flat lighting`, `uniform brightness`
+Avoid: `dramatic lighting`, `cinematic lighting`, `strong shadows`, `directional spotlight`
 
 ---
 
-## Texture Detail
-
-The amount of detail should match the intended material.
+## Texture Detail Profiles
 
 ### Stone
+`porous rock surface, slate and charcoal gray tones, irregular small cracks and mineral pores, natural mineral grain variation`
 
-`irregular rock structure, small cracks, pores, mineral variation, rough granular surface`
-
-### Dirt
-
-`fine soil particles, small stones, subtle organic variation, irregular granular structure`
-
-### Sand
-
-`fine grains, subtle ripples, small particles, natural granular variation`
-
-### Wood
-
-`continuous wood grain, subtle knots, fine fibers, irregular grain variation`
+### Cobblestone
+`interlocking stone paving blocks, weathered gray and charcoal tones, tight mortar joints and chipped rock edges, natural stone wear and block orientation variation`
 
 ### Brick
+`repeating brick masonry blocks, terracotta red and gray mortar tones, weathered brick edges and fine clay pores, subtle brick shade variation`
 
-`repeating masonry structure, individual brick surfaces, mortar variation, weathered edges`
+### Dirt
+`compact soil surface, rich dark brown and umber tones, fine earth particles and small embedded pebbles, organic soil texture variation`
+
+### Sand
+`smooth dune granule surface, golden sand and warm beige tones, fine granules and micro ripple lines, wind-swept ripple variation`
+
+### Wood
+`parallel timber planks, warm oak and dark walnut tones, subtle knots and fine wood grain, organic grain variation`
 
 ### Metal
-
-`subtle scratches, fine brushed surface, small imperfections, realistic material variation`
+`industrial sheet metal plate, steel gray and gunmetal tones, fine brushed grain and micro scratches, subtle metallic sheen variation`
 
 ### Moss
+`dense organic moss cushion, forest green and emerald moss tones, small moss fronds and velvety tufts, irregular organic growth patterns`
 
-`dense organic texture, small moss structures, irregular growth patterns, subtle green variation`
+### Lava
+`molten magma channels with basalt rock crust, glowing orange-red fissures and dark charcoal crust, emissive magma veins and micro embers, fluid lava flow variation`
 
----
+### Water
+`fluid water surface, turquoise aquatic blue and clear cyan tones, shimmering caustic light patterns, gentle surface ripple variation`
 
-## Prompt Length
-
-Keep the final prompt relatively compact.
-
-Target approximately:
-
-**25–60 words**
-
-The prompt should describe the material and its important characteristics without turning into a long narrative.
-
-Prioritize the most important information:
-
-1. Material
-2. Surface structure
-3. Color
-4. Scale of detail
-5. Variation
-6. Seamless/tileable requirement
-
-Do not fill the prompt with generic quality words such as:
-
-`masterpiece, beautiful, stunning, epic, 8k, award winning`
-
-These are less useful than describing the actual material.
+### Grass
+`dense meadow lawn turf, lush green meadow and earthy soil tones, fine grass blade clusters and clovers, soft blade direction variation`
 
 ---
 
 ## Negative Prompt
 
-Use a consistent negative prompt to suppress objects and image composition:
+Use a consistent negative prompt to suppress objects, composition, and cross-material contamination:
 
 `object, objects, scene, landscape, building, character, person, animal, furniture, centered object, focal point, perspective, horizon, foreground, background, frame, border, vignette, text, logo, watermark, UI, strong directional lighting, dramatic shadows, visible seams`
 
 ---
 
-## Output Requirements
-
-Target:
-
-* **Resolution:** 512×512
-* **Format:** square
-* **Purpose:** seamless/tileable texture
-* **Composition:** uniform surface
-* **Lighting:** neutral and consistent
-* **Detail:** distributed across the entire image
-* **No focal point**
-* **No identifiable objects**
-* **No borders**
-* **No text**
-* **No baked-in dramatic shadows**
-
-SDXL Base 1.0 is natively optimized around 1024×1024, so if maximum texture quality is important, consider generating at 1024×1024 and downscaling to 512×512 rather than generating directly at 512×512.
-
----
-
 ## Template
 
-Use this template when generating prompts:
-
-`[MATERIAL], [SURFACE STRUCTURE], [COLOR / PALETTE], [SMALL-SCALE DETAILS], [NATURAL VARIATION], evenly distributed detail, uniform surface, flat neutral lighting, seamless tileable texture, continuous pattern, no visible borders`
-
-### Example Output
-
-`dark volcanic stone, rough porous surface, irregular small cracks, charcoal gray and dark brown palette, fine mineral particles and subtle color variation, evenly distributed detail, uniform surface, flat neutral lighting, seamless tileable texture, continuous pattern, no visible borders`
+`[MATERIAL], [SURFACE STRUCTURE], [COLOR / PALETTE], [SMALL-SCALE DETAILS], [NATURAL VARIATION], uniform detail, neutral lighting, seamless tileable texture`

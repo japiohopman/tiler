@@ -4,7 +4,7 @@
  */
 
 import { MaterialId } from '../../src/types';
-import { getMaterialProfile, MaterialProfile } from './materialProfiles';
+import { getMaterialProfile, MATERIAL_PROFILES, MaterialProfile } from './materialProfiles';
 
 export interface PromptAdherenceReport {
   materialId: MaterialId;
@@ -50,11 +50,15 @@ const COMPOSITION_FORBIDDEN_WORDS = [
   'scene',
   'landscape',
   'focal point',
+  'top-down',
+  'orthographic',
+  'tileset',
 ];
 
 /**
  * Deterministically evaluates an assembled prompt for material identity, tile constraints,
- * user intent preservation, and absence of forbidden semantic / composition terms.
+ * user intent preservation, absence of forbidden semantic / composition terms,
+ * and absence of unrequested cross-material contamination.
  */
 export function evaluatePromptAdherence(
   prompt: string,
@@ -63,6 +67,7 @@ export function evaluatePromptAdherence(
 ): PromptAdherenceReport {
   const profile: MaterialProfile = getMaterialProfile(materialId);
   const promptLower = prompt.toLowerCase();
+  const userLower = (userPrompt || '').toLowerCase();
 
   const matchedMaterialTerms: string[] = [];
   const matchedTileTerms: string[] = [];
@@ -121,18 +126,38 @@ export function evaluatePromptAdherence(
     }
   }
 
-  if (forbiddenTermsFound.length > 0) {
-    issues.push(`Positive prompt contains forbidden semantic/composition terms: ${forbiddenTermsFound.join(', ')}`);
+  // 4. Check for Unrequested Cross-Material Contamination
+  const allMaterialIds = Object.keys(MATERIAL_PROFILES) as MaterialId[];
+  for (const otherId of allMaterialIds) {
+    if (otherId === profile.id) continue;
+
+    const otherProfile = MATERIAL_PROFILES[otherId];
+    const otherName = otherProfile.canonicalName.toLowerCase();
+
+    // Check if other material ID or name appears in positive prompt
+    const idRegex = new RegExp(`\\b${otherId}\\b`, 'i');
+    const nameRegex = new RegExp(`\\b${otherName}\\b`, 'i');
+
+    const hasOtherInPrompt = idRegex.test(positivePart) || nameRegex.test(positivePart);
+    const userRequestedOther = userLower.includes(otherId) || userLower.includes(otherName);
+
+    if (hasOtherInPrompt && !userRequestedOther) {
+      forbiddenTermsFound.push(`cross-material contamination: ${otherId}`);
+    }
   }
 
-  // 4. Check User Intent Preservation
+  if (forbiddenTermsFound.length > 0) {
+    issues.push(`Positive prompt contains forbidden semantic/composition/contamination terms: ${forbiddenTermsFound.join(', ')}`);
+  }
+
+  // 5. Check User Intent Preservation
   let hasUserIntentPreserved = true;
   if (userPrompt && userPrompt.trim().length > 0) {
     const userWords = userPrompt
       .toLowerCase()
       .replace(/[^\w\s]/gi, '')
       .split(/\s+/)
-      .filter((w) => w.length > 2);
+      .filter((w) => w.length > 2 && !COMPOSITION_FORBIDDEN_WORDS.includes(w));
 
     for (const uw of userWords) {
       if (promptLower.includes(uw)) {
