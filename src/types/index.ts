@@ -3,12 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type MaterialId = 'cobblestone' | 'wood' | 'water' | 'grass' | 'lava' | 'sand';
+export type MaterialId =
+  | 'stone'
+  | 'cobblestone'
+  | 'brick'
+  | 'dirt'
+  | 'sand'
+  | 'wood'
+  | 'metal'
+  | 'moss'
+  | 'lava'
+  | 'water'
+  | 'grass';
 
 export interface MaterialDefinition {
   id: MaterialId;
   name: string;
-  category: 'ground' | 'liquid' | 'organic' | 'stone';
+  category: 'ground' | 'liquid' | 'organic' | 'stone' | 'metal';
   description: string;
   defaultPrompt: string;
   colorHint: string;
@@ -48,7 +59,7 @@ export interface GenerationParams {
 }
 
 export interface PromptAdherenceSummary {
-  materialId: string;
+  materialId: MaterialId | string;
   canonicalName: string;
   score: number;
   pass: boolean;
@@ -78,7 +89,7 @@ export interface GenerationMetadata {
   rawSeamScore?: number;
   processedSeamScore?: number;
   userPrompt?: string;
-  materialProfileId?: string;
+  materialProfileId?: MaterialId | string;
   negativePrompt?: string;
   promptAdherence?: PromptAdherenceSummary;
 }
@@ -288,15 +299,31 @@ export const TARGET_MATERIALS: MaterialDefinition[] = [
     name: 'Cobblestone',
     category: 'stone',
     description: 'Irregular stone blocks with mortar grooves, durable pavement texture.',
-    defaultPrompt: 'top-down seamless cobblestone pavement texture, flat lighting, game asset, high detail',
+    defaultPrompt: 'seamless cobblestone pavement texture, flat lighting, game asset, high detail',
     colorHint: '#78716c',
+  },
+  {
+    id: 'stone',
+    name: 'Stone',
+    category: 'stone',
+    description: 'Weathered dark rock surface with natural mineral cracks and porous detail.',
+    defaultPrompt: 'seamless dark stone rock surface texture, rough porous surface, fine mineral detail',
+    colorHint: '#57534e',
+  },
+  {
+    id: 'brick',
+    name: 'Brick',
+    category: 'stone',
+    description: 'Aged brick masonry blocks with mortar lines and clay pores.',
+    defaultPrompt: 'seamless brick masonry texture, individual brick blocks, weathered mortar',
+    colorHint: '#9a3412',
   },
   {
     id: 'wood',
     name: 'Wood',
     category: 'organic',
     description: 'Planked hardwood or timber grain surface for floors and crates.',
-    defaultPrompt: 'top-down seamless wooden floor planks texture, wood grain knots, flat even lighting',
+    defaultPrompt: 'seamless wooden floor planks texture, wood grain knots, flat even lighting',
     colorHint: '#b45309',
   },
   {
@@ -304,7 +331,7 @@ export const TARGET_MATERIALS: MaterialDefinition[] = [
     name: 'Water',
     category: 'liquid',
     description: 'Clear animated fluid ripples and caustic reflections for aquatic terrain.',
-    defaultPrompt: 'top-down seamless water surface texture, subtle caustic ripples, crystal clear turquoise',
+    defaultPrompt: 'seamless water surface texture, subtle caustic ripples, crystal clear turquoise',
     colorHint: '#0284c7',
   },
   {
@@ -312,15 +339,23 @@ export const TARGET_MATERIALS: MaterialDefinition[] = [
     name: 'Grass',
     category: 'ground',
     description: 'Lush meadow turf with clover and natural soil blending.',
-    defaultPrompt: 'top-down seamless green grass meadow texture, natural blades, flat game sprite lighting',
+    defaultPrompt: 'seamless green grass meadow texture, natural blades, flat game sprite lighting',
     colorHint: '#16a34a',
+  },
+  {
+    id: 'moss',
+    name: 'Moss',
+    category: 'organic',
+    description: 'Dense organic vegetation cushion with soft moss tufts.',
+    defaultPrompt: 'seamless organic moss growth texture, dense vegetation cushion, velvety green',
+    colorHint: '#15803d',
   },
   {
     id: 'lava',
     name: 'Lava',
     category: 'liquid',
     description: 'Molten magma cracks with glowing embers and dark basalt crust.',
-    defaultPrompt: 'top-down seamless molten lava magma texture, glowing orange veins, dark basalt rock crust',
+    defaultPrompt: 'seamless molten lava magma texture, glowing orange veins, dark basalt rock crust',
     colorHint: '#dc2626',
   },
   {
@@ -328,8 +363,24 @@ export const TARGET_MATERIALS: MaterialDefinition[] = [
     name: 'Sand',
     category: 'ground',
     description: 'Desert dunes and beach granules with gentle wind-swept ripple lines.',
-    defaultPrompt: 'top-down seamless desert sand dune texture, fine granules, gentle wind ripples, flat lighting',
+    defaultPrompt: 'seamless desert sand dune texture, fine granules, gentle wind ripples, flat lighting',
     colorHint: '#d97706',
+  },
+  {
+    id: 'dirt',
+    name: 'Dirt',
+    category: 'ground',
+    description: 'Compact soil earth terrain with fine particles and micro pebbles.',
+    defaultPrompt: 'seamless dirt soil earth surface texture, fine particles, small stones',
+    colorHint: '#78350f',
+  },
+  {
+    id: 'metal',
+    name: 'Metal',
+    category: 'metal',
+    description: 'Brushed steel metallic plate surface with subtle micro scratches.',
+    defaultPrompt: 'seamless brushed steel metal plate texture, subtle micro scratches',
+    colorHint: '#64748b',
   },
 ];
 

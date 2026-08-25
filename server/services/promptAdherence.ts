@@ -4,13 +4,13 @@
  */
 
 import { MaterialId } from '../../src/types';
-import { getMaterialProfile, MaterialProfile } from './materialProfiles';
+import { getMaterialProfile, MATERIAL_PROFILES, MaterialProfile } from './materialProfiles';
 
 export interface PromptAdherenceReport {
   materialId: MaterialId;
   canonicalName: string;
   score: number; // 0 to 100
-  pass: boolean; // score >= 70 and no critical forbidden terms
+  pass: boolean; // score >= 70 and no critical forbidden terms or excessive length
   hasMaterialIdentity: boolean;
   hasTileConstraints: boolean;
   hasUserIntentPreserved: boolean;
@@ -22,18 +22,39 @@ export interface PromptAdherenceReport {
   details: string;
 }
 
+/**
+ * Required surface tileability keywords for SDXL material texture generation
+ */
 const REQUIRED_TILE_KEYWORDS = [
+  'seamless',
+  'tileable',
+  'texture',
+];
+
+/**
+ * Composition words forbidden in positive prompts per SDXL Rule 2
+ */
+const COMPOSITION_FORBIDDEN_WORDS = [
+  'centered',
+  'foreground',
+  'background',
+  'horizon',
+  'perspective',
+  'camera',
+  'close-up',
+  'wide shot',
+  'scene',
+  'landscape',
+  'focal point',
   'top-down',
   'orthographic',
-  'overhead',
-  'texture',
-  'seamless',
-  'surface',
+  'tileset',
 ];
 
 /**
  * Deterministically evaluates an assembled prompt for material identity, tile constraints,
- * user intent preservation, and absence of forbidden semantic terms.
+ * user intent preservation, absence of forbidden semantic / composition terms,
+ * absence of unrequested cross-material contamination, and compact word length (target: 15–25 words, max 30 words).
  */
 export function evaluatePromptAdherence(
   prompt: string,
@@ -42,6 +63,7 @@ export function evaluatePromptAdherence(
 ): PromptAdherenceReport {
   const profile: MaterialProfile = getMaterialProfile(materialId);
   const promptLower = prompt.toLowerCase();
+  const userLower = (userPrompt || '').toLowerCase();
 
   const matchedMaterialTerms: string[] = [];
   const matchedTileTerms: string[] = [];
@@ -50,7 +72,6 @@ export function evaluatePromptAdherence(
   const issues: string[] = [];
 
   // 1. Check Material Identity
-  // The canonical name or descriptive terms must be present
   if (promptLower.includes(profile.canonicalName.toLowerCase()) || promptLower.includes(profile.id)) {
     matchedMaterialTerms.push(profile.canonicalName);
   }
@@ -60,7 +81,6 @@ export function evaluatePromptAdherence(
     if (promptLower.includes(termLower)) {
       matchedMaterialTerms.push(term);
     } else {
-      // Check sub-words
       const subWords = termLower.split(' ').filter((w) => w.length > 3);
       for (const sw of subWords) {
         if (promptLower.includes(sw) && !matchedMaterialTerms.includes(sw)) {
@@ -75,7 +95,7 @@ export function evaluatePromptAdherence(
     issues.push(`Prompt missing canonical material terms for '${profile.canonicalName}'`);
   }
 
-  // 2. Check Tile Constraints
+  // 2. Check Surface Tileability Constraints
   for (const kw of REQUIRED_TILE_KEYWORDS) {
     if (promptLower.includes(kw)) {
       matchedTileTerms.push(kw);
@@ -84,36 +104,61 @@ export function evaluatePromptAdherence(
 
   const hasTileConstraints = matchedTileTerms.length >= 2;
   if (!hasTileConstraints) {
-    issues.push('Prompt lacks sufficient top-down / orthographic / seamless tile constraint terms');
+    issues.push('Prompt lacks sufficient seamless tileability constraint terms');
   }
 
-  // 3. Check Forbidden Terms
-  for (const forbidden of profile.forbiddenTerms) {
-    const forbiddenLower = forbidden.toLowerCase();
-    // Use regex word boundary check so "water" doesn't match "watermark" in negative rules unless specified
-    // But note: negative rules in prompt string might say "NO sky, NO buildings".
-    // Forbidden terms check verifies whether positive prompt accidentally contains forbidden concepts outside negative rules!
-    const positivePart = promptLower.split('strict negative rules:')[0] || promptLower.split('negative guidance:')[0] || promptLower;
+  // 3. Check Forbidden Material & Composition Terms in positive prompt
+  const positivePart = promptLower.split('strict negative rules:')[0] || promptLower.split('negative guidance:')[0] || promptLower;
 
-    // Check if forbidden term appears in the positive prompt section
-    const regex = new RegExp(`\\b${forbiddenLower}\\b`, 'i');
+  const forbiddenCheckList = Array.from(
+    new Set([...profile.forbiddenTerms, ...COMPOSITION_FORBIDDEN_WORDS])
+  );
+
+  for (const forbidden of forbiddenCheckList) {
+    const forbiddenLower = forbidden.toLowerCase();
+    const regex = new RegExp(`\\b${forbiddenLower.replace(/\s+/g, '\\s+')}\\b`, 'i');
     if (regex.test(positivePart)) {
       forbiddenTermsFound.push(forbidden);
     }
   }
 
-  if (forbiddenTermsFound.length > 0) {
-    issues.push(`Positive prompt contains forbidden semantic terms: ${forbiddenTermsFound.join(', ')}`);
+  // 4. Check for Unrequested Cross-Material Contamination
+  const allMaterialIds = Object.keys(MATERIAL_PROFILES) as MaterialId[];
+  for (const otherId of allMaterialIds) {
+    if (otherId === profile.id) continue;
+
+    const otherProfile = MATERIAL_PROFILES[otherId];
+    const otherName = otherProfile.canonicalName.toLowerCase();
+
+    const idRegex = new RegExp(`\\b${otherId}\\b`, 'i');
+    const nameRegex = new RegExp(`\\b${otherName}\\b`, 'i');
+
+    const hasOtherInPrompt = idRegex.test(positivePart) || nameRegex.test(positivePart);
+    const userRequestedOther = userLower.includes(otherId) || userLower.includes(otherName);
+
+    if (hasOtherInPrompt && !userRequestedOther) {
+      forbiddenTermsFound.push(`cross-material contamination: ${otherId}`);
+    }
   }
 
-  // 4. Check User Intent Preservation
+  if (forbiddenTermsFound.length > 0) {
+    issues.push(`Positive prompt contains forbidden semantic/composition/contamination terms: ${forbiddenTermsFound.join(', ')}`);
+  }
+
+  // 5. Check Prompt Compactness (Target: 15-25 words, Hard Max: 30 words)
+  const wordCount = prompt.trim().split(/\s+/).length;
+  if (wordCount > 30) {
+    issues.push(`Prompt length (${wordCount} words) exceeds hard maximum limit of 30 words`);
+  }
+
+  // 6. Check User Intent Preservation
   let hasUserIntentPreserved = true;
   if (userPrompt && userPrompt.trim().length > 0) {
     const userWords = userPrompt
       .toLowerCase()
       .replace(/[^\w\s]/gi, '')
       .split(/\s+/)
-      .filter((w) => w.length > 2);
+      .filter((w) => w.length > 2 && !COMPOSITION_FORBIDDEN_WORDS.includes(w));
 
     for (const uw of userWords) {
       if (promptLower.includes(uw)) {
@@ -130,33 +175,29 @@ export function evaluatePromptAdherence(
   // Calculate deterministic score (0 to 100)
   let score = 0;
 
-  // Material identity: max 40 points
   if (hasMaterialIdentity) {
     score += Math.min(40, 20 + matchedMaterialTerms.length * 5);
   }
 
-  // Tile constraints: max 30 points
   if (hasTileConstraints) {
-    score += Math.min(30, matchedTileTerms.length * 6);
+    score += Math.min(30, matchedTileTerms.length * 10);
   }
 
-  // User intent preservation: max 20 points
   if (hasUserIntentPreserved) {
     score += 20;
   }
 
-  // Absence of forbidden terms in positive section: max 10 points
-  if (forbiddenTermsFound.length === 0) {
+  if (forbiddenTermsFound.length === 0 && wordCount <= 30) {
     score += 10;
   } else {
-    // Penalty for forbidden terms in positive section
-    score = Math.max(0, score - forbiddenTermsFound.length * 15);
+    score = Math.max(0, score - forbiddenTermsFound.length * 15 - (wordCount > 30 ? 20 : 0));
   }
 
-  const pass = score >= 70 && forbiddenTermsFound.length === 0 && hasMaterialIdentity;
+  const pass = score >= 70 && forbiddenTermsFound.length === 0 && hasMaterialIdentity && wordCount <= 30;
 
   const details = [
     `Material: ${profile.canonicalName} (${hasMaterialIdentity ? 'MATCHED' : 'MISSING'})`,
+    `Words: ${wordCount} (Target: 15-25, Max: 30)`,
     `Score: ${score}/100 [${pass ? 'PASS' : 'WEAK_ADHERENCE'}]`,
     `Matched Material Terms: ${matchedMaterialTerms.join(', ') || 'None'}`,
     `Matched Tile Constraints: ${matchedTileTerms.join(', ') || 'None'}`,
