@@ -25,31 +25,31 @@ export interface StructuredPromptResult {
 }
 
 /**
- * Visual style descriptor mapping for game asset rendering
+ * Compact visual style descriptors optimized for SDXL token efficiency
  */
 const STYLE_DESCRIPTORS: Record<string, string> = {
-  'pixel-art': '16-bit retro pixel art game asset style, clean pixel clusters, subtle dithering, limited cohesive palette',
-  'hand-painted': 'stylized hand-painted game texture, painterly digital art brushstrokes, soft ambient occlusion',
-  'stylized': 'modern stylized game texture, clean defined shapes, vibrant saturation, smooth bevels, Blizzard/Riot game art style',
-  'photorealistic': 'photorealistic 2D ground scan texture, micro-surface details, ultra-high fidelity material texture',
-  'retro-16bit': 'classic 16-bit JRPG top-down tileset asset, crisp sprite-friendly boundaries, retro console aesthetic',
+  'pixel-art': '16-bit retro pixel art game asset style, clean pixel clusters',
+  'hand-painted': 'stylized hand-painted game texture, painterly brushstrokes',
+  'stylized': 'modern stylized 2D game art texture, Blizzard/Riot style',
+  'photorealistic': 'photorealistic 2D ground scan texture, high fidelity',
+  'retro-16bit': 'classic 16-bit top-down JRPG tileset texture',
 };
 
 /**
- * Detail modifier descriptions
+ * Compact detail modifier descriptions
  */
 const DETAIL_DESCRIPTORS: Record<string, string> = {
-  subtle: 'clean low-frequency details, minimal noise, smooth surface readability',
-  medium: 'balanced surface texture, natural frequency variation, clear definition',
-  high: 'high surface complexity, rich micro-details, intricate crevices and texture depth',
-  ultra: 'maximum intricate texture detail, micro-grain, complex surface fractures and high definition',
+  subtle: 'smooth clean surface',
+  medium: 'balanced surface texture',
+  high: 'high surface detail and depth',
+  ultra: 'intricate micro-grain texture detail',
 };
 
 /**
  * Dedicated Material-Aware Prompt Builder for 2D Game Ground Textures.
  *
- * Enforces technical, orthographic, lighting, material identity, and negative constraints
- * specified for game engine tileable ground textures.
+ * Generates compact, punchy positive prompts for SDXL models (15-35 words) while passing
+ * negative constraints via the dedicated negative_prompt API parameter.
  */
 export class PromptBuilder {
   /**
@@ -76,47 +76,29 @@ export class PromptBuilder {
     // Preserve original user modifier intent
     const userModifier = (additionalPrompt || customPrompt || '').trim();
 
-    // 1. Base Subject prioritizing Material Identity
+    // 1. Core Subject prioritizing Material Identity
     const primaryDescriptiveTerms = profile.descriptiveTerms.slice(0, 3).join(', ');
     const subject = `Top-down orthographic 2D game ground texture of ${profile.canonicalName} (${primaryDescriptiveTerms}).`;
 
-    // 2. Visual Style & Artistic Rendering
-    const styleClause = `Visual Style: ${styleDescription}. Detail Level: ${detailDescription}.`;
+    // 2. Compact Style & Detail rendering
+    const styleClause = `Visual Style: ${styleDescription}. Detail: ${detailDescription}.`;
 
     // 3. User Additional Modifier Clause (preserves original user input verbatim)
     const userClause = userModifier.length > 0 ? `Specific Features: ${userModifier}.` : '';
 
-    // 4. Technical Ground Texture & Orthographic Tile Constraints
-    const technicalRequirements = [
-      'Top-down 90-degree direct overhead orthographic view.',
-      'Pure flat texture-only surface with 100% uniform seamless coverage filling the entire square frame from edge to edge.',
-      'Flat ambient non-directional lighting with no cast shadows, no direct sun angle, and no external lighting direction.',
-      'Seamless tileable repeating pattern design suitable as a 2D game ground terrain texture.',
-    ].join(' ');
-
-    // 5. Strict Negative Rules within prompt text
-    const negativeTextClause = [
-      'Strict Negative Rules:',
-      'NO perspective, NO angled isometric view, NO horizon line, NO sky, NO 3D scene depth.',
-      'NO characters, NO animals, NO monsters, NO trees, NO standalone objects, NO props, NO buildings, NO items.',
-      'NO borders, NO frames, NO vignetting, NO circular crop, NO rounded corners.',
-      'NO text, NO letters, NO numbers, NO watermark, NO logo, NO user interface (UI) elements.',
-      profile.negativeConstraints.length > 0 ? `NO ${profile.negativeConstraints.join(', NO ')}.` : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
+    // 4. Concise Technical Tileability & Direct Overhead View constraints
+    const technicalRequirements = 'Flat direct overhead orthographic view, 100% uniform seamless tileable repeating pattern surface.';
 
     const builtPrompt = [
       subject,
       styleClause,
       userClause,
       technicalRequirements,
-      negativeTextClause,
     ]
       .filter(Boolean)
       .join(' ');
 
-    // Build dedicated negative prompt parameter for providers supporting negative_prompt (e.g. Pixazo SDXL)
+    // Build dedicated negative prompt parameter for SDXL models (e.g. Pixazo SDXL)
     const baseNegativeTerms = [
       'blurry',
       'distorted',
@@ -137,6 +119,13 @@ export class PromptBuilder {
       'frame',
       'watermark',
       'text',
+      'animals',
+      'monsters',
+      'trees',
+      'props',
+      'items',
+      'vignetting',
+      'UI',
     ];
 
     const combinedNegatives = Array.from(
