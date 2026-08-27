@@ -9,7 +9,7 @@ import { evaluatePromptAdherence } from './promptAdherence';
 import { getMaterialProfile } from './materialProfiles';
 
 /**
- * Deterministic Prompt & Material Adherence Unit Tests (Phase 3.6)
+ * Deterministic Prompt & Material Adherence Unit Tests (Phase 3.6 & Compact Prompt Architecture)
  */
 async function runPromptAdherenceTests() {
   console.log('🧪 Starting Deterministic Prompt Adherence Tests...\n');
@@ -52,11 +52,11 @@ async function runPromptAdherenceTests() {
     'Assembled prompt with customPrompt must still contain material profile identity'
   );
   assert.ok(
-    customStructured.builtPrompt.includes('Top-down 90-degree direct overhead orthographic view'),
+    customStructured.builtPrompt.includes('overhead orthographic view'),
     'Assembled prompt with customPrompt must still enforce top-down orthographic constraint'
   );
   assert.ok(
-    customStructured.builtPrompt.includes('Seamless tileable repeating pattern'),
+    customStructured.builtPrompt.includes('seamless tileable repeating pattern'),
     'Assembled prompt with customPrompt must still enforce tileability constraint'
   );
   console.log('  ✓ Custom prompt non-bypass verified');
@@ -119,7 +119,7 @@ async function runPromptAdherenceTests() {
 
   // 8. Material profile isolation (no cross-leakage in positive prompt)
   console.log('Test 8: Material profile isolation');
-  const positiveLavaPrompt = lavaStructured.builtPrompt.toLowerCase().split('strict negative rules:')[0];
+  const positiveLavaPrompt = lavaStructured.builtPrompt.toLowerCase();
   assert.strictEqual(
     positiveLavaPrompt.includes('cobblestone'),
     false,
@@ -131,6 +131,15 @@ async function runPromptAdherenceTests() {
     'Lava positive prompt must not contain mortar terms'
   );
   console.log('  ✓ Material profile isolation verified');
+
+  // 9. Compact prompt length check (< 50 words)
+  console.log('Test 9: Prompt conciseness check for SDXL token efficiency');
+  const wordCount = lavaStructured.builtPrompt.split(/\s+/).length;
+  assert.ok(
+    wordCount <= 50,
+    `Built prompt should be concise (< 50 words) for SDXL models, but was ${wordCount} words`
+  );
+  console.log(`  ✓ Prompt is concise (${wordCount} words)`);
 
   console.log('\n✅ All Deterministic Prompt Adherence Tests Passed Successfully!');
 }

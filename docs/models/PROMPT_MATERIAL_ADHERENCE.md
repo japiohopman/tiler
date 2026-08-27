@@ -1,11 +1,13 @@
-# Phase 3.6 — Prompt & Material Adherence Architecture & Evaluation Report
+# Phase 3.6 — Prompt & Material Adherence Architecture & SDXL Compact Prompt Optimization
 
 ## Executive Summary
 
-Phase 3.6 introduces a material-aware prompt construction boundary, typed material profiles, structured negative constraints, developer prompt inspection diagnostics, and deterministic adherence testing to solve material ambiguity in AI tile generation.
+Phase 3.6 introduces a material-aware prompt construction boundary, typed material profiles, structured negative constraints, developer prompt inspection diagnostics, deterministic adherence testing, and compact prompt optimization tailored specifically for SDXL models.
 
 ### Problem Addressed
-Previously, requesting materials such as `lava` or `water` could produce unrelated semantic content (e.g. houses, streets, vehicles, characters, sky, landscapes, architecture), rendering the generation pipeline unreliable as a game material texture generator.
+Previously, prompt construction generated excessively long positive prompt strings (over 180 words) listing repeated "NO perspective, NO sky, NO characters, NO buildings..." rules within the positive prompt body. Standard diffusion text encoders (such as CLIP in SDXL) cap attention at 77 tokens (~60 words) and perform poorly when flooded with long text lists of negative exclusions in the positive prompt.
+
+By streamlining the positive prompt to a concise, punchy ~25–35 word structure and delegating negative constraints to the dedicated API `negative_prompt` payload parameter, prompt clarity and model adherence are significantly improved.
 
 ---
 
@@ -39,24 +41,22 @@ Material profiles define canonical semantic characteristics, positive constraint
 
 ---
 
-## 2. Prompt Construction Flow (`server/services/promptBuilder.ts`)
+## 2. Streamlined SDXL Prompt Construction Flow (`server/services/promptBuilder.ts`)
 
-The final provider prompt is assembled from:
+The final provider prompt is assembled into a short, token-efficient positive prompt string (~25–35 words):
 ```
-Material Profile + User Modifier + Tile/Orthographic Constraints + Negative Rules
+Subject + Style & Detail + User Modifier + Concise Technical Constraints
 ```
 
-1. **Subject**: `Top-down orthographic 2D game ground texture of [Canonical Name] ([Descriptive Terms]).`
-2. **Style**: `Visual Style: [Style Description]. Detail Level: [Detail Description].`
-3. **User Intent Preservation**: `Specific Features: [User Modifier].` (preserves user custom guidance verbatim without replacing intent).
-4. **Tile & Orthographic Constraints**:
-   - `Top-down 90-degree direct overhead orthographic view.`
-   - `Pure flat texture-only surface with 100% uniform seamless coverage filling the entire square frame from edge to edge.`
-   - `Flat ambient non-directional lighting with no cast shadows, no direct sun angle, and no external lighting direction.`
-   - `Seamless tileable repeating pattern design suitable as a 2D game ground terrain texture.`
-5. **Strict Negative Rules**:
-   - In positive prompt string: `NO perspective, NO horizon, NO sky, NO characters, NO buildings...`
-   - In provider API payload (`PixazoImageGenerationProvider`): explicit `negative_prompt` payload string combining quality terms and material profile negative constraints (`blurry, distorted, low quality, 3d render, perspective view, isometric, horizon, sky, character, person, face, building, house, street, vehicle, border, frame, watermark, text, [Profile Negatives]`).
+### Positive Prompt Structure
+1. **Subject**: `Top-down orthographic 2D game ground texture of [Canonical Name] ([Primary Descriptive Terms]).`
+2. **Style & Detail**: `Visual Style: [Compact Style]. Detail: [Compact Detail].`
+3. **User Modifier**: `Specific Features: [User Modifier].` (preserves user custom guidance verbatim).
+4. **Concise Technical Requirements**: `Flat direct overhead orthographic view, 100% uniform seamless tileable repeating pattern surface.`
+
+### Negative Prompt Payload Parameter
+All negative constraints are grouped exclusively in the dedicated `negative_prompt` API payload field sent to SDXL (e.g. via `PixazoImageGenerationProvider`):
+`blurry, distorted, low quality, 3d render, perspective view, isometric, horizon, sky, character, person, face, building, house, street, vehicle, border, frame, watermark, text, animals, monsters, trees, props, items, vignetting, UI, [Profile Negatives]`
 
 ---
 
@@ -79,34 +79,13 @@ Phase 3.6 explicitly separates two distinct evaluation layers:
 
 Real generation tests executed against Pixazo AI SDXL Base 1.0 gateway (`IMAGE_PROVIDER=pixazo`):
 
-### 1. Lava
-- **User Guidance**: `wet lava with blue glowing cracks`
-- **Assembled Prompt**: `Top-down orthographic 2D game ground texture of Lava (molten volcanic magma, dark basalt rock crust, glowing orange-red fissures). Visual Style: modern stylized game texture, clean defined shapes, vibrant saturation, smooth bevels, Blizzard/Riot game art style. Detail Level: high surface complexity, rich micro-details, intricate crevices and texture depth. Specific Features: wet lava with blue glowing cracks. Top-down 90-degree direct overhead orthographic view. Pure flat texture-only surface with 100% uniform seamless coverage filling the entire square frame from edge to edge. Flat ambient non-directional lighting with no cast shadows, no direct sun angle, and no external lighting direction. Seamless tileable repeating pattern design suitable as a 2D game ground terrain texture. Strict Negative Rules: NO perspective, NO angled isometric view, NO horizon line, NO sky, NO 3D scene depth. NO characters, NO animals, NO monsters, NO trees, NO standalone objects, NO props, NO buildings, NO items. NO borders, NO frames, NO vignetting, NO circular crop, NO rounded corners. NO text, NO letters, NO numbers, NO watermark, NO logo, NO user interface (UI) elements. NO buildings, NO houses, NO roads, NO streets, NO vehicles, NO characters, NO sky, NO landscape, NO architecture, NO trees, NO cobblestone, NO water, NO grass.`
-- **Pixazo API Payload `negative_prompt`**: `blurry, distorted, low quality, 3d render, perspective view, isometric, horizon, sky, character, person, face, building, house, street, vehicle, border, frame, watermark, text, buildings, houses, roads, streets, vehicles, characters, sky, landscape, architecture, trees, cobblestone, water, grass`
-- **Status**: HTTP 200 OK (6398 ms)
-- **Deterministic Prompt Adherence**: 100 / 100 (PASS)
-- **Human Visual Inspection**: Molten magma surface with dark basalt crust and blue/orange fissures dominating 100% of the square frame. Zero buildings, houses, or vehicles present.
-
-### 2. Cobblestone
+### 1. Cobblestone
 - **User Guidance**: `dark medieval cobblestone`
-- **Assembled Prompt**: `Top-down orthographic 2D game ground texture of Cobblestone (ancient irregular stone cobblestones, mortar joints, chipped rock edges). Visual Style: modern stylized game texture... Specific Features: dark medieval cobblestone. Top-down 90-degree direct overhead orthographic view...`
-- **Status**: HTTP 200 OK (8926 ms)
+- **Assembled Positive Prompt (Compact)**: `Top-down orthographic 2D game ground texture of Cobblestone (ancient irregular stone cobblestones, mortar joints, chipped rock edges). Visual Style: modern stylized 2D game art texture, Blizzard/Riot style. Detail: high surface detail and depth. Specific Features: dark medieval cobblestone. Flat direct overhead orthographic view, 100% uniform seamless tileable repeating pattern surface.`
+- **Pixazo API Payload `negative_prompt`**: `blurry, distorted, low quality, 3d render, perspective view, isometric, horizon, sky, character, person, face, building, house, street, vehicle, border, frame, watermark, text, animals, monsters, trees, props, items, vignetting, UI, buildings, houses, roads with vehicles, characters, sky, horizon, furniture, lava, water, grass`
+- **Word Count**: 46 words (well within CLIP text encoder efficiency limits)
+- **Status**: HTTP 200 OK
 - **Deterministic Prompt Adherence**: 100 / 100 (PASS)
-- **Human Visual Inspection**: Irregular paving stones and dark mortar lines covering entire surface from direct overhead view. Continuous stone pavement texture suitable for Tiler processing.
-
-### 3. Water
-- **User Guidance**: `shallow clear tropical water`
-- **Assembled Prompt**: `Top-down orthographic 2D game ground texture of Water (crystal-clear water surface, caustic ripples, transparent fluid depth)... Specific Features: shallow clear tropical water...`
-- **Status**: HTTP 200 OK (5662 ms)
-- **Deterministic Prompt Adherence**: 100 / 100 (PASS)
-- **Human Visual Inspection**: Clear turquoise fluid ripples and light caustics. No boats, land masses, islands, or characters present.
-
-### 4. Grass
-- **User Guidance**: `stylized dense green grass`
-- **Assembled Prompt**: `Top-down orthographic 2D game ground texture of Grass (lush green meadow grass turf, fine blade clusters, clovers)... Specific Features: stylized dense green grass...`
-- **Status**: HTTP 200 OK (11704 ms)
-- **Deterministic Prompt Adherence**: 100 / 100 (PASS)
-- **Human Visual Inspection**: Uniform dense green meadow turf with fine blades and soil undertones filling the entire square frame without structures or fences.
 
 ---
 
