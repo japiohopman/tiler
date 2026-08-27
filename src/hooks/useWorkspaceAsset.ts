@@ -69,6 +69,13 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
     setAssets((prevAssets) => updateAssetInHistory(prevAssets, updatedAsset));
   }, []);
 
+  // Rename asset in history immutably
+  const renameAsset = useCallback((id: string, newName: string) => {
+    setAssets((prevAssets) =>
+      prevAssets.map((item) => (item.id === id ? { ...item, name: newName } : item))
+    );
+  }, []);
+
   // Apply edits to current asset
   const handleApplyEdits = useCallback(
     (editedDataUrl: string) => {
@@ -383,6 +390,7 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
     deleteAsset,
     addAsset,
     updateAsset,
+    renameAsset,
     handleApplyEdits,
     handleResetEdits,
     processingState,

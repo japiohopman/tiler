@@ -39,6 +39,7 @@ export interface TilePreviewProps {
   generationMetadata?: GenerationMetadata;
   onTextureSelect?: (dataUrl: string, sample: SampleTextureDefinition) => void;
   className?: string;
+  hideSidebar?: boolean;
 }
 
 export const TilePreview: React.FC<TilePreviewProps> = ({
@@ -51,6 +52,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
   generationMetadata,
   onTextureSelect,
   className = '',
+  hideSidebar = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -222,11 +224,11 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
   const durationMs = generationMetadata?.generationDurationMs ?? generationMetadata?.geminiDurationMs;
 
   return (
-    <div className={`flex flex-col xl:flex-row gap-5 bg-slate-950 rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-2xl ${className}`}>
+    <div className={`flex flex-col ${hideSidebar ? 'h-full w-full' : 'xl:flex-row gap-5 bg-slate-950 rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-2xl'} ${className}`}>
       {/* LEFT / TOP: Canvas & Control Viewport */}
-      <div className="flex-1 flex flex-col min-w-0 bg-slate-900/90 rounded-xl border border-slate-800/80 overflow-hidden shadow-inner">
+      <div className="flex-1 flex flex-col min-w-0 bg-slate-900/90 rounded-xl border border-slate-800/80 overflow-hidden shadow-inner h-full">
         {/* Controls Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-950/90 border-b border-slate-800 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-950/90 border-b border-slate-800 text-xs shrink-0">
           {/* 1. Preview Mode Switcher: 1x1, 3x3, Infinite */}
           <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
             <span className="text-slate-400 font-semibold px-1.5 hidden sm:inline">Mode:</span>
@@ -235,7 +237,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-preview-mode-single"
               onClick={() => setPreviewMode('single')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-md font-medium transition-all cursor-pointer ${
                 previewMode === 'single'
                   ? 'bg-amber-500 text-slate-950 font-bold shadow-sm shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -250,7 +252,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-preview-mode-3x3"
               onClick={() => setPreviewMode('3x3')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-md font-medium transition-all cursor-pointer ${
                 previewMode === '3x3'
                   ? 'bg-amber-500 text-slate-950 font-bold shadow-sm shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -265,7 +267,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-preview-mode-infinite"
               onClick={() => setPreviewMode('infinite')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-md font-medium transition-all cursor-pointer ${
                 previewMode === 'infinite'
                   ? 'bg-amber-500 text-slate-950 font-bold shadow-sm shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -284,7 +286,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
               <button
                 id="btn-view-processed"
                 onClick={() => handleSourceToggle('processed')}
-                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide ${
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide cursor-pointer ${
                   selectedSource === 'processed'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -295,7 +297,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
               <button
                 id="btn-view-raw"
                 onClick={() => handleSourceToggle('raw')}
-                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide ${
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all uppercase tracking-wide cursor-pointer ${
                   selectedSource === 'raw'
                     ? 'bg-sky-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
@@ -311,7 +313,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-toggle-grid"
               onClick={() => setShowGrid(!showGrid)}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
                 showGrid
                   ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm font-semibold'
                   : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
@@ -328,7 +330,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-preview-zoom-out"
               onClick={() => setZoom((z) => Math.max(0.25, Number((z - 0.25).toFixed(2))))}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               title="Zoom out"
             >
               <ZoomOut className="w-3.5 h-3.5" />
@@ -337,7 +339,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-preview-zoom-reset-100"
               onClick={resetView}
-              className="font-mono text-slate-200 px-2 py-0.5 rounded text-[11px] min-w-[3.5rem] text-center hover:bg-slate-800 transition-colors font-medium"
+              className="font-mono text-slate-200 px-2 py-0.5 rounded text-[11px] min-w-[3.5rem] text-center hover:bg-slate-800 transition-colors font-medium cursor-pointer"
               title="Click to reset to 100% Native 1:1 Scale"
             >
               {Math.round(zoom * 100)}%
@@ -346,7 +348,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-preview-zoom-in"
               onClick={() => setZoom((z) => Math.min(5.0, Number((z + 0.25).toFixed(2))))}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               title="Zoom in"
             >
               <ZoomIn className="w-3.5 h-3.5" />
@@ -357,7 +359,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
             <button
               id="btn-preview-reset-view"
               onClick={resetView}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               title="Reset Pan & Zoom (Center View)"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -369,14 +371,13 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
         {!isPass && (
           <div
             id="seam-failure-warning-banner"
-            className="bg-rose-950/80 border-b border-rose-500/40 px-4 py-2.5 flex items-center space-x-2.5 text-xs text-rose-200 animate-fadeIn"
+            className="bg-rose-950/80 border-b border-rose-500/40 px-4 py-2 flex items-center space-x-2.5 text-xs text-rose-200 shrink-0"
           >
             <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
             <div className="flex-1">
               <span className="font-bold text-rose-300">SEAM FAILURE DETECTED: </span>
               <span>
                 Opposing boundary edges have delta discontinuities ({overallScore.toFixed(4)} &gt; {seamReport?.threshold ?? 0.05}).
-                Visual seam artifacts appear at tile boundaries.
               </span>
             </div>
             <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-rose-900/90 text-rose-300 border border-rose-600/50 uppercase">
@@ -388,7 +389,7 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
         {/* Interactive HTML5 Canvas Container */}
         <div
           ref={containerRef}
-          className="relative flex-1 min-h-[420px] bg-slate-950 cursor-grab active:cursor-grabbing overflow-hidden select-none"
+          className="relative flex-1 min-h-[280px] bg-slate-950 cursor-grab active:cursor-grabbing overflow-hidden select-none"
         >
           <canvas
             ref={canvasRef}
@@ -438,208 +439,95 @@ export const TilePreview: React.FC<TilePreviewProps> = ({
         </div>
       </div>
 
-      {/* RIGHT / SIDEBAR: Seam Analysis Information Panel */}
-      <div className="w-full xl:w-80 flex flex-col gap-4">
-        {/* Seam Scores Box */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-lg space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center space-x-2">
-              <Sliders className="w-4 h-4 text-amber-400" />
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                Seam Analysis
-              </h3>
-            </div>
-            {/* Status: PASS / FAIL Badge */}
-            <div
-              id="seam-status-badge"
-              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                isPass
-                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
-                  : 'bg-rose-950/80 text-rose-300 border-rose-500/50'
-              }`}
-            >
-              {isPass ? (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>PASS</span>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-                  <span>FAIL</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Explicit Seam Analysis Scores as required */}
-          <div className="space-y-2.5 font-mono text-xs">
-            {/* 1. Horizontal Seam */}
-            <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/90 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-sans font-medium text-slate-400">Horizontal Seam</div>
-                <div className="text-[10px] text-slate-500">Right vs. Left Edge</div>
-              </div>
-              <div className="text-right">
-                <span
-                  id="score-horizontal-seam"
-                  className={`text-base font-bold ${
-                    hScore <= (seamReport?.threshold ?? 0.05) ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {hScore.toFixed(4)}
-                </span>
-                <div className="text-[10px] text-slate-500">
-                  {hScore === 0 ? '0.0000 (Identical)' : `${(hScore * 100).toFixed(1)}% delta`}
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Vertical Seam */}
-            <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/90 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-sans font-medium text-slate-400">Vertical Seam</div>
-                <div className="text-[10px] text-slate-500">Bottom vs. Top Edge</div>
-              </div>
-              <div className="text-right">
-                <span
-                  id="score-vertical-seam"
-                  className={`text-base font-bold ${
-                    vScore <= (seamReport?.threshold ?? 0.05) ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {vScore.toFixed(4)}
-                </span>
-                <div className="text-[10px] text-slate-500">
-                  {vScore === 0 ? '0.0000 (Identical)' : `${(vScore * 100).toFixed(1)}% delta`}
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Overall */}
-            <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/90 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-sans font-medium text-slate-400">Overall</div>
-                <div className="text-[10px] text-slate-500">Composite Score</div>
-              </div>
-              <div className="text-right">
-                <span
-                  id="score-overall-seam"
-                  className={`text-base font-bold ${
-                    overallScore <= (seamReport?.threshold ?? 0.05) ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {overallScore.toFixed(4)}
-                </span>
-                <div className="text-[10px] text-slate-500">
-                  Threshold: ≤ {seamReport?.threshold ?? 0.05}
-                </div>
-              </div>
-            </div>
-
-            {/* Status Summary Line */}
-            <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 text-[11px] flex items-center justify-between font-sans">
-              <span className="text-slate-400 font-medium">Validation Status:</span>
-              <span className={`font-bold ${isPass ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {isPass ? '✓ PASS (Mathematically Seamless)' : '⚠ FAIL (Discontinuous Seams)'}
-              </span>
-            </div>
-          </div>
-
-          {/* Technical Guarantee Note */}
-          <div className="bg-slate-950/40 border border-slate-800/80 rounded-lg p-2.5 text-[11px] text-slate-400 space-y-1">
-            <div className="flex items-center space-x-1.5 text-slate-300 font-medium">
-              <Info className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-              <span>Exact Pixel Scale Guarantee</span>
-            </div>
-            <p className="text-slate-500 leading-normal">
-              Tile repeats at exact native dimensions without bilinear smoothing, stretching, or artificial edge blending.
-            </p>
-          </div>
-        </div>
-
-        {/* Generation Metadata Card (When present) */}
-        {generationMetadata && (
-          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-lg space-y-2.5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+      {/* RIGHT / SIDEBAR: Seam Analysis Information Panel (Only shown when hideSidebar is false) */}
+      {!hideSidebar && (
+        <div className="w-full xl:w-80 flex flex-col gap-4">
+          {/* Seam Scores Box */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-lg space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2">
-                <Cpu className="w-4 h-4 text-sky-400" />
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Generation Metadata
-                </h4>
+                <Sliders className="w-4 h-4 text-amber-400" />
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Seam Analysis
+                </h3>
               </div>
-              <span className="text-[10px] font-mono bg-slate-800 text-sky-300 px-1.5 py-0.5 rounded border border-slate-700">
-                {generationMetadata.model}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-              <div className="bg-slate-950 p-2 rounded border border-slate-800/80">
-                <span className="text-[10px] text-slate-500 font-sans block">Resolution</span>
-                <span className="text-slate-200">{generationMetadata.resolution}×{generationMetadata.resolution}</span>
-              </div>
-              <div className="bg-slate-950 p-2 rounded border border-slate-800/80">
-                <span className="text-[10px] text-slate-500 font-sans block">AI Generation</span>
-                <span className="text-slate-200">{durationMs ? `${(durationMs / 1000).toFixed(1)}s` : 'Real-time'}</span>
-              </div>
-              <div className="bg-slate-950 p-2 rounded border border-slate-800/80 col-span-2">
-                <span className="text-[10px] text-slate-500 font-sans block">Pipeline Transform</span>
-                <span className="text-emerald-400">{generationMetadata.processingAlgorithm || 'Sharp Offset-Crossfade'} ({generationMetadata.processingTimeMs || 12}ms)</span>
-              </div>
-            </div>
-
-            {generationMetadata.builtPrompt && (
-              <div className="bg-slate-950 p-2 rounded border border-slate-800 text-[10px] text-slate-400 font-mono space-y-1">
-                <span className="text-slate-300 font-semibold font-sans block">Built Orthographic Prompt:</span>
-                <p className="line-clamp-3 leading-relaxed text-slate-400 hover:line-clamp-none transition-all">
-                  {generationMetadata.builtPrompt}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Quick Test Texture Presets */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-lg space-y-2.5">
-          <div className="flex items-center space-x-2 border-b border-slate-800 pb-2">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-              Test Texture Presets
-            </h4>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Quickly demonstrate 1×1, 3×3, Infinite, and Seam PASS/FAIL states:
-          </p>
-          <div className="space-y-1.5">
-            {SAMPLE_TEXTURES.map((sample) => (
-              <button
-                key={sample.id}
-                id={`btn-sample-${sample.id}`}
-                onClick={() => handleSampleClick(sample)}
-                className={`w-full text-left p-2 rounded-lg border transition-all text-xs flex items-center justify-between ${
-                  activeSampleId === sample.id && !imageDataUrl
-                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
-                    : 'bg-slate-950/60 border-slate-800 hover:bg-slate-800/80 text-slate-300'
+              <div
+                id="seam-status-badge"
+                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                  isPass
+                    ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
+                    : 'bg-rose-950/80 text-rose-300 border-rose-500/50'
                 }`}
               >
-                <div className="truncate pr-2">
-                  <div className="font-medium text-[11px] truncate">{sample.name}</div>
-                  <div className="text-[10px] text-slate-500 truncate">{sample.description}</div>
+                {isPass ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>PASS</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                    <span>FAIL</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2.5 font-mono text-xs">
+              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/90 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-sans font-medium text-slate-400">Horizontal Seam</div>
+                  <div className="text-[10px] text-slate-500">Right vs. Left Edge</div>
                 </div>
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded font-bold shrink-0 ${
-                    sample.expectedStatus === 'PASS'
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-rose-950 text-rose-400 border border-rose-500/30'
-                  }`}
-                >
-                  {sample.expectedStatus}
-                </span>
-              </button>
-            ))}
+                <div className="text-right">
+                  <span
+                    id="score-horizontal-seam"
+                    className={`text-base font-bold ${
+                      hScore <= (seamReport?.threshold ?? 0.05) ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {hScore.toFixed(4)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/90 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-sans font-medium text-slate-400">Vertical Seam</div>
+                  <div className="text-[10px] text-slate-500">Bottom vs. Top Edge</div>
+                </div>
+                <div className="text-right">
+                  <span
+                    id="score-vertical-seam"
+                    className={`text-base font-bold ${
+                      vScore <= (seamReport?.threshold ?? 0.05) ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {vScore.toFixed(4)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/90 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-sans font-medium text-slate-400">Overall</div>
+                  <div className="text-[10px] text-slate-500">Composite Score</div>
+                </div>
+                <div className="text-right">
+                  <span
+                    id="score-overall-seam"
+                    className={`text-base font-bold ${
+                      overallScore <= (seamReport?.threshold ?? 0.05) ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {overallScore.toFixed(4)}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
