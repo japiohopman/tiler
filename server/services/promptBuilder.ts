@@ -74,29 +74,36 @@ export class PromptBuilder {
     const detailDescription = DETAIL_DESCRIPTORS[normalizedDetail] || DETAIL_DESCRIPTORS.high;
 
     // Preserve original user modifier intent
-    const userModifier = (additionalPrompt || customPrompt || '').trim();
+    const userModifier = (additionalPrompt || '').trim();
 
-    // 1. Core Subject prioritizing Material Identity
-    const primaryDescriptiveTerms = profile.descriptiveTerms.slice(0, 3).join(', ');
-    const subject = `${profile.canonicalName} texture, ${primaryDescriptiveTerms}`;
+    let builtPrompt: string;
 
-    // 2. Compact Style & Detail rendering
-    const styleClause = `${styleDescription}, ${detailDescription}`;
+    if (customPrompt && customPrompt.trim().length > 0) {
+      // User explicitly edited or provided a complete prompt override
+      builtPrompt = customPrompt.trim();
+    } else {
+      // 1. Core Subject prioritizing Material Identity
+      const primaryDescriptiveTerms = profile.descriptiveTerms.slice(0, 3).join(', ');
+      const subject = `${profile.canonicalName} texture, ${primaryDescriptiveTerms}`;
 
-    // 3. User Additional Modifier Clause (preserves original user input verbatim)
-    const userClause = userModifier.length > 0 ? userModifier : '';
+      // 2. Compact Style & Detail rendering
+      const styleClause = `${styleDescription}, ${detailDescription}`;
 
-    // 4. Concise Technical Tileability & Direct Overhead View constraints without camera buzzwords
-    const technicalRequirements = 'top-down view, seamless tileable texture, game asset';
+      // 3. User Additional Modifier Clause (preserves original user input verbatim)
+      const userClause = userModifier.length > 0 ? userModifier : '';
 
-    const builtPrompt = [
-      subject,
-      styleClause,
-      userClause,
-      technicalRequirements,
-    ]
-      .filter(Boolean)
-      .join(', ');
+      // 4. Concise Technical Tileability & Direct Overhead View constraints without camera buzzwords
+      const technicalRequirements = 'top-down view, seamless tileable texture, game asset';
+
+      builtPrompt = [
+        subject,
+        styleClause,
+        userClause,
+        technicalRequirements,
+      ]
+        .filter(Boolean)
+        .join(', ');
+    }
 
     // Build dedicated negative prompt parameter for SDXL models (e.g. Pixazo SDXL)
     const baseNegativeTerms = [

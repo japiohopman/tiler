@@ -29,48 +29,48 @@ async function runPromptAdherenceTests() {
   assert.strictEqual(lavaStructured.adherenceReport.hasMaterialIdentity, true);
   console.log('  ✓ Material-aware prompt construction verified');
 
-  // 2. Custom prompt is preserved
-  console.log('Test 2: Custom user prompt is preserved verbatim');
+  // 2. User additional guidance prompt is preserved verbatim
+  console.log('Test 2: User additional guidance prompt is preserved verbatim');
   const customWording = 'wet lava with blue glowing cracks';
-  const customStructured = PromptBuilder.buildStructuredPrompt({
+  const guidanceStructured = PromptBuilder.buildStructuredPrompt({
     material: 'lava',
     style: 'stylized',
-    customPrompt: customWording,
+    additionalPrompt: customWording,
   });
 
   assert.ok(
-    customStructured.builtPrompt.includes(customWording),
-    'Custom user prompt wording must be preserved verbatim in assembled prompt'
+    guidanceStructured.builtPrompt.includes(customWording),
+    'User additional prompt wording must be preserved verbatim in assembled prompt'
   );
-  assert.strictEqual(customStructured.adherenceReport.hasUserIntentPreserved, true);
-  console.log('  ✓ Custom prompt preservation verified');
+  assert.strictEqual(guidanceStructured.adherenceReport.hasUserIntentPreserved, true);
+  console.log('  ✓ User guidance preservation verified');
 
-  // 3. Custom prompt does NOT bypass material/tile constraints
-  console.log('Test 3: Custom prompt does NOT bypass material profile or tile constraints');
+  // 3. User guidance prompt preserves material profile and tile constraints
+  console.log('Test 3: User guidance prompt preserves material profile and tile constraints');
   assert.ok(
-    customStructured.builtPrompt.includes('Lava texture'),
-    'Assembled prompt with customPrompt must still contain material profile identity'
+    guidanceStructured.builtPrompt.includes('Lava texture'),
+    'Assembled prompt with guidance must still contain material profile identity'
   );
   assert.ok(
-    customStructured.builtPrompt.includes('top-down view'),
-    'Assembled prompt with customPrompt must still enforce top-down view constraint'
+    guidanceStructured.builtPrompt.includes('top-down view'),
+    'Assembled prompt with guidance must still enforce top-down view constraint'
   );
   assert.ok(
-    customStructured.builtPrompt.includes('seamless tileable texture'),
-    'Assembled prompt with customPrompt must still enforce tileability constraint'
+    guidanceStructured.builtPrompt.includes('seamless tileable texture'),
+    'Assembled prompt with guidance must still enforce tileability constraint'
   );
-  console.log('  ✓ Custom prompt non-bypass verified');
+  console.log('  ✓ User guidance constraint preservation verified');
 
   // 4. Final provider prompt equals prompt evaluated for adherence and stored in metadata
   console.log('Test 4: Final provider prompt equality across adherence report & metadata contract');
-  const providerPrompt = customStructured.builtPrompt;
-  const adherenceEvaluatedPrompt = customStructured.adherenceReport.details;
+  const providerPrompt = guidanceStructured.builtPrompt;
+  const adherenceEvaluatedPrompt = guidanceStructured.adherenceReport.details;
   assert.ok(
     adherenceEvaluatedPrompt.includes('Lava (MATCHED)'),
     'Adherence report must evaluate the exact assembled prompt sent to provider'
   );
   assert.strictEqual(
-    customStructured.userPrompt,
+    guidanceStructured.userPrompt,
     customWording,
     'User prompt metadata must retain original user prompt input'
   );
@@ -79,22 +79,22 @@ async function runPromptAdherenceTests() {
   // 5. Adherence evaluation evaluates the exact prompt sent to the provider
   console.log('Test 5: Adherence evaluation evaluates exact provider prompt');
   const directReport = evaluatePromptAdherence(providerPrompt, 'lava', customWording);
-  assert.strictEqual(directReport.score, customStructured.adherenceReport.score);
-  assert.strictEqual(directReport.pass, customStructured.adherenceReport.pass);
+  assert.strictEqual(directReport.score, guidanceStructured.adherenceReport.score);
+  assert.strictEqual(directReport.pass, guidanceStructured.adherenceReport.pass);
   console.log('  ✓ Exact prompt adherence evaluation verified');
 
   // 6. Negative prompt remains material-aware
   console.log('Test 6: Negative prompt payload remains material-aware');
   assert.ok(
-    customStructured.negativePrompt.includes('buildings'),
+    guidanceStructured.negativePrompt.includes('buildings'),
     'Negative prompt payload must include profile negative terms like "buildings"'
   );
   assert.ok(
-    customStructured.negativePrompt.includes('houses'),
+    guidanceStructured.negativePrompt.includes('houses'),
     'Negative prompt payload must include profile negative terms like "houses"'
   );
   assert.ok(
-    customStructured.negativePrompt.includes('water'),
+    guidanceStructured.negativePrompt.includes('water'),
     'Negative prompt payload for lava must include excluded material terms like "water"'
   );
   console.log('  ✓ Material-aware negative prompt payload verified');

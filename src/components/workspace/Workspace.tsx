@@ -29,6 +29,8 @@ import {
   TileProcessingOptions,
   WorkspaceAsset,
 } from '../../types';
+import { PromptBuilder } from '../../../server/services/promptBuilder';
+import { Eye, Edit2, RotateCcw } from 'lucide-react';
 
 interface WorkspaceProps {
   asset: WorkspaceAsset | null;
@@ -87,8 +89,18 @@ export const Workspace: React.FC<WorkspaceProps> = ({
   onContextMenuPreview,
 }) => {
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [showPromptInspector, setShowPromptInspector] = useState<boolean>(false);
 
   const isGenerating = generationState.status === 'generating' || generationState.status === 'processing' || generationState.status === 'analyzing';
+
+  // Compute live prompt preview
+  const liveStructuredPrompt = PromptBuilder.buildStructuredPrompt({
+    material: params.material,
+    style: params.style,
+    detail: params.detail,
+    additionalPrompt: params.additionalPrompt,
+    customPrompt: params.customPrompt,
+  });
   const isProcessing = processingState.status === 'processing' || processingState.status === 'analyzing';
   const isBusy = isGenerating || isProcessing;
 
@@ -178,21 +190,33 @@ export const Workspace: React.FC<WorkspaceProps> = ({
         {/* Prompt & Action Controls */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <div className="flex-1 min-w-0">
-            <input
-              id="input-additional-prompt"
-              type="text"
-              value={params.additionalPrompt ?? params.customPrompt ?? ''}
-              disabled={isBusy}
-              onChange={(e) =>
-                onParamsChange({
-                  ...params,
-                  additionalPrompt: e.target.value,
-                  customPrompt: e.target.value,
-                })
-              }
-              placeholder="Guidance e.g. mossy patches, weathered cracks..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500 font-mono transition-colors"
-            />
+            <div className="relative">
+              <input
+                id="input-additional-prompt"
+                type="text"
+                value={params.additionalPrompt ?? ''}
+                disabled={isBusy}
+                onChange={(e) =>
+                  onParamsChange({
+                    ...params,
+                    additionalPrompt: e.target.value,
+                    // reset custom prompt override if user modifies guidance
+                    customPrompt: undefined,
+                  })
+                }
+                placeholder="Guidance e.g. mossy patches, weathered cracks..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-24 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500 font-mono transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPromptInspector(!showPromptInspector)}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono text-amber-400 hover:bg-slate-800 flex items-center gap-1 cursor-pointer"
+                title="Inspect or edit full prompt string sent to AI model"
+              >
+                <Eye className="w-3 h-3" />
+                <span>Prompt</span>
+              </button>
+            </div>
           </div>
 
           {/* Primary Action Button (Generate vs Regenerate) */}
@@ -236,6 +260,51 @@ export const Workspace: React.FC<WorkspaceProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Expandable Live Prompt Inspector & Override Box */}
+        {showPromptInspector && (
+          <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg space-y-2 text-xs font-mono animate-in fade-in duration-100">
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Exact Prompt String Sent To AI Model</span>
+              </span>
+              {params.customPrompt && (
+                <button
+                  type="button"
+                  onClick={() => onParamsChange({ ...params, customPrompt: undefined })}
+                  className="text-slate-400 hover:text-rose-400 flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset to Auto</span>
+                </button>
+              )}
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 uppercase block mb-1">Positive Prompt (Editable Override)</label>
+              <textarea
+                rows={2}
+                value={params.customPrompt ?? liveStructuredPrompt.builtPrompt}
+                onChange={(e) =>
+                  onParamsChange({
+                    ...params,
+                    customPrompt: e.target.value,
+                  })
+                }
+                disabled={isBusy}
+                className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-xs text-emerald-300 focus:outline-none focus:border-amber-500 resize-none font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-500 uppercase block mb-1">Negative Prompt Payload (Auto-generated)</label>
+              <div className="p-2 bg-slate-900 border border-slate-800 rounded text-[11px] text-slate-400 leading-tight">
+                {liveStructuredPrompt.negativePrompt}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Collapsible Advanced Options */}
         {showAdvanced && (
