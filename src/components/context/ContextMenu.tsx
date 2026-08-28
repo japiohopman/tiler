@@ -30,7 +30,7 @@ interface ContextMenuProps {
   menuState: ContextMenuState;
   onClose: () => void;
   onSelectAsset?: (id: string) => void;
-  onRenameAsset?: (id: string) => void;
+  onRenameAsset?: (id: string, newName: string) => void;
   onGenerateVariant?: (asset: WorkspaceAsset) => void;
   onOpenEditor?: () => void;
   onReprocess?: () => void;
@@ -109,7 +109,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
           <button
             onClick={() => {
-              onRenameAsset?.(asset.id);
+              const newName = window.prompt('Enter new tile name:', asset.name);
+              if (newName && newName.trim()) {
+                onRenameAsset?.(asset.id, newName.trim());
+              }
               onClose();
             }}
             className="w-full text-left px-3 py-1.5 hover:bg-slate-800 flex items-center gap-2 cursor-pointer"

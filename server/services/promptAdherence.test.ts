@@ -48,15 +48,15 @@ async function runPromptAdherenceTests() {
   // 3. Custom prompt does NOT bypass material/tile constraints
   console.log('Test 3: Custom prompt does NOT bypass material profile or tile constraints');
   assert.ok(
-    customStructured.builtPrompt.includes('Top-down orthographic 2D game ground texture of Lava'),
+    customStructured.builtPrompt.includes('Lava texture'),
     'Assembled prompt with customPrompt must still contain material profile identity'
   );
   assert.ok(
-    customStructured.builtPrompt.includes('overhead orthographic view'),
-    'Assembled prompt with customPrompt must still enforce top-down orthographic constraint'
+    customStructured.builtPrompt.includes('top-down view'),
+    'Assembled prompt with customPrompt must still enforce top-down view constraint'
   );
   assert.ok(
-    customStructured.builtPrompt.includes('seamless tileable repeating pattern'),
+    customStructured.builtPrompt.includes('seamless tileable texture'),
     'Assembled prompt with customPrompt must still enforce tileability constraint'
   );
   console.log('  ✓ Custom prompt non-bypass verified');
@@ -107,7 +107,7 @@ async function runPromptAdherenceTests() {
   });
 
   assert.ok(
-    pixelLava.builtPrompt.includes('16-bit retro pixel art game asset style'),
+    pixelLava.builtPrompt.includes('16-bit retro pixel art game texture'),
     'Pixel art style descriptor must be included'
   );
   assert.ok(

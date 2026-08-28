@@ -44,7 +44,7 @@ export const AppShell: React.FC<AppShellProps> = ({ state, actions, children }) 
         onNewDocument={() => actions.setNotification?.({ message: 'Created new tile workspace', type: 'info' })}
         onOpenDocument={() => actions.setNotification?.({ message: 'Use Asset Explorer to select tiles', type: 'info' })}
         onSaveDocument={() => actions.setNotification?.({ message: 'Tile workspace state saved locally', type: 'success' })}
-        onSaveAsDocument={() => actions.setNotification?.({ message: 'Save As modal opened', type: 'info' })}
+        onSaveAsDocument={() => actions.onSaveAsDocument?.()}
         onExport={() => actions.handleExport?.({ format: 'png', resolution: 512, exportGridSheet: false, gridSheetSize: 3, includeSeamReport: true, includeMetadata: true })}
         onOpenEditor={() => actions.setActiveView('editor')}
         onToggleExplorer={() => setShowExplorer(!showExplorer)}
