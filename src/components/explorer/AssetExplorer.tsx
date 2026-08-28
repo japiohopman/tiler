@@ -101,13 +101,13 @@ export const AssetExplorer: React.FC<AssetExplorerProps> = ({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/90 text-slate-200 select-none text-xs font-sans">
+    <div className="flex flex-col h-full bg-[#1e1e1e] text-slate-200 select-none text-xs font-mono">
       {/* Explorer Header */}
-      <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+      <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between bg-[#161616]">
         <div className="flex items-center space-x-2">
-          <Folder className="w-3.5 h-3.5 text-amber-400" />
-          <span className="font-bold text-white uppercase tracking-wider text-[11px]">
-            EXPLORER
+          <Folder className="w-3.5 h-3.5 text-red-500" />
+          <span className="font-bold text-white uppercase tracking-widest text-[10px]">
+            HIERARCHY_EXPLORER
           </span>
         </div>
         <div className="flex items-center space-x-1">
@@ -190,8 +190,8 @@ export const AssetExplorer: React.FC<AssetExplorerProps> = ({
                                 }}
                                 className={`group relative p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between space-x-2 ${
                                   isSelected
-                                    ? 'bg-amber-950/40 border-amber-500/80 shadow-md ring-1 ring-amber-500/30 text-white'
-                                    : 'bg-slate-950/50 border-slate-800/80 text-slate-300 hover:border-slate-700 hover:bg-slate-800/40'
+                                    ? 'bg-red-950/40 border-red-800/80 shadow-md ring-1 ring-red-800/30 text-white'
+                                    : 'bg-black/30 border-white/5 text-slate-300 hover:border-white/10 hover:bg-white/5'
                                 }`}
                               >
                                 {/* Thumbnail */}

@@ -145,13 +145,13 @@ export const Workspace: React.FC<WorkspaceProps> = ({
       </div>
 
       {/* Lower Area: Integrated Generator Control Bar */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 shrink-0 flex flex-col gap-2.5 shadow-lg">
+      <div className="bg-[#1e1e1e] border border-white/10 rounded-xl p-3 shrink-0 flex flex-col gap-2.5 shadow-xl font-mono">
         {/* Top Control Strip */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           {/* Material Pills */}
           <div className="flex items-center space-x-1 overflow-x-auto py-0.5">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
-              Material:
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1 hidden sm:inline">
+              ESSENCE:
             </span>
             {TARGET_MATERIALS.map((mat) => {
               const isSelected = params.material === mat.id;
@@ -161,10 +161,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({
                   id={`material-select-${mat.id}`}
                   onClick={() => handleMaterialSelect(mat.id)}
                   disabled={isBusy}
-                  className={`px-2.5 py-1 rounded-lg border text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer disabled:opacity-50 ${
+                  className={`px-2.5 py-1 rounded-lg border text-xs font-bold uppercase flex items-center space-x-1.5 transition-all cursor-pointer disabled:opacity-50 ${
                     isSelected
-                      ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-sm'
-                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white'
+                      ? 'bg-red-700 text-white border-red-500 font-bold shadow-md shadow-red-900/40'
+                      : 'bg-black/40 border-white/10 text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <span>{getMaterialIcon(mat.id)}</span>
@@ -239,7 +239,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({
               id={asset ? 'btn-regenerate-tile' : 'btn-generate-tile'}
               onClick={onGenerate}
               disabled={isBusy}
-              className="py-2 px-5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:from-amber-600 active:to-amber-700 text-slate-950 text-xs font-bold uppercase tracking-wide flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+              className="py-2 px-5 rounded-lg bg-gradient-to-r from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 active:from-red-800 text-white text-xs font-bold uppercase tracking-widest flex items-center justify-center space-x-2 shadow-lg shadow-red-950/40 transition-all cursor-pointer disabled:opacity-50"
             >
               {isGenerating ? (
                 <>

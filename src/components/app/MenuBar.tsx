@@ -99,25 +99,26 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   return (
     <div
       ref={menuRef}
-      className="bg-slate-950 border-b border-slate-800 px-3 py-1 flex items-center justify-between text-xs select-none z-50 relative font-sans text-slate-300"
+      className="bg-[#252525] border-b border-white/5 px-3 py-1.5 flex items-center justify-between text-xs select-none z-50 relative font-mono text-slate-300"
     >
       {/* Menu Bar Left Items */}
       <div className="flex items-center space-x-1">
         {/* Application Brand / Icon */}
-        <div className="flex items-center space-x-2 mr-3 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800">
-          <Layers className="w-3.5 h-3.5 text-amber-400" />
-          <span className="font-bold text-white tracking-tight text-[11px]">TILER</span>
-          <span className="text-[9px] font-mono text-amber-400/90 bg-amber-950/80 px-1 rounded border border-amber-500/30">
+        <div className="flex items-center space-x-2 mr-3 px-2 py-0.5 rounded bg-black/40 border border-white/10">
+          <Layers className="w-3.5 h-3.5 text-red-600" />
+          <span className="font-bold text-white tracking-widest text-[11px]">ARCANE_OS // TILER</span>
+          <span className="text-[9px] font-mono text-red-500/90 bg-red-950/80 px-1 rounded border border-red-500/30 font-bold">
             PRO
           </span>
         </div>
+        <div className="h-4 w-[1px] bg-white/10 mx-1.5 hidden sm:block" />
 
         {/* FILES */}
         <div className="relative">
           <button
             onClick={() => handleMenuClick('FILES')}
-            className={`px-2.5 py-1 rounded hover:bg-slate-800/80 transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wide ${
-              activeMenu === 'FILES' ? 'bg-slate-800 text-amber-400' : 'text-slate-300'
+            className={`px-2.5 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer text-[11px] font-bold uppercase tracking-wider ${
+              activeMenu === 'FILES' ? 'bg-white/10 text-red-500' : 'text-slate-300'
             }`}
           >
             FILES
@@ -184,8 +185,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         <div className="relative">
           <button
             onClick={() => handleMenuClick('EDIT')}
-            className={`px-2.5 py-1 rounded hover:bg-slate-800/80 transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wide ${
-              activeMenu === 'EDIT' ? 'bg-slate-800 text-amber-400' : 'text-slate-300'
+            className={`px-2.5 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer text-[11px] font-bold uppercase tracking-wider ${
+              activeMenu === 'EDIT' ? 'bg-white/10 text-red-500' : 'text-slate-300'
             }`}
           >
             EDIT
@@ -214,8 +215,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         <div className="relative">
           <button
             onClick={() => handleMenuClick('VIEW')}
-            className={`px-2.5 py-1 rounded hover:bg-slate-800/80 transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wide ${
-              activeMenu === 'VIEW' ? 'bg-slate-800 text-amber-400' : 'text-slate-300'
+            className={`px-2.5 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer text-[11px] font-bold uppercase tracking-wider ${
+              activeMenu === 'VIEW' ? 'bg-white/10 text-red-500' : 'text-slate-300'
             }`}
           >
             VIEW
@@ -289,8 +290,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         <div className="relative">
           <button
             onClick={() => handleMenuClick('TOOLS')}
-            className={`px-2.5 py-1 rounded hover:bg-slate-800/80 transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wide ${
-              activeMenu === 'TOOLS' ? 'bg-slate-800 text-amber-400' : 'text-slate-300'
+            className={`px-2.5 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer text-[11px] font-bold uppercase tracking-wider ${
+              activeMenu === 'TOOLS' ? 'bg-white/10 text-red-500' : 'text-slate-300'
             }`}
           >
             TOOLS
@@ -327,8 +328,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         <div className="relative">
           <button
             onClick={() => handleMenuClick('WINDOW')}
-            className={`px-2.5 py-1 rounded hover:bg-slate-800/80 transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wide ${
-              activeMenu === 'WINDOW' ? 'bg-slate-800 text-amber-400' : 'text-slate-300'
+            className={`px-2.5 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer text-[11px] font-bold uppercase tracking-wider ${
+              activeMenu === 'WINDOW' ? 'bg-white/10 text-red-500' : 'text-slate-300'
             }`}
           >
             WINDOW
@@ -372,8 +373,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         <div className="relative">
           <button
             onClick={() => handleMenuClick('HELP')}
-            className={`px-2.5 py-1 rounded hover:bg-slate-800/80 transition-colors cursor-pointer text-xs font-semibold uppercase tracking-wide ${
-              activeMenu === 'HELP' ? 'bg-slate-800 text-amber-400' : 'text-slate-300'
+            className={`px-2.5 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer text-[11px] font-bold uppercase tracking-wider ${
+              activeMenu === 'HELP' ? 'bg-white/10 text-red-500' : 'text-slate-300'
             }`}
           >
             HELP

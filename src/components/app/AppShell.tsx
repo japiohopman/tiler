@@ -38,7 +38,7 @@ export const AppShell: React.FC<AppShellProps> = ({ state, actions, children }) 
   } = state;
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 select-none">
+    <div className="h-screen w-screen overflow-hidden bg-[#1a1a1a] text-slate-100 flex flex-col font-mono selection:bg-red-700 selection:text-white select-none">
       {/* 1. Top Application Menu Bar */}
       <MenuBar
         onNewDocument={() => actions.setNotification?.({ message: 'Created new tile workspace', type: 'info' })}
@@ -91,19 +91,19 @@ export const AppShell: React.FC<AppShellProps> = ({ state, actions, children }) 
       <main className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* Left Column: Asset Explorer */}
         {showExplorer && (
-          <aside className="w-64 sm:w-72 shrink-0 border-r border-slate-800 bg-slate-900/95 flex flex-col h-full overflow-hidden z-20">
+          <aside className="w-64 sm:w-72 shrink-0 border-r border-white/5 bg-[#1e1e1e] flex flex-col h-full overflow-hidden z-20">
             {children.explorer}
           </aside>
         )}
 
         {/* Center: Main Workspace Surface */}
-        <section className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-slate-950 relative">
+        <section className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#1a1a1a] relative">
           {children.workspace}
         </section>
 
         {/* Right Column: Properties / Inspector */}
         {showInspector && (
-          <aside className="w-80 shrink-0 border-l border-slate-800 bg-slate-900/95 flex flex-col h-full overflow-y-auto z-20">
+          <aside className="w-80 shrink-0 border-l border-white/5 bg-[#1e1e1e] flex flex-col h-full overflow-y-auto z-20">
             {children.inspector}
           </aside>
         )}

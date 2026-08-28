@@ -54,7 +54,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   };
 
   return (
-    <footer className="bg-slate-950 border-t border-slate-800 px-3 py-1 flex items-center justify-between text-[11px] font-mono text-slate-400 select-none z-40 shrink-0">
+    <footer className="bg-[#0a0a0a] border-t border-white/5 px-4 py-1.5 flex items-center justify-between text-[9px] font-mono text-white/40 select-none z-40 shrink-0">
       {/* Left: Pipeline Execution Status */}
       <div className="flex items-center space-x-3 min-w-0">
         <div className="flex items-center space-x-1.5 shrink-0">

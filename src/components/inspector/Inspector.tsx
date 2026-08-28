@@ -76,12 +76,12 @@ export const Inspector: React.FC<InspectorProps> = ({
   const adherence = asset?.generationMetadata?.promptAdherence;
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/95 text-slate-200 select-none text-xs font-sans">
+    <div className="flex flex-col h-full bg-[#1e1e1e] text-slate-200 select-none text-xs font-mono">
       {/* Inspector Header */}
-      <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 shrink-0">
+      <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between bg-[#161616] shrink-0">
         <div className="flex items-center space-x-2">
-          <Sliders className="w-3.5 h-3.5 text-amber-400" />
-          <span className="font-bold text-white uppercase tracking-wider text-[11px]">
+          <Sliders className="w-3.5 h-3.5 text-red-500" />
+          <span className="font-bold text-white uppercase tracking-widest text-[10px]">
             PROPERTIES & DIAGNOSTICS
           </span>
         </div>
