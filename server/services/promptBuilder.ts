@@ -28,11 +28,11 @@ export interface StructuredPromptResult {
  * Compact visual style descriptors optimized for SDXL token efficiency
  */
 const STYLE_DESCRIPTORS: Record<string, string> = {
-  'pixel-art': '16-bit retro pixel art game asset style, clean pixel clusters',
-  'hand-painted': 'stylized hand-painted game texture, painterly brushstrokes',
-  'stylized': 'modern stylized 2D game art texture, Blizzard/Riot style',
-  'photorealistic': 'photorealistic 2D ground scan texture, high fidelity',
-  'retro-16bit': 'classic 16-bit top-down JRPG tileset texture',
+  'pixel-art': '16-bit retro pixel art game texture, pixelated',
+  'hand-painted': 'hand-painted game texture, painterly brushstrokes',
+  'stylized': 'stylized 2D game texture, clean digital art',
+  'photorealistic': 'photorealistic surface scan texture, highly detailed',
+  'retro-16bit': '16-bit top-down RPG tile texture',
 };
 
 /**
@@ -40,9 +40,9 @@ const STYLE_DESCRIPTORS: Record<string, string> = {
  */
 const DETAIL_DESCRIPTORS: Record<string, string> = {
   subtle: 'smooth clean surface',
-  medium: 'balanced surface texture',
-  high: 'high surface detail and depth',
-  ultra: 'intricate micro-grain texture detail',
+  medium: 'balanced texture detail',
+  high: 'sharp surface detail',
+  ultra: 'intricate micro-texture detail',
 };
 
 /**
@@ -70,33 +70,40 @@ export class PromptBuilder {
     const normalizedStyle = (style || 'stylized').toLowerCase().trim();
     const normalizedDetail = (detail || 'high').toLowerCase().trim();
 
-    const styleDescription = STYLE_DESCRIPTORS[normalizedStyle] || `${normalizedStyle} game art style`;
+    const styleDescription = STYLE_DESCRIPTORS[normalizedStyle] || `${normalizedStyle} game style`;
     const detailDescription = DETAIL_DESCRIPTORS[normalizedDetail] || DETAIL_DESCRIPTORS.high;
 
     // Preserve original user modifier intent
-    const userModifier = (additionalPrompt || customPrompt || '').trim();
+    const userModifier = (additionalPrompt || '').trim();
 
-    // 1. Core Subject prioritizing Material Identity
-    const primaryDescriptiveTerms = profile.descriptiveTerms.slice(0, 3).join(', ');
-    const subject = `Top-down orthographic 2D game ground texture of ${profile.canonicalName} (${primaryDescriptiveTerms}).`;
+    let builtPrompt: string;
 
-    // 2. Compact Style & Detail rendering
-    const styleClause = `Visual Style: ${styleDescription}. Detail: ${detailDescription}.`;
+    if (customPrompt && customPrompt.trim().length > 0) {
+      // User explicitly edited or provided a complete prompt override
+      builtPrompt = customPrompt.trim();
+    } else {
+      // 1. Core Subject prioritizing Material Identity
+      const primaryDescriptiveTerms = profile.descriptiveTerms.slice(0, 3).join(', ');
+      const subject = `${profile.canonicalName} texture, ${primaryDescriptiveTerms}`;
 
-    // 3. User Additional Modifier Clause (preserves original user input verbatim)
-    const userClause = userModifier.length > 0 ? `Specific Features: ${userModifier}.` : '';
+      // 2. Compact Style & Detail rendering
+      const styleClause = `${styleDescription}, ${detailDescription}`;
 
-    // 4. Concise Technical Tileability & Direct Overhead View constraints
-    const technicalRequirements = 'Flat direct overhead orthographic view, 100% uniform seamless tileable repeating pattern surface.';
+      // 3. User Additional Modifier Clause (preserves original user input verbatim)
+      const userClause = userModifier.length > 0 ? userModifier : '';
 
-    const builtPrompt = [
-      subject,
-      styleClause,
-      userClause,
-      technicalRequirements,
-    ]
-      .filter(Boolean)
-      .join(' ');
+      // 4. Concise Technical Tileability & Direct Overhead View constraints without camera buzzwords
+      const technicalRequirements = 'top-down view, seamless tileable texture, game asset';
+
+      builtPrompt = [
+        subject,
+        styleClause,
+        userClause,
+        technicalRequirements,
+      ]
+        .filter(Boolean)
+        .join(', ');
+    }
 
     // Build dedicated negative prompt parameter for SDXL models (e.g. Pixazo SDXL)
     const baseNegativeTerms = [
