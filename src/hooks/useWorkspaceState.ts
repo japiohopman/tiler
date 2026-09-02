@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   EdgeRegionDepth,
   ExportOptions,
@@ -14,17 +14,24 @@ import {
   WorkspaceState,
 } from '../types';
 import { tileApiClient } from '../services/apiClient';
+import {
+  clearWorkspace,
+  loadWorkspace,
+  saveWorkspace,
+} from '../services/workspacePersistence';
 import { usePreviewState } from './usePreviewState';
 import { useExport } from './useExport';
 import { useWorkspaceAsset } from './useWorkspaceAsset';
 import { useGeneration } from './useGeneration';
 
 export function useWorkspaceState() {
+  const isLoadedRef = useRef(false);
   const [activeView, setActiveView] = useState<'workspace' | 'editor' | 'processor'>('workspace');
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [activeProvider, setActiveProvider] = useState<string>('pixazo');
   const [providerConfigured, setProviderConfigured] = useState<boolean>(true);
   const [notification, setNotification] = useState<{ message: string; type: 'info' | 'success' | 'warn' } | null>(null);
+  const [isPersistent, setIsPersistent] = useState<boolean>(true);
 
   // Generation & Processing Parameters
   const [params, setParams] = useState<GenerationParams>({
@@ -45,7 +52,7 @@ export function useWorkspaceState() {
   }, []);
 
   // Sub-hooks
-  const { previewState, setSelectedSource, setPreviewMode, setShowGrid } = usePreviewState();
+  const { previewState, setPreviewState, setSelectedSource, setPreviewMode, setShowGrid } = usePreviewState();
   const { exportState, handleExport: executeExport } = useExport(handleNotify);
   const {
     assets,
@@ -54,6 +61,8 @@ export function useWorkspaceState() {
     selectAsset,
     deleteAsset,
     addAsset,
+    clearAllAssets,
+    restoreAssets,
     handleApplyEdits,
     handleResetEdits,
     processingState,
@@ -75,7 +84,7 @@ export function useWorkspaceState() {
     handleNotify
   );
 
-  // Initial Backend Health Check & Sample Asset Setup
+  // Initial Local Workspace Persistence Restore & Backend Health Check
   useEffect(() => {
     async function verifyBackendAndInit() {
       try {
@@ -90,11 +99,85 @@ export function useWorkspaceState() {
       } catch (err) {
         setBackendStatus('offline');
       }
-
     }
 
-    verifyBackendAndInit();
-  }, []);
+    async function initWorkspace() {
+      // Attempt to restore local workspace asynchronously (loads image blobs from IndexedDB)
+      const persisted = await loadWorkspace();
+      if (persisted && persisted.workspace) {
+        const { assets: restoredAssets, currentAssetId: restoredId, params: restoredParams, processingOptions: restoredOpts, preview: restoredPreview } = persisted.workspace;
+
+        if (restoredAssets && restoredAssets.length > 0) {
+          restoreAssets(restoredAssets, restoredId);
+        }
+        if (restoredParams) {
+          setParams(restoredParams);
+        }
+        if (restoredOpts) {
+          setProcessingOptions(restoredOpts);
+        }
+        if (restoredPreview) {
+          setPreviewState(restoredPreview);
+        }
+
+        if (restoredAssets && restoredAssets.length > 0) {
+          handleNotify(`Workspace restored from local storage (${restoredAssets.length} asset${restoredAssets.length > 1 ? 's' : ''})`, 'info');
+        }
+      }
+
+      isLoadedRef.current = true;
+      verifyBackendAndInit();
+    }
+
+    initWorkspace();
+  }, [restoreAssets, setPreviewState, handleNotify]);
+
+  // Debounced Auto-Save on Workspace State Transitions
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+
+    const timeoutId = setTimeout(async () => {
+      const result = await saveWorkspace({
+        assets,
+        currentAssetId,
+        params,
+        processingOptions,
+        preview: previewState,
+      });
+
+      if (!result.success && result.isQuotaExceeded) {
+        setIsPersistent(false);
+        handleNotify(
+          'Local storage quota exceeded. Workspace session remains active, but changes cannot be saved locally.',
+          'warn'
+        );
+      } else if (result.success && !result.isPersistent && result.error) {
+        setIsPersistent(false);
+        handleNotify(result.error, 'warn');
+      } else if (result.success && result.isPersistent) {
+        setIsPersistent(true);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [assets, currentAssetId, params, processingOptions, previewState, handleNotify]);
+
+  // Intentional Workspace Clear Action
+  const handleClearWorkspace = useCallback(async () => {
+    await clearWorkspace();
+    clearAllAssets();
+    setParams({
+      material: 'cobblestone',
+      style: 'stylized',
+      customPrompt: TARGET_MATERIALS[0].defaultPrompt,
+      resolution: 512,
+    });
+    setProcessingOptions({
+      algorithm: 'offset-crossfade',
+      blendMarginPercent: 10,
+    });
+    handleNotify('Local workspace cleared.', 'info');
+  }, [clearAllAssets, handleNotify]);
 
   const handleReanalyze = useCallback(
     async (threshold: number, edgeRegion: EdgeRegionDepth) => {
@@ -137,6 +220,7 @@ export function useWorkspaceState() {
     preview: previewState,
     export: exportState,
     notification,
+    isPersistent,
   };
 
   return {
@@ -153,6 +237,7 @@ export function useWorkspaceState() {
       handleTileFromProcessor,
       selectAsset,
       deleteAsset,
+      handleClearWorkspace,
       handleApplyEdits,
       handleResetEdits,
       setSelectedSource,

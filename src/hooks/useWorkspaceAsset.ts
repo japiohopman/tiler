@@ -14,6 +14,7 @@ import {
 } from '../types';
 import { tileApiClient } from '../services/apiClient';
 import { SAMPLE_TEXTURES, SampleTextureDefinition } from '../utils/sampleTextures';
+import { imageStorage } from '../services/imageStorage';
 import {
   addAssetToHistory,
   applyEditsToAsset,
@@ -45,7 +46,7 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
 
   // Delete asset from history
   const deleteAsset = useCallback(
-    (assetIdToDelete: string) => {
+    async (assetIdToDelete: string) => {
       const { updatedAssets, nextCurrentAssetId } = deleteAssetFromHistory(
         assets,
         assetIdToDelete,
@@ -53,6 +54,7 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
       );
       setAssets(updatedAssets);
       setCurrentAssetId(nextCurrentAssetId);
+      await imageStorage.deleteAssetImages(assetIdToDelete);
       onNotify?.('Asset removed from workspace', 'info');
     },
     [assets, currentAssetId, onNotify]
@@ -373,6 +375,16 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
     [addAsset]
   );
 
+  const clearAllAssets = useCallback(() => {
+    setAssets([]);
+    setCurrentAssetId(null);
+  }, []);
+
+  const restoreAssets = useCallback((newAssets: WorkspaceAsset[], newCurrentAssetId: string | null) => {
+    setAssets(newAssets);
+    setCurrentAssetId(newCurrentAssetId);
+  }, []);
+
   return {
     assets,
     setAssets,
@@ -383,6 +395,8 @@ export function useWorkspaceAsset(onNotify?: (message: string, type: 'info' | 's
     deleteAsset,
     addAsset,
     updateAsset,
+    clearAllAssets,
+    restoreAssets,
     handleApplyEdits,
     handleResetEdits,
     processingState,

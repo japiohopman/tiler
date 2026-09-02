@@ -148,17 +148,19 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
 
       if (!response.ok) {
         let errorDetails = '';
+        let activityId = '';
         const rawText = await response.text().catch(() => '');
         if (rawText) {
           try {
             const errJson = JSON.parse(rawText);
+            activityId = errJson.activityId ? ` (Activity ID: ${errJson.activityId})` : '';
             errorDetails = errJson.message || errJson.error || JSON.stringify(errJson);
           } catch {
             errorDetails = rawText;
           }
         }
 
-        const debugInfo = `[URL: POST ${endpoint} | Status: ${response.status} ${response.statusText} | Body: ${this.sanitizeErrorMessage(errorDetails.trim(), apiKey)}]`;
+        const debugInfo = `[URL: POST ${endpoint}${activityId} | PromptLen: ${builtPrompt.length} | NegPromptLen: ${negativePrompt.length} | Res: ${resolution}x${resolution} | Status: ${response.status} ${response.statusText} | Body: ${this.sanitizeErrorMessage(errorDetails.trim(), apiKey)}]`;
 
         if (response.status === 401) {
           throw new ProviderError(

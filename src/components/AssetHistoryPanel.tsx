@@ -16,6 +16,7 @@ import {
   Sparkles,
   Sliders,
   Check,
+  HardDrive,
 } from 'lucide-react';
 import { WorkspaceAsset } from '../types';
 
@@ -24,7 +25,9 @@ interface AssetHistoryPanelProps {
   currentAssetId: string | null;
   onSelectAsset: (id: string) => void;
   onDeleteAsset: (id: string) => void;
+  onClearWorkspace?: () => void;
   activeProvider?: string;
+  isPersistent?: boolean;
 }
 
 export const AssetHistoryPanel: React.FC<AssetHistoryPanelProps> = ({
@@ -32,7 +35,9 @@ export const AssetHistoryPanel: React.FC<AssetHistoryPanelProps> = ({
   currentAssetId,
   onSelectAsset,
   onDeleteAsset,
+  onClearWorkspace,
   activeProvider = 'pixazo',
+  isPersistent = true,
 }) => {
   const currentAsset = assets.find((a) => a.id === currentAssetId) || null;
 
@@ -99,9 +104,40 @@ export const AssetHistoryPanel: React.FC<AssetHistoryPanelProps> = ({
           </h2>
         </div>
         <div className="flex items-center space-x-2">
+          {isPersistent ? (
+            <span className="text-[10px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center space-x-1">
+              <HardDrive className="w-3 h-3 text-emerald-400" />
+              <span>Saved locally</span>
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono bg-amber-950/80 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded flex items-center space-x-1" title="Workspace image blobs stored in session memory fallback only. Changes will not survive reload.">
+              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              <span>Session only — not persisted</span>
+            </span>
+          )}
           <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
             {assets.length} / 20 Assets
           </span>
+          {onClearWorkspace && assets.length > 0 && (
+            <button
+              id="btn-clear-workspace"
+              type="button"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Are you sure you want to clear your local workspace? All saved assets will be deleted and the workspace will be reset.'
+                  )
+                ) {
+                  onClearWorkspace();
+                }
+              }}
+              className="text-[11px] font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 border border-slate-700 hover:border-rose-800/50 px-2.5 py-0.5 rounded transition-all cursor-pointer flex items-center space-x-1"
+              title="Clear all saved assets and reset workspace persistence"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Clear Workspace</span>
+            </button>
+          )}
         </div>
       </div>
 
