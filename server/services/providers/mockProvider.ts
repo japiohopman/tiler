@@ -99,7 +99,7 @@ export class MockImageGenerationProvider implements ImageGenerationProvider {
   }
 
   /**
-   * Creates an SVG texture pattern procedurally based on material, style, and seed
+   * Creates a procedurally seamless SVG texture pattern based on material and seed
    */
   private createSvgPattern(params: {
     resolution: number;
@@ -108,42 +108,81 @@ export class MockImageGenerationProvider implements ImageGenerationProvider {
     style: string;
     seed: number;
   }): string {
-    const { resolution, palette, material, style, seed } = params;
-    const gridCount = 8;
-    const cellSize = resolution / gridCount;
+    const { resolution, palette, material, seed } = params;
+    const materialKey = (material || 'cobblestone').toLowerCase();
 
-    // Pseudo-random helper seeded deterministically
     const randomAt = (x: number, y: number) => {
       const val = Math.sin(seed * 9999 + x * 12.9898 + y * 78.233) * 43758.5453;
       return val - Math.floor(val);
     };
 
-    let cellsContent = '';
-    for (let row = 0; yCondition(row, gridCount); row++) {
-      for (let col = 0; col < gridCount; col++) {
-        const x = col * cellSize;
-        const y = row * cellSize;
-        const r = randomAt(col, row);
+    let patternElements = '';
 
-        const fill = r > 0.6 ? palette.accent : r > 0.3 ? palette.fg : palette.bg;
-        const sizeOffset = (r * cellSize) / 4;
+    if (materialKey === 'cobblestone' || materialKey === 'brick' || materialKey === 'stone') {
+      const cols = 8;
+      const rows = 8;
+      const cellW = resolution / cols;
+      const cellH = resolution / rows;
 
-        cellsContent += `<rect x="${x + sizeOffset / 2}" y="${y + sizeOffset / 2}" width="${cellSize - sizeOffset}" height="${cellSize - sizeOffset}" fill="${fill}" rx="${cellSize / 8}" opacity="0.85" />`;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = c * cellW;
+          const y = r * cellH;
+          // Periodic trig function guarantees 100% seamless color continuity across opposing edges
+          const rand = 0.5 + 0.5 * Math.sin((2 * Math.PI * c) / cols) * Math.cos((2 * Math.PI * r) / rows);
+          const color = rand > 0.6 ? palette.accent : rand > 0.3 ? palette.fg : palette.bg;
+          const rx = 4;
+
+          patternElements += `<rect x="${x + 1}" y="${y + 1}" width="${cellW - 2}" height="${cellH - 2}" fill="${color}" rx="${rx}" stroke="#1e293b" stroke-width="1.5" />`;
+        }
       }
-    }
+    } else if (materialKey === 'wood') {
+      const planks = 8;
+      const plankH = resolution / planks;
 
-    function yCondition(r: number, max: number) {
-      return r < max;
+      for (let p = 0; p < planks; p++) {
+        const y = p * plankH;
+        const rand = 0.5 + 0.5 * Math.sin((2 * Math.PI * p) / planks);
+        const color = rand > 0.5 ? palette.fg : palette.bg;
+
+        patternElements += `<rect x="0" y="${y}" width="${resolution}" height="${plankH}" fill="${color}" stroke="#451a03" stroke-width="1.5" />`;
+        patternElements += `<line x1="0" y1="${y + plankH * 0.5}" x2="${resolution}" y2="${y + plankH * 0.5}" stroke="${palette.accent}" stroke-width="1" opacity="0.4" />`;
+      }
+    } else if (materialKey === 'water') {
+      patternElements += `<rect width="${resolution}" height="${resolution}" fill="${palette.bg}" />`;
+      const ripples = 8;
+      const step = resolution / ripples;
+
+      for (let i = 0; i < ripples; i++) {
+        const y = i * step;
+        patternElements += `<path d="M 0 ${y} Q ${resolution / 4} ${y - 10}, ${resolution / 2} ${y} T ${resolution} ${y}" fill="none" stroke="${palette.accent}" stroke-width="2" opacity="0.6" />`;
+      }
+    } else if (materialKey === 'lava') {
+      patternElements += `<rect width="${resolution}" height="${resolution}" fill="${palette.bg}" />`;
+      const veins = 8;
+      const step = resolution / veins;
+
+      for (let i = 0; i < veins; i++) {
+        const y = i * step;
+        patternElements += `<path d="M 0 ${y} Q ${resolution / 2} ${y + 15}, ${resolution} ${y}" fill="none" stroke="${palette.accent}" stroke-width="3" />`;
+      }
+    } else {
+      // Grass / Sand / Default organic periodic grid
+      const grid = 16;
+      const sz = resolution / grid;
+
+      for (let r = 0; r < grid; r++) {
+        for (let c = 0; c < grid; c++) {
+          const rand = 0.5 + 0.5 * Math.sin((2 * Math.PI * c) / grid) * Math.cos((2 * Math.PI * r) / grid);
+          const fill = rand > 0.6 ? palette.accent : rand > 0.3 ? palette.fg : palette.bg;
+          patternElements += `<rect x="${c * sz}" y="${r * sz}" width="${sz}" height="${sz}" fill="${fill}" opacity="0.9" />`;
+        }
+      }
     }
 
     return `<svg width="${resolution}" height="${resolution}" viewBox="0 0 ${resolution} ${resolution}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${resolution}" height="${resolution}" fill="${palette.bg}" />
-      ${cellsContent}
-      <!-- Overlay text marking as Mock Development Asset -->
-      <rect x="0" y="${resolution - 24}" width="${resolution}" height="24" fill="rgba(15, 23, 42, 0.75)" />
-      <text x="10" y="${resolution - 8}" fill="#f8fafc" font-family="monospace" font-size="11" font-weight="bold">
-        [MOCK] ${material.toUpperCase()} (${style.toUpperCase()}) SEED:${seed}
-      </text>
+      ${patternElements}
     </svg>`;
   }
 

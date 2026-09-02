@@ -127,8 +127,8 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       negative_prompt: negativePrompt,
       height: resolution,
       width: resolution,
-      num_steps: 20,
-      guidance: 5,
+      num_steps: 25,
+      guidance: 7.5,
     };
 
     if (typeof request.seed === 'number') {
