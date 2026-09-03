@@ -1,6 +1,6 @@
 # Tiler Task Board
 
-This is the operational task board. `ROADMAP.md` defines the long-term direction; this file defines what is ready, active, blocked, and next.
+This is the operational task board. `ROADMAP.md` defines the long-term direction and Jules queue; this file defines what is ready, active, blocked, and next.
 
 ## Status legend
 
@@ -27,19 +27,20 @@ This is the operational task board. `ROADMAP.md` defines the long-term direction
 
 | ID | Task | Status | Priority | Notes |
 |---|---|---|---|---|
-| S1 | Pixazo SDXL generation reliability | ACTIVE / INVESTIGATE | P0 | Reproduce HTTP 500 and verify exact provider request contract |
+| S1 | Pixazo SDXL generation reliability | READY / QUEUED | P0 | Canonical Jules queue item; orchestrator dispatches from `ROADMAP.md` |
 | S2 | Runtime error log discipline | READY | P0 | Keep `docs/errors.md` as the chronological error record |
 | S3 | Main-branch verification gate | READY | P0 | Every merged phase gets a real local verification pass |
 
 ## Phase 4.0 — Production UX & hardening
 
-### 4.1 Information Architecture — READY
+### 4.1 Information Architecture — BLOCKED
 
 - Map all current screens/panels/controls.
 - Define the primary production workflow.
 - Separate production UI from developer/QA UI.
 - Define navigation and workspace hierarchy.
 - Remove stale phase/engine terminology.
+- Move into the Jules Ready queue only after Phase 3.7 and stabilization gates allow Phase 4 to begin.
 
 ### 4.2 Production Workspace UX — READY
 
@@ -51,17 +52,7 @@ This is the operational task board. `ROADMAP.md` defines the long-term direction
 
 ### 4.3 Developer / QA Workspace — READY
 
-Move, group, or isolate:
-
-- benchmark controls;
-- test texture presets;
-- prompt inspector;
-- seam diagnostics;
-- provider diagnostics;
-- raw metrics;
-- engine diagnostics.
-
-These tools remain available but should not clutter the normal product path.
+Move, group, or isolate benchmark controls, test texture presets, prompt inspector, seam diagnostics, provider diagnostics, raw metrics, and engine diagnostics.
 
 ### 4.4 Generation UX — READY
 
@@ -167,28 +158,11 @@ The order should generally be:
 
 ## Definition of ready
 
-A task is `READY` when:
-
-- the goal is unambiguous;
-- the starting branch/base is known;
-- dependencies are known;
-- acceptance criteria are measurable;
-- the scope is appropriate for one Jules session/PR;
-- relevant docs and errors are identified.
+A task is `READY` when the goal is unambiguous, the starting branch/base is known, dependencies are known, acceptance criteria are measurable, the scope fits one Jules session/PR, and relevant docs/errors are identified.
 
 ## Definition of done
 
-A task is `DONE` only after:
-
-1. Implementation exists.
-2. Relevant automated tests pass.
-3. Typecheck/lint passes.
-4. Build passes.
-5. Real runtime behavior has been checked where applicable.
-6. PR has been human-reviewed.
-7. PR is merged to `main`.
-8. `docs/errors.md` is updated when errors were found.
-9. Roadmap/task board are updated.
+A task is `DONE` only after implementation, relevant automated tests, typecheck/lint, build, real runtime verification where applicable, human review, merge to `main`, and documentation/error-log updates where required.
 
 ## Jules rule
 
