@@ -2,19 +2,9 @@ name: Jules Orchestrator
 
 on:
   workflow_dispatch:
-    inputs:
-      task_id:
-        description: "Task Board ID to execute (for example 4.1, 4.2, S1)"
-        required: true
-        type: string
-      starting_branch:
-        description: "Branch Jules should start from"
-        required: false
-        default: "main"
-        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: jules-orchestrator
@@ -22,33 +12,49 @@ concurrency:
 
 jobs:
   invoke-jules:
-    name: Invoke Jules for Task Board item
+    name: Reconcile and dispatch Jules queue
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       JULES_API_KEY: ${{ secrets.JULES_API_KEY }}
-      TASK_ID: ${{ inputs.task_id }}
-      STARTING_BRANCH: ${{ inputs.starting_branch }}
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
 
     steps:
-      - name: Checkout planning documents
+      - name: Checkout main
         uses: actions/checkout@v5
         with:
+          ref: main
           fetch-depth: 30
+          persist-credentials: true
 
-      - name: Validate repository configuration
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Validate orchestrator configuration
         shell: bash
         run: |
           set -euo pipefail
           test -n "${JULES_API_KEY:-}" || {
-            echo "JULES_API_KEY is not configured in GitHub Actions secrets."
+            echo "JULES_API_KEY is not configured in GitHub Actions repository secrets."
             exit 1
           }
           test -f ROADMAP.md
           test -f AGEND.md
+          test -f AGENT.MD
+          test -f AGENT_RULES.md
           test -f docs/TASKBOARD.md
           test -f docs/errors.md
-          echo "Planning documents found."
+          test -f scripts/jules-orchestrator.mjs
+          test -f .github/jules-queue-state.json
+          node --check scripts/jules-orchestrator.mjs
+          if ! grep -q '^### Ready$' ROADMAP.md; then
+            echo 'ROADMAP.md does not contain the required ### Ready queue under ## Now.'
+            exit 1
+          fi
+          echo "Orchestrator configuration validated."
 
       - name: Resolve Jules GitHub source
         shell: bash
@@ -75,119 +81,15 @@ jobs:
 
           if [ -z "$SOURCE" ] || [ "$SOURCE" = "null" ]; then
             echo "Jules GitHub source for japiohopman/tiler was not found."
-            echo "Connect the repository to Jules first."
+            echo "Connect japiohopman/tiler to Jules before running the orchestrator."
             exit 1
           fi
 
           echo "JULES_SOURCE=$SOURCE" >> "$GITHUB_ENV"
           echo "Resolved Jules source for japiohopman/tiler."
 
-      - name: Assemble task context
+      - name: Run queue orchestrator
         shell: bash
         run: |
           set -euo pipefail
-
-          cat > jules-prompt.md <<EOF
-You are Jules working on the Tiler repository.
-
-TASK ID: ${TASK_ID}
-STARTING BRANCH: ${STARTING_BRANCH}
-
-You are an implementation agent. The human maintainer owns planning, review, and merge decisions.
-
-## Mandatory task rules
-
-1. Work only on TASK ID ${TASK_ID} unless a directly related blocker must be fixed to complete it.
-2. Start from ${STARTING_BRANCH}.
-3. Read ROADMAP.md, AGEND.md, docs/TASKBOARD.md, and docs/errors.md before changing code.
-4. Respect the current phase gate. Do not invent a new phase.
-5. Do not merge your own PR.
-6. Do not declare the phase complete yourself.
-7. Do not commit secrets or modify environment credentials.
-8. Do not silently remove existing functionality.
-9. If the task discovers an unrelated bug, record it in docs/errors.md only when appropriate and keep the implementation scoped.
-10. Run the relevant tests, typecheck/lint, and build before opening the PR.
-11. Create a focused PR with a clear summary, tests performed, and remaining risks.
-12. Do not rewrite ROADMAP.md or docs/TASKBOARD.md merely to claim your own task is complete. Documentation status is updated after human review and merge.
-
-## Project roadmap
-
-$(cat ROADMAP.md)
-
-## Current agenda
-
-$(cat AGEND.md)
-
-## Task board
-
-$(cat docs/TASKBOARD.md)
-
-## Runtime error log
-
-$(cat docs/errors.md)
-
-## Completion expectation
-
-Implement the selected task, verify it, and leave the repository in a reviewable state. If the task cannot be completed safely, stop and explain the blocker in the PR rather than expanding scope.
-EOF
-
-          echo "Task context assembled for ${TASK_ID}."
-
-      - name: Create Jules session
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          jq -n \
-            --rawfile prompt jules-prompt.md \
-            --arg source "$JULES_SOURCE" \
-            --arg starting_branch "$STARTING_BRANCH" \
-            --arg task_id "$TASK_ID" \
-            '{
-              prompt: $prompt,
-              sourceContext: {
-                source: $source,
-                githubRepoContext: {
-                  startingBranch: $starting_branch
-                }
-              },
-              requirePlanApproval: false,
-              automationMode: "AUTO_CREATE_PR",
-              title: ("Tiler " + $task_id)
-            }' > jules-payload.json
-
-          http_status=$(curl -sS \
-            -o jules-response.json \
-            -w '%{http_code}' \
-            -X POST \
-            -H "Content-Type: application/json" \
-            -H "X-Goog-Api-Key: ${JULES_API_KEY}" \
-            -d @jules-payload.json \
-            https://jules.googleapis.com/v1alpha/sessions)
-
-          if [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
-            echo "Jules session creation failed with HTTP $http_status"
-            cat jules-response.json
-            exit 1
-          fi
-
-          SESSION_ID=$(jq -r '.id // empty' jules-response.json)
-          SESSION_NAME=$(jq -r '.name // empty' jules-response.json)
-
-          if [ -z "$SESSION_ID" ]; then
-            echo "Jules returned no session ID."
-            cat jules-response.json
-            exit 1
-          fi
-
-          echo "Jules session created: ${SESSION_NAME:-$SESSION_ID}"
-          echo "The session was requested with AUTO_CREATE_PR."
-          echo "Human review remains required before merge."
-
-          PR_URLS=$(jq -r '.outputs[]?.pullRequest?.url // empty' jules-response.json)
-          if [ -n "$PR_URLS" ]; then
-            echo "PR output(s):"
-            echo "$PR_URLS"
-          else
-            echo "Jules has accepted the session; the PR will appear when the session produces an output."
-          fi
+          node scripts/jules-orchestrator.mjs
