@@ -48,15 +48,15 @@ async function runPromptAdherenceTests() {
   // 3. Custom prompt does NOT bypass material/tile constraints
   console.log('Test 3: Custom prompt does NOT bypass material profile or tile constraints');
   assert.ok(
-    customStructured.builtPrompt.includes('Top-down orthographic 2D game ground texture of Lava'),
+    customStructured.builtPrompt.includes('surface texture of Lava'),
     'Assembled prompt with customPrompt must still contain material profile identity'
   );
   assert.ok(
-    customStructured.builtPrompt.includes('overhead orthographic view'),
+    customStructured.builtPrompt.includes('orthographic'),
     'Assembled prompt with customPrompt must still enforce top-down orthographic constraint'
   );
   assert.ok(
-    customStructured.builtPrompt.includes('seamless tileable repeating pattern'),
+    customStructured.builtPrompt.toLowerCase().includes('seamless tileable'),
     'Assembled prompt with customPrompt must still enforce tileability constraint'
   );
   console.log('  ✓ Custom prompt non-bypass verified');

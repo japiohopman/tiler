@@ -152,7 +152,7 @@ export class TileProcessor {
 
   /**
    * Blends the center cross seams (x = width/2, y = height/2) in the offset buffer
-   * using smooth cosine falloff weighted with the continuous center data from the source buffer.
+   * using smooth seam boundary interpolation without double-exposing unrelated source pixels.
    */
   private blendCenterSeams(
     source: Buffer,
@@ -170,46 +170,63 @@ export class TileProcessor {
     }
 
     const blended = Buffer.alloc(width * height * 4);
-    const halfW = width / 2;
-    const halfH = height / 2;
+    offset.copy(blended);
+
+    const halfW = Math.floor(width / 2);
+    const halfH = Math.floor(height / 2);
 
     const blendPixelsX = Math.max(2, Math.round(width * (blendPercent / 100)));
     const blendPixelsY = Math.max(2, Math.round(height * (blendPercent / 100)));
 
-    const radiusX = blendPixelsX / 2;
-    const radiusY = blendPixelsY / 2;
+    const radiusX = Math.floor(blendPixelsX / 2);
+    const radiusY = Math.floor(blendPixelsY / 2);
 
+    // 1. Horizontal seam crossfade across x = halfW
     for (let y = 0; y < height; y++) {
-      const dy = Math.abs(y - halfH);
-      const wy = dy < radiusY ? 0.5 * (1 + Math.cos((Math.PI * dy) / radiusY)) : 0;
+      for (let dx = 0; dx < radiusX; dx++) {
+        const xLeft = halfW - 1 - dx;
+        const xRight = halfW + dx;
 
-      for (let x = 0; x < width; x++) {
-        const dx = Math.abs(x - halfW);
-        const wx = dx < radiusX ? 0.5 * (1 + Math.cos((Math.PI * dx) / radiusX)) : 0;
+        if (xLeft < 0 || xRight >= width) continue;
 
-        // Combined blend weight in [0, 1]
-        const weight = wx + wy - wx * wy;
-        const idx = (y * width + x) * 4;
+        const t = (dx + 0.5) / radiusX;
+        const wLeft = 0.5 + 0.5 * Math.sin(Math.PI * (t - 0.5));
+        const wRight = 1 - wLeft;
 
-        if (weight <= 0.0001) {
-          // Pure offset pixel (untouched)
-          blended[idx] = offset[idx];
-          blended[idx + 1] = offset[idx + 1];
-          blended[idx + 2] = offset[idx + 2];
-          blended[idx + 3] = offset[idx + 3];
-        } else if (weight >= 0.9999) {
-          // Pure source center pixel (continuous seam bridge)
-          blended[idx] = source[idx];
-          blended[idx + 1] = source[idx + 1];
-          blended[idx + 2] = source[idx + 2];
-          blended[idx + 3] = source[idx + 3];
-        } else {
-          // Smooth cosine interpolation
-          const invWeight = 1 - weight;
-          blended[idx] = Math.round(offset[idx] * invWeight + source[idx] * weight);
-          blended[idx + 1] = Math.round(offset[idx + 1] * invWeight + source[idx + 1] * weight);
-          blended[idx + 2] = Math.round(offset[idx + 2] * invWeight + source[idx + 2] * weight);
-          blended[idx + 3] = Math.round(offset[idx + 3] * invWeight + source[idx + 3] * weight);
+        const idxLeft = (y * width + xLeft) * 4;
+        const idxRight = (y * width + xRight) * 4;
+
+        for (let c = 0; c < 4; c++) {
+          const valLeft = offset[idxLeft + c];
+          const valRight = offset[idxRight + c];
+
+          blended[idxLeft + c] = Math.round(valLeft * wLeft + valRight * wRight);
+          blended[idxRight + c] = Math.round(valRight * wLeft + valLeft * wRight);
+        }
+      }
+    }
+
+    // 2. Vertical seam crossfade across y = halfH
+    for (let x = 0; x < width; x++) {
+      for (let dy = 0; dy < radiusY; dy++) {
+        const yTop = halfH - 1 - dy;
+        const yBottom = halfH + dy;
+
+        if (yTop < 0 || yBottom >= height) continue;
+
+        const t = (dy + 0.5) / radiusY;
+        const wTop = 0.5 + 0.5 * Math.sin(Math.PI * (t - 0.5));
+        const wBottom = 1 - wTop;
+
+        const idxTop = (yTop * width + x) * 4;
+        const idxBottom = (yBottom * width + x) * 4;
+
+        for (let c = 0; c < 4; c++) {
+          const valTop = blended[idxTop + c];
+          const valBottom = blended[idxBottom + c];
+
+          blended[idxTop + c] = Math.round(valTop * wTop + valBottom * wBottom);
+          blended[idxBottom + c] = Math.round(valBottom * wTop + valTop * wBottom);
         }
       }
     }

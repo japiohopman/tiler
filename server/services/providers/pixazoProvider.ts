@@ -128,7 +128,7 @@ export class PixazoImageGenerationProvider implements ImageGenerationProvider {
       height: resolution,
       width: resolution,
       num_steps: 20,
-      guidance: 5,
+      guidance_scale: 5,
     };
 
     if (typeof request.seed === 'number') {

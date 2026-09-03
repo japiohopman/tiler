@@ -30,8 +30,8 @@ export interface StructuredPromptResult {
 const STYLE_DESCRIPTORS: Record<string, string> = {
   'pixel-art': '16-bit retro pixel art game asset style, clean pixel clusters',
   'hand-painted': 'stylized hand-painted game texture, painterly brushstrokes',
-  'stylized': 'modern stylized 2D game art texture, Blizzard/Riot style',
-  'photorealistic': 'photorealistic 2D ground scan texture, high fidelity',
+  'stylized': 'modern stylized game texture',
+  'photorealistic': 'photorealistic ground scan texture, high fidelity',
   'retro-16bit': 'classic 16-bit top-down JRPG tileset texture',
 };
 
@@ -76,18 +76,18 @@ export class PromptBuilder {
     // Preserve original user modifier intent
     const userModifier = (additionalPrompt || customPrompt || '').trim();
 
-    // 1. Core Subject prioritizing Material Identity
+    // 1. Core Subject prioritizing Material Identity with concise top-down tileable constraints
     const primaryDescriptiveTerms = profile.descriptiveTerms.slice(0, 3).join(', ');
-    const subject = `Top-down orthographic 2D game ground texture of ${profile.canonicalName} (${primaryDescriptiveTerms}).`;
+    const subject = `Seamless tileable top-down orthographic surface texture of ${profile.canonicalName}, ${primaryDescriptiveTerms}.`;
 
-    // 2. Compact Style & Detail rendering
-    const styleClause = `Visual Style: ${styleDescription}. Detail: ${detailDescription}.`;
+    // 2. Natural Style & Detail rendering without key-value label clutter
+    const styleClause = `${styleDescription}, ${detailDescription}.`;
 
     // 3. User Additional Modifier Clause (preserves original user input verbatim)
-    const userClause = userModifier.length > 0 ? `Specific Features: ${userModifier}.` : '';
+    const userClause = userModifier.length > 0 ? `${userModifier}.` : '';
 
-    // 4. Concise Technical Tileability & Direct Overhead View constraints
-    const technicalRequirements = 'Flat direct overhead orthographic view, 100% uniform seamless tileable repeating pattern surface.';
+    // 4. Concise Technical Tileability requirement
+    const technicalRequirements = 'Flat overhead view, repeating tileable pattern.';
 
     const builtPrompt = [
       subject,
