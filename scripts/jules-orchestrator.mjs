@@ -236,12 +236,11 @@ function commitAndPush() {
   execSync(`git add ${STATE_PATH}`);
 
   try {
-    execSync('git diff --cached --quiet')
-      ? null
-      : execSync('git commit -m "chore: advance Jules queue"');
+    execSync('git diff --cached --quiet');
+    console.log('Queue state is already committed.');
+  } catch {
+    execSync('git commit -m "chore: advance Jules queue"');
     execSync('git push origin HEAD:main');
-  } catch (error) {
-    console.log('Nothing to commit, or push raced with another run:', error.message);
   }
 }
 
