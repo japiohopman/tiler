@@ -14,6 +14,31 @@ The target product flow is:
 
 The application should never require the user to understand internal benchmark or provider machinery in order to use the core workflow.
 
+## Now
+
+This section is the **Jules execution queue**. Jules only dispatches the first unchecked task under `### Ready`. Tasks remain in place; completion is recorded by changing the task checkbox from `[ ]` to `[x]` after verification.
+
+### Ready
+
+- [ ] S1 — Pixazo SDXL generation reliability
+  - **Problem:** real-provider generation has historically failed with HTTP 500 responses; the exact provider contract and current implementation must remain verified.
+  - **Goal:** establish a reliable real Pixazo generation path with correct request fields, robust error handling, and regression coverage.
+  - **Acceptance:** live generation succeeds with the current supported payload; provider errors are explicit; automated provider tests pass; no secrets are exposed.
+
+### Blocked
+
+- [ ] 4.1 — Information Architecture
+  - **Problem:** production UI and developer/QA tooling are still too closely mixed.
+  - **Goal:** define the production information architecture before cosmetic Phase 4 work proceeds.
+  - **Acceptance:** production workflow, developer/QA workspace, navigation hierarchy, and control ownership are explicitly defined and reviewed.
+  - **Dependency:** Phase 3.7 final verification and immediate stabilization tasks must be complete.
+
+### Human Review
+
+- [ ] Phase 3.7 final verification
+  - This is a human verification gate, not an autonomous Jules implementation task.
+  - Confirm persistence, restore, deletion cleanup, workspace clearing, and durable/session-only status before advancing Phase 3.
+
 ## Current status
 
 | Phase | Focus | Status |
