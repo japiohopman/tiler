@@ -206,6 +206,7 @@ async function main() {
           source: JULES_SOURCE,
           githubRepoContext: { startingBranch: 'main' },
         },
+        requirePlanApproval: false,
         automationMode: 'AUTO_CREATE_PR',
         title: next.text.slice(0, 80),
       }),
