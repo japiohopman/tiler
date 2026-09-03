@@ -1,40 +1,35 @@
-name: Jules Orchestrator
+name: Jules Queue Orchestrator
 
+# The heartbeat. Runs every 15 minutes, or manually via workflow_dispatch.
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch: {}
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
   group: jules-orchestrator
   cancel-in-progress: false
 
 jobs:
-  invoke-jules:
-    name: Reconcile and dispatch Jules queue
+  orchestrate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      JULES_API_KEY: ${{ secrets.JULES_API_KEY }}
-      GITHUB_TOKEN: ${{ github.token }}
-      GITHUB_REPOSITORY: ${{ github.repository }}
-
     steps:
-      - name: Checkout main
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
-          ref: main
-          fetch-depth: 30
-          persist-credentials: true
+          fetch-depth: 1
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Validate orchestrator configuration
         shell: bash
+        env:
+          JULES_API_KEY: ${{ secrets.JULES_API_KEY }}
         run: |
           set -euo pipefail
           test -n "${JULES_API_KEY:-}" || {
@@ -50,46 +45,13 @@ jobs:
           test -f scripts/jules-orchestrator.mjs
           test -f .github/jules-queue-state.json
           node --check scripts/jules-orchestrator.mjs
-          if ! grep -q '^### Ready$' ROADMAP.md; then
-            echo 'ROADMAP.md does not contain the required ### Ready queue under ## Now.'
-            exit 1
-          fi
+          grep -q '^### Ready$' ROADMAP.md
           echo "Orchestrator configuration validated."
 
-      - name: Resolve Jules GitHub source
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          http_status=$(curl -sS \
-            -o jules-sources.json \
-            -w '%{http_code}' \
-            -H "X-Goog-Api-Key: ${JULES_API_KEY}" \
-            https://jules.googleapis.com/v1alpha/sources)
-
-          if [ "$http_status" -lt 200 ] || [ "$http_status" -ge 300 ]; then
-            echo "Jules sources request failed with HTTP $http_status"
-            cat jules-sources.json
-            exit 1
-          fi
-
-          SOURCE=$(jq -r '
-            .sources[]
-            | select(.githubRepo.owner == "japiohopman" and .githubRepo.repo == "tiler")
-            | .name
-          ' jules-sources.json | head -n 1)
-
-          if [ -z "$SOURCE" ] || [ "$SOURCE" = "null" ]; then
-            echo "Jules GitHub source for japiohopman/tiler was not found."
-            echo "Connect japiohopman/tiler to Jules before running the orchestrator."
-            exit 1
-          fi
-
-          echo "JULES_SOURCE=$SOURCE" >> "$GITHUB_ENV"
-          echo "Resolved Jules source for japiohopman/tiler."
-
-      - name: Run queue orchestrator
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/jules-orchestrator.mjs
+      - name: Run orchestrator
+        env:
+          JULES_API_KEY: ${{ secrets.JULES_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          JULES_SOURCE: sources/github/japiohopman/tiler
+        run: node scripts/jules-orchestrator.mjs
