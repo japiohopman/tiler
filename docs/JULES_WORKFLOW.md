@@ -4,165 +4,117 @@ Tiler uses Jules as an implementation agent, not as the project manager or merge
 
 ## Source of truth
 
-The project has three planning layers:
+The project has three planning layers plus one runtime queue-state file:
 
-1. `ROADMAP.md` — long-term direction and phase gates.
+1. `ROADMAP.md` — long-term direction, phase gates, and the ordered `## Now` / `### Ready` Jules queue.
 2. `AGEND.md` — short-horizon priorities and the current development agenda.
-3. `docs/TASKBOARD.md` — operational tasks and their state.
+3. `docs/TASKBOARD.md` — operational tasks and their human-maintained status.
+4. `.github/jules-queue-state.json` — the single persistent record of the currently active Jules session.
 
-Jules receives these documents as context when invoked by the GitHub Actions workflow.
+Jules receives the planning documents as context when invoked.
 
-## Standard flow
+## Queue flow
 
 ```text
-Task Board
-   ↓
-Human selects task
-   ↓
-GitHub Actions
-   ↓
-Jules Session
-   ↓
-Jules implementation
-   ↓
-Jules PR
-   ↓
-Human review
-   ↓
-Merge to main
-   ↓
-Real local verification
-   ↓
-Error log / docs update
-   ↓
-Next task
+ROADMAP.md Ready queue
+        ↓
+GitHub Actions workflow_dispatch
+        ↓
+Queue orchestrator
+        ↓
+Reconcile .github/jules-queue-state.json
+        ↓
+Dispatch exactly one Jules task
+        ↓
+Jules creates implementation PR
+        ↓
+Human review / merge gate
+        ↓
+Jules checks its own task [x] after verification
+        ↓
+Next orchestrator run advances queue
 ```
 
-## Why the workflow is manual by default
+The queue never requires ROADMAP task lines to be moved between sections. Multiline task descriptions remain attached to their checkbox.
 
-The Jules REST API supports automated sessions and automatic PR creation. The API is currently documented as an alpha release, so we do not allow an unattended schedule to continuously modify the repository.
+## Why the workflow is manual
 
-Instead, the orchestrator is started deliberately through `workflow_dispatch` with a task ID.
+The Jules REST API supports automated sessions and PR creation. It is currently documented as an alpha API, so the orchestrator is deliberately started through `workflow_dispatch` rather than an unattended schedule.
 
-This gives us speed without giving an agent authority to silently advance the project.
+Each run is also protected by a concurrency lock so two queue reconciliations cannot run simultaneously.
 
 ## Jules authentication
 
-Store the Jules API key as a GitHub Actions repository secret:
+The repository secret must be named:
 
 `JULES_API_KEY`
 
-Never commit the key to the repository. Jules requires the key in the `X-Goog-Api-Key` header, and publicly exposed keys can be disabled by Google.
+The workflow passes it to Jules through the `X-Goog-Api-Key` header. Never commit the key or any other credential.
 
 ## Jules source
 
-Jules must have the GitHub repository connected through the Jules web app before the REST API can use it as a source.
+Jules must have `japiohopman/tiler` connected before the workflow can create sessions. The workflow resolves the connected Jules source dynamically instead of hard-coding an opaque source ID.
 
-The workflow resolves the source for:
+## Queue state
 
-`japiohopman/tiler`
+`.github/jules-queue-state.json` stays intentionally small:
 
-rather than hard-coding an opaque source ID.
+```json
+{
+  "activeSession": null
+}
+```
+
+After dispatch:
+
+```json
+{
+  "activeSession": {
+    "name": "sessions/...",
+    "task": "S1 — Pixazo SDXL generation reliability",
+    "startedAt": "2026-09-03T00:00:00.000Z"
+  }
+}
+```
+
+Only this file records the active Jules session. `ROADMAP.md` remains the canonical task order.
+
+## Queue reconciliation
+
+Each run:
+
+1. Reads the first unchecked task under `## Now` / `### Ready`.
+2. Treats an active state entry as stale when it no longer matches that canonical next task.
+3. Waits when Jules has a session but no PR yet.
+4. Waits for human review when the PR exists but is not merged.
+5. Stops for manual inspection when the PR is merged but Jules did not check its task checkbox.
+6. Clears the active state only when the PR is merged and the task is checked `[x]`.
+7. Dispatches the next task only after the previous task has cleared that gate.
+
+This makes the state file recoverable if a workflow run is interrupted or state becomes stale.
+
+## Task completion
+
+Jules must change only its own dispatched task checkbox from `[ ]` to `[x]`, in place, and only after personally verifying the work. Problem/Goal/Acceptance sub-bullets must remain attached to the task.
+
+Jules never merges its own PR and never decides that a phase is complete.
 
 ## Starting branch
 
-Normal feature work starts from:
+Normal queue dispatches always start from current `main`. The orchestrator does not accept an arbitrary branch input, preventing accidental dispatch from stale feature branches.
 
-`main`
+## Error handling
 
-A different starting branch may be supplied manually when deliberately continuing a recovery/fix workflow.
-
-The selected starting branch must be explicitly stated in the task context.
-
-## Task scope rules
-
-Every Jules invocation must identify:
-
-- task ID;
-- objective;
-- current phase;
-- starting branch;
-- acceptance criteria;
-- tests to run;
-- relevant error documentation;
-- constraints.
-
-Jules should not invent a new phase or expand the task into unrelated refactoring.
-
-## PR rules
-
-Jules may create the implementation branch and PR.
-
-Jules must not:
-
-- merge its own PR;
-- rewrite the roadmap to declare its own work complete;
-- silently close unrelated tasks;
-- remove known errors from `docs/errors.md`;
-- commit secrets;
-- replace real provider verification with a mock when real verification is required.
-
-Human review remains mandatory.
-
-## Error handling workflow
-
-When a real runtime test finds an error:
-
-1. Add an entry to `docs/errors.md`.
-2. Reproduce it.
-3. Identify the affected task.
-4. Decide whether it blocks the current phase.
-5. Give Jules a focused fix/investigation task.
-6. Review the resulting PR.
-7. Re-test on `main` after merge.
-
-A provider error must not automatically be treated as an application bug, and an application bug must not automatically be treated as a provider outage.
+Reproducible runtime errors belong in `docs/errors.md` without credentials. Historical incidents remain in the log after they are fixed.
 
 ## Phase gate
 
-A task may be merged when its implementation and tests are satisfactory.
+The project gate remains:
 
-A phase may be marked `DONE` only after:
+`Implementation → Tests → PR review → Merge → Real main test → Docs update → Next phase`
 
-- all required tasks are complete;
-- known blockers are resolved or explicitly accepted;
-- real runtime verification is complete where applicable;
-- documentation is updated.
-
-## Recommended Jules prompt structure
-
-```text
-Task: <task id>
-Phase: <phase>
-Starting branch: <branch>
-
-Context:
-<short explanation>
-
-Goal:
-<one clear outcome>
-
-Requirements:
-- ...
-
-Constraints:
-- stay within task scope
-- preserve existing behavior unless explicitly changing it
-- do not merge
-
-Tests:
-- ...
-
-Definition of Done:
-- ...
-```
-
-The orchestrator adds the current roadmap, agenda, task board, and error log automatically so Jules has project context without requiring a huge hand-written prompt every time.
+A phase does not advance merely because Jules produced a PR.
 
 ## Jules API reference
 
-The current official Jules REST API documentation is:
-
 `https://jules.google/docs/api/reference`
-
-The API currently uses `v1alpha`, supports GitHub sources and sessions, and can create a PR automatically using `automationMode: AUTO_CREATE_PR`.
