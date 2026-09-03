@@ -1,6 +1,6 @@
 # Tiler Task Board
 
-This is the operational task board. `ROADMAP.md` defines the long-term direction; this file defines what is ready, active, blocked, and next.
+This is the operational task board. `ROADMAP.md` defines the long-term direction and Jules queue; this file defines what is ready, active, blocked, and next.
 
 ## Status legend
 
@@ -27,19 +27,20 @@ This is the operational task board. `ROADMAP.md` defines the long-term direction
 
 | ID | Task | Status | Priority | Notes |
 |---|---|---|---|---|
-| S1 | Pixazo SDXL generation reliability | ACTIVE / INVESTIGATE | P0 | Reproduce HTTP 500 and verify exact provider request contract |
+| S1 | Pixazo SDXL generation reliability | READY / QUEUED | P0 | Canonical Jules queue item; queue orchestrator dispatches it from `ROADMAP.md` |
 | S2 | Runtime error log discipline | READY | P0 | Keep `docs/errors.md` as the chronological error record |
 | S3 | Main-branch verification gate | READY | P0 | Every merged phase gets a real local verification pass |
 
 ## Phase 4.0 — Production UX & hardening
 
-### 4.1 Information Architecture — READY
+### 4.1 Information Architecture — BLOCKED
 
 - Map all current screens/panels/controls.
 - Define the primary production workflow.
 - Separate production UI from developer/QA UI.
 - Define navigation and workspace hierarchy.
 - Remove stale phase/engine terminology.
+- Move into `ROADMAP.md` `### Ready` only after Phase 3.7 and stabilization gates allow Phase 4 to begin.
 
 ### 4.2 Production Workspace UX — READY
 
